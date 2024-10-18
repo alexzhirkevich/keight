@@ -4,12 +4,12 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.argForNameOrIndex
-import io.github.alexzhirkevich.keight.ecmascript.ESAny
-import io.github.alexzhirkevich.keight.ecmascript.ESObject
-import io.github.alexzhirkevich.keight.ecmascript.ESObjectBase
-import io.github.alexzhirkevich.keight.ecmascript.SyntaxError
-import io.github.alexzhirkevich.keight.ecmascript.TypeError
-import io.github.alexzhirkevich.keight.ecmascript.unresolvedReference
+import io.github.alexzhirkevich.keight.es.ESAny
+import io.github.alexzhirkevich.keight.es.ESObject
+import io.github.alexzhirkevich.keight.es.ESObjectBase
+import io.github.alexzhirkevich.keight.es.SyntaxError
+import io.github.alexzhirkevich.keight.es.TypeError
+import io.github.alexzhirkevich.keight.es.unresolvedReference
 import io.github.alexzhirkevich.keight.invoke
 
 public class FunctionParam(

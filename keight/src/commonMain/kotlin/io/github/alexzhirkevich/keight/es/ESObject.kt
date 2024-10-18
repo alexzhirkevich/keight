@@ -1,11 +1,11 @@
-package io.github.alexzhirkevich.keight.ecmascript
+package io.github.alexzhirkevich.keight.es
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.common.Callable
 import io.github.alexzhirkevich.keight.common.Function
 import io.github.alexzhirkevich.keight.common.FunctionParam
-import io.github.alexzhirkevich.keight.javascript.JsWrapper
+import io.github.alexzhirkevich.keight.js.JsWrapper
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.properties.ReadOnlyProperty
 
@@ -57,8 +57,10 @@ private class ObjectMap(
 
 internal open class ESObjectBase(
     open val name : String,
-    private val map : MutableMap<Any?, Any?> = ObjectMap()
+    map : MutableMap<Any?, Any?> = mutableMapOf()
 ) : ESObject {
+
+    private val map = ObjectMap(map)
 
     override val keys: Set<String>
         get() = map.keys.map { it.toString() }.toSet()
@@ -131,6 +133,9 @@ private class ObjectScopeImpl(
     }
 }
 
+public fun Object(name: String, contents : Map<Any?, Any?>) : ESObject {
+    return ESObjectBase(name, contents.toMutableMap())
+}
 
 public fun  Object(name: String, builder : ObjectScope.() -> Unit) : ESObject {
     return ObjectScopeImpl(name).also(builder).o

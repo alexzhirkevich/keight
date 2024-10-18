@@ -1,8 +1,8 @@
-import io.github.alexzhirkevich.keight.ecmascript.ESClass
-import io.github.alexzhirkevich.keight.ecmascript.ESObject
-import io.github.alexzhirkevich.keight.ecmascript.ReferenceError
-import io.github.alexzhirkevich.keight.ecmascript.SyntaxError
-import io.github.alexzhirkevich.keight.javascript.JSRuntime
+import io.github.alexzhirkevich.keight.es.ESClass
+import io.github.alexzhirkevich.keight.es.ESObject
+import io.github.alexzhirkevich.keight.es.ReferenceError
+import io.github.alexzhirkevich.keight.es.SyntaxError
+import io.github.alexzhirkevich.keight.js.JSRuntime
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFailsWith

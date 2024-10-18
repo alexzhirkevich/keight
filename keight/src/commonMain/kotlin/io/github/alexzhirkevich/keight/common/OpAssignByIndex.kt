@@ -3,9 +3,9 @@ package io.github.alexzhirkevich.keight.common
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.ecmascript.ESObject
+import io.github.alexzhirkevich.keight.es.ESObject
 import io.github.alexzhirkevich.keight.invoke
-import io.github.alexzhirkevich.keight.javascript.JsArray
+import io.github.alexzhirkevich.keight.js.JsArray
 
 internal class OpAssignByIndex(
     private val variableName : String,

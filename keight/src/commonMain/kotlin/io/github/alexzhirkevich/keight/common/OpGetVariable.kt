@@ -3,8 +3,8 @@ package io.github.alexzhirkevich.keight.common
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.ecmascript.ESAny
-import io.github.alexzhirkevich.keight.ecmascript.unresolvedReference
+import io.github.alexzhirkevich.keight.es.ESAny
+import io.github.alexzhirkevich.keight.es.unresolvedReference
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 

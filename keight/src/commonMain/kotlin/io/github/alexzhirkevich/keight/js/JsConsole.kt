@@ -1,8 +1,8 @@
-package io.github.alexzhirkevich.keight.javascript
+package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.common.FunctionParam
-import io.github.alexzhirkevich.keight.ecmascript.Object
+import io.github.alexzhirkevich.keight.es.Object
 
 internal fun JsConsole() = Object("console") {
     "log".func(FunctionParam("data", isVararg = true)) { out(it, io::out) }

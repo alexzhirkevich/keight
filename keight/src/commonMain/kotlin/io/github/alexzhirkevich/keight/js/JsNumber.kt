@@ -1,14 +1,14 @@
-package io.github.alexzhirkevich.keight.javascript
+package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.argAtOrNull
 import io.github.alexzhirkevich.keight.common.Function
-import io.github.alexzhirkevich.keight.ecmascript.ESAny
-import io.github.alexzhirkevich.keight.ecmascript.ESClass
-import io.github.alexzhirkevich.keight.ecmascript.ESObjectBase
-import io.github.alexzhirkevich.keight.ecmascript.checkArgsNotNull
-import io.github.alexzhirkevich.keight.ecmascript.unresolvedReference
+import io.github.alexzhirkevich.keight.es.ESAny
+import io.github.alexzhirkevich.keight.es.ESClass
+import io.github.alexzhirkevich.keight.es.ESObjectBase
+import io.github.alexzhirkevich.keight.es.checkArgsNotNull
+import io.github.alexzhirkevich.keight.es.unresolvedReference
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 import kotlin.math.pow

@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.javascript
+package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.LangContext
 import io.github.alexzhirkevich.keight.common.fastMap

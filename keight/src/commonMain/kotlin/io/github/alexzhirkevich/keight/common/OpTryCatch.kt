@@ -2,7 +2,7 @@ package io.github.alexzhirkevich.keight.common
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.ecmascript.SyntaxError
+import io.github.alexzhirkevich.keight.es.SyntaxError
 import io.github.alexzhirkevich.keight.invoke
 
 internal class ThrowableValue(val value : Any?) : Throwable(message = value?.toString()) {

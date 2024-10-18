@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.ecmascript
+package io.github.alexzhirkevich.keight.es
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime

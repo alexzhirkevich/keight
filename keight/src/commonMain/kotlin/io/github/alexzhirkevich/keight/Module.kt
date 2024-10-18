@@ -1,7 +1,13 @@
 package io.github.alexzhirkevich.keight
 
+/**
+ * Pluggable module for script runtimes
+ * */
 public interface Module {
-    public fun import(runtime: ScriptRuntime)
+
+    public fun importInto(runtime: ScriptRuntime)
+
+    public companion object
 }
 
 

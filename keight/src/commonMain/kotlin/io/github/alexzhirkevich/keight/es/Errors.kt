@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.ecmascript
+package io.github.alexzhirkevich.keight.es
 
 public open class ESError(message : String?, cause : Throwable?) : Exception(message, cause), ESAny {
     override fun get(variable: Any?): Any? {

@@ -1,6 +1,6 @@
-import io.github.alexzhirkevich.keight.ecmascript.ReferenceError
-import io.github.alexzhirkevich.keight.ecmascript.SyntaxError
-import io.github.alexzhirkevich.keight.ecmascript.TypeError
+import io.github.alexzhirkevich.keight.es.ReferenceError
+import io.github.alexzhirkevich.keight.es.SyntaxError
+import io.github.alexzhirkevich.keight.es.TypeError
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 

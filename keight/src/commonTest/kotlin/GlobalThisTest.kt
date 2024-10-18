@@ -1,4 +1,4 @@
-import io.github.alexzhirkevich.keight.javascript.JSRuntime
+import io.github.alexzhirkevich.keight.js.JSRuntime
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

@@ -1,18 +1,15 @@
-package io.github.alexzhirkevich.keight.javascript
+package io.github.alexzhirkevich.keight.es
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.common.FunctionParam
 import io.github.alexzhirkevich.keight.common.fastMap
 import io.github.alexzhirkevich.keight.common.fastSumBy
-import io.github.alexzhirkevich.keight.ecmascript.ESObject
-import io.github.alexzhirkevich.keight.ecmascript.Object
-import io.github.alexzhirkevich.keight.ecmascript.checkArgs
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.math.*
 import kotlin.random.Random
 
-internal fun JsMath() : ESObject {
+internal fun ESMath() : ESObject {
 
     return Object("Math") {
 

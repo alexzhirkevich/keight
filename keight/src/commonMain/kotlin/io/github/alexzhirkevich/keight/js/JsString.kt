@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.javascript
+package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
@@ -6,9 +6,9 @@ import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.argAtOrNull
 import io.github.alexzhirkevich.keight.common.checkNotEmpty
 import io.github.alexzhirkevich.keight.common.valueAtIndexOrUnit
-import io.github.alexzhirkevich.keight.ecmascript.ESAny
-import io.github.alexzhirkevich.keight.ecmascript.checkArgs
-import io.github.alexzhirkevich.keight.ecmascript.checkArgsNotNull
+import io.github.alexzhirkevich.keight.es.ESAny
+import io.github.alexzhirkevich.keight.es.checkArgs
+import io.github.alexzhirkevich.keight.es.checkArgsNotNull
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 

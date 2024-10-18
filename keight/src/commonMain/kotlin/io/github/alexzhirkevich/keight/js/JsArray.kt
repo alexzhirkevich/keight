@@ -1,17 +1,17 @@
-package io.github.alexzhirkevich.keight.javascript
+package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.common.Callable
 import io.github.alexzhirkevich.keight.common.OpConstant
-import io.github.alexzhirkevich.keight.ecmascript.TypeError
+import io.github.alexzhirkevich.keight.es.TypeError
 import io.github.alexzhirkevich.keight.common.checkNotEmpty
 import io.github.alexzhirkevich.keight.common.fastFilter
 import io.github.alexzhirkevich.keight.common.fastMap
 import io.github.alexzhirkevich.keight.common.valueAtIndexOrUnit
-import io.github.alexzhirkevich.keight.ecmascript.ESAny
-import io.github.alexzhirkevich.keight.ecmascript.checkArgs
+import io.github.alexzhirkevich.keight.es.ESAny
+import io.github.alexzhirkevich.keight.es.checkArgs
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 
@@ -99,6 +99,13 @@ internal value class JsArray(
             "some" -> {
                 op(context, arguments, function) { callable ->
                     value.any {
+                        !context.isFalse(callable.invoke(listOf(OpConstant(it)), context))
+                    }
+                }
+            }
+            "very" -> {
+                op(context, arguments, function) { callable ->
+                    value.all {
                         !context.isFalse(callable.invoke(listOf(OpConstant(it)), context))
                     }
                 }

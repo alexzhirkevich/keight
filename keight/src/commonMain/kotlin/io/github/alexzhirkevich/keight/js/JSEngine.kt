@@ -1,13 +1,15 @@
-package io.github.alexzhirkevich.keight.javascript
+package io.github.alexzhirkevich.keight.js
 
+import io.github.alexzhirkevich.keight.Module
 import io.github.alexzhirkevich.keight.ScriptEngine
-import io.github.alexzhirkevich.keight.ecmascript.ESInterpreter
+import io.github.alexzhirkevich.keight.es.ESInterpreter
 import io.github.alexzhirkevich.keight.evaluate
 
 public fun JSEngine(
     runtime: JSRuntime = JSRuntime(),
-    interpreter: ESInterpreter = ESInterpreter(JSLangContext)
-) : ScriptEngine = ScriptEngine(runtime, interpreter)
+    interpreter: ESInterpreter = ESInterpreter(JSLangContext),
+    vararg modules : Module
+) : ScriptEngine = ScriptEngine(runtime, interpreter, *modules)
 
 /**
  * Simplest way to evaluate some JavaScript code.

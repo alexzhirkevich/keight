@@ -19,7 +19,24 @@ public fun ScriptEngine.invoke(script: Script) : Any? {
 
 public fun ScriptEngine(
     runtime: ScriptRuntime,
-    interpreter: ScriptInterpreter
+    interpreter: ScriptInterpreter,
+    vararg modules: Module
 ): ScriptEngine = object : ScriptEngine, ScriptInterpreter by interpreter {
+
     override val runtime: ScriptRuntime get() = runtime
+
+    init {
+        importModules()
+    }
+
+    override fun reset() {
+        super.reset()
+        importModules()
+    }
+
+    private fun importModules(){
+        modules.forEach {
+            it.importInto(runtime)
+        }
+    }
 }

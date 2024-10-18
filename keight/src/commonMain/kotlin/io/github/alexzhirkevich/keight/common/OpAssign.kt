@@ -3,9 +3,9 @@ package io.github.alexzhirkevich.keight.common
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.ecmascript.ESAny
-import io.github.alexzhirkevich.keight.ecmascript.ESObject
-import io.github.alexzhirkevich.keight.ecmascript.TypeError
+import io.github.alexzhirkevich.keight.es.ESAny
+import io.github.alexzhirkevich.keight.es.ESObject
+import io.github.alexzhirkevich.keight.es.TypeError
 import io.github.alexzhirkevich.keight.invoke
 
 internal class OpAssign(

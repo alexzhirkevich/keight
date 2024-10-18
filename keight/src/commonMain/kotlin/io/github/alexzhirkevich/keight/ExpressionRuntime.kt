@@ -1,6 +1,6 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.javascript.JSRuntime
+import io.github.alexzhirkevich.keight.js.JSRuntime
 import kotlin.math.min
 
 public class ExpressionRuntime : JSRuntime() {

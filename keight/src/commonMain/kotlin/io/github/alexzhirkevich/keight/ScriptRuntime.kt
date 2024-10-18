@@ -1,7 +1,7 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.ecmascript.SyntaxError
-import io.github.alexzhirkevich.keight.ecmascript.TypeError
+import io.github.alexzhirkevich.keight.es.SyntaxError
+import io.github.alexzhirkevich.keight.es.TypeError
 
 
 public enum class VariableType {

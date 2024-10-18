@@ -3,7 +3,7 @@ package io.github.alexzhirkevich.keight.common
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.invoke
-import io.github.alexzhirkevich.keight.javascript.JsWrapper
+import io.github.alexzhirkevich.keight.js.JsWrapper
 
 internal fun  OpEquals(
     a : Expression,

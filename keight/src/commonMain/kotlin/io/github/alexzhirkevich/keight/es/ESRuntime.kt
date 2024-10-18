@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.ecmascript
+package io.github.alexzhirkevich.keight.es
 
 import io.github.alexzhirkevich.keight.DefaultRuntime
 import io.github.alexzhirkevich.keight.DefaultScriptIO
@@ -29,6 +29,7 @@ public abstract class ESRuntime(
     }
 
     private fun init() {
+        set("Math", ESMath(), VariableType.Const)
         set("Object", ESObjectAccessor(), VariableType.Const)
         set("Number", ESNumber(), VariableType.Const)
         set("globalThis", this, VariableType.Const)

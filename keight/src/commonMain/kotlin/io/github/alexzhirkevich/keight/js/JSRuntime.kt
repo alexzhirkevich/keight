@@ -1,13 +1,13 @@
-package io.github.alexzhirkevich.keight.javascript
+package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.DefaultScriptIO
 import io.github.alexzhirkevich.keight.LangContext
 import io.github.alexzhirkevich.keight.ScriptIO
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.ecmascript.ESNumber
-import io.github.alexzhirkevich.keight.ecmascript.ESObject
-import io.github.alexzhirkevich.keight.ecmascript.ESRuntime
-import io.github.alexzhirkevich.keight.ecmascript.init
+import io.github.alexzhirkevich.keight.es.ESNumber
+import io.github.alexzhirkevich.keight.es.ESObject
+import io.github.alexzhirkevich.keight.es.ESRuntime
+import io.github.alexzhirkevich.keight.es.init
 
 
 public open class JSRuntime(
@@ -24,7 +24,6 @@ public open class JSRuntime(
     }
 
     private fun recreate() {
-        set("Math", JsMath(), VariableType.Const)
         set("console", JsConsole(), VariableType.Const)
 
         init {

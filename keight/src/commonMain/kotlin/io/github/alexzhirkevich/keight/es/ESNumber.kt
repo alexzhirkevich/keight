@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.ecmascript
+package io.github.alexzhirkevich.keight.es
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
@@ -7,8 +7,8 @@ import io.github.alexzhirkevich.keight.common.FunctionParam
 import io.github.alexzhirkevich.keight.common.OpConstant
 import io.github.alexzhirkevich.keight.common.defaults
 import io.github.alexzhirkevich.keight.invoke
-import io.github.alexzhirkevich.keight.javascript.JsNumber
-import io.github.alexzhirkevich.keight.javascript.JsNumberClass
+import io.github.alexzhirkevich.keight.js.JsNumber
+import io.github.alexzhirkevich.keight.js.JsNumberClass
 
 internal class ESNumber : ESFunctionBase("Number") {
 

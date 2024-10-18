@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.ecmascript
+package io.github.alexzhirkevich.keight.es
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.InterpretationContext
@@ -93,7 +93,7 @@ internal class ESInterpreterImpl(
         ch = if (--pos > 0 && pos < expr.length) expr[pos] else ' '
     }
 
-    private fun Char.skip(): Boolean = this == ' ' || this == '\n'
+    private fun Char.skip(ignoreNewLines: Boolean = true): Boolean = this == ' ' || this == '\n' && ignoreNewLines
 
     private fun eat(charToEat: Char): Boolean {
         while (ch.skip() && pos < expr.length)
@@ -121,13 +121,13 @@ internal class ESInterpreterImpl(
         return false
     }
 
-    private fun nextCharIs(condition: (Char) -> Boolean): Boolean {
+    private fun nextCharIs(ignoreNewLines : Boolean = true, condition: (Char) -> Boolean): Boolean {
         var i = pos
 
         while (i < expr.length) {
             if (condition(expr[i]))
                 return true
-            if (expr[i].skip())
+            if (expr[i].skip(ignoreNewLines = ignoreNewLines))
                 i++
             else return false
         }
@@ -650,7 +650,7 @@ internal class ESInterpreterImpl(
     ): Expression {
         val parsedOp = when {
 
-            isExpressionStart && nextCharIs('{'::equals) ->
+            isExpressionStart && nextCharIs(condition = '{'::equals) ->
                 parseBlock(blockContext = emptyList())
 
             !isExpressionStart && eat('{') -> {
@@ -796,15 +796,21 @@ internal class ESInterpreterImpl(
                 OpConstant(langContext.fromKotlin(num))
             }
 
-            nextCharIs('\''::equals) || nextCharIs('"'::equals) -> {
+            nextCharIs(condition = '\''::equals)
+                    || nextCharIs(condition = '"'::equals)
+                    || nextCharIs(condition = '`'::equals) -> {
                 if (EXPR_DEBUG_PRINT_ENABLED) {
                     print("making const string... ")
                 }
                 val c = ch
                 val startPos = pos
+                val isTemplate = c == '`'
                 do {
                     nextChar()
-                } while (!nextCharIs(c::equals) && pos < expr.length)
+                } while (pos < expr.length
+                    && !nextCharIs(condition = c::equals)
+                    && (isTemplate || !nextCharIs(condition = '\n'::equals)))
+
                 syntaxCheck(eat(c)){
                     "Invalid string at pos $startPos"
                 }
@@ -885,7 +891,7 @@ internal class ESInterpreterImpl(
             }
             // begin condition || property || index
             eat('.')
-                    || nextCharIs('['::equals) ->
+                    || nextCharIs(condition = '['::equals) ->
                 parseFactorOp(this, blockContext) // continue with receiver
 
             eatSequence("instanceof") -> {
@@ -910,7 +916,7 @@ internal class ESInterpreterImpl(
 
     private fun parseFunctionArgs(name: String?): List<Expression>? {
 
-        if (!nextCharIs('('::equals)) {
+        if (!nextCharIs(condition = '('::equals)) {
             return null
         }
 
@@ -1444,7 +1450,7 @@ internal class ESInterpreterImpl(
             "Missing function args"
         }
 
-        syntaxCheck(nextCharIs('{'::equals)) {
+        syntaxCheck(nextCharIs(condition = '{'::equals)) {
             "Missing function body at $pos"
         }
 
@@ -1468,8 +1474,11 @@ internal class ESInterpreterImpl(
 
                 val start = pos
                 val name = parseTermOp(globalContext, emptyList())
-                syntaxCheck(name is OpGetVariable) {
-                    "Invalid syntax at $start"
+
+                val variableName = when(name){
+                    is OpGetVariable -> name.name
+                    is OpConstant -> name.value.toString()
+                    else -> throw SyntaxError("Invalid syntax at pos $start")
                 }
 
                 syntaxCheck(eat(':')) {
@@ -1477,10 +1486,10 @@ internal class ESInterpreterImpl(
                 }
 
                 if (EXPR_DEBUG_PRINT_ENABLED) {
-                    println("making object property ${name.name}")
+                    println("making object property $variableName")
                 }
 
-                this[name.name] = parseExpressionOp(globalContext, null, emptyList())
+                this[variableName] = parseExpressionOp(globalContext, null, emptyList())
                 eat(',')
             }
         } + extraFields
