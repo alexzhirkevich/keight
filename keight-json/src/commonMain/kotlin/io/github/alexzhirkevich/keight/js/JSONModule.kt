@@ -12,6 +12,6 @@ public val Module.Companion.JSON : Module get() = JSONModule
 private object JSONModule : Module  {
 
     override fun importInto(runtime: ScriptRuntime) {
-        runtime.set("JSON", JsJSON(), VariableType.Const)
+        runtime.set("JSON", JsJSON(), VariableType.Global)
     }
 }

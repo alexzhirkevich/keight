@@ -9,7 +9,7 @@ import io.github.alexzhirkevich.keight.VariableType
 import kotlin.jvm.JvmInline
 
 public abstract class ESRuntime(
-    override val io: ScriptIO = DefaultScriptIO,
+    override var io: ScriptIO = DefaultScriptIO,
 ) : DefaultRuntime(), ESObject {
 
     override val comparator: Comparator<Any?> by lazy {
@@ -29,10 +29,10 @@ public abstract class ESRuntime(
     }
 
     private fun init() {
-        set("Math", ESMath(), VariableType.Const)
-        set("Object", ESObjectAccessor(), VariableType.Const)
-        set("Number", ESNumber(), VariableType.Const)
-        set("globalThis", this, VariableType.Const)
+        set("Math", ESMath(), VariableType.Global)
+        set("Object", ESObjectAccessor(), VariableType.Global)
+        set("Number", ESNumber(), VariableType.Global)
+        set("globalThis", this, VariableType.Global)
         set("this", this, VariableType.Const)
         set("Infinity", Double.POSITIVE_INFINITY, VariableType.Const)
         set("NaN", Double.NaN, VariableType.Const)

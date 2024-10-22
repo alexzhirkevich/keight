@@ -2,6 +2,7 @@ package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.es.SyntaxError
 import io.github.alexzhirkevich.keight.es.TypeError
+import kotlin.jvm.JvmInline
 
 
 public enum class VariableType {
@@ -10,9 +11,13 @@ public enum class VariableType {
 
 public interface ScriptRuntime : LangContext {
 
-    public val io : ScriptIO
+    public var io : ScriptIO
 
     public val comparator : Comparator<Any?>
+
+    public fun isEmpty() : Boolean
+
+    public fun remove(variable: Any?) : Any?
 
     public operator fun contains(variable: Any?): Boolean
 
@@ -32,8 +37,7 @@ private class ScopedRuntime(
     private val parent : ScriptRuntime
 ) : DefaultRuntime(), LangContext by parent {
 
-    override val io: ScriptIO
-        get() = parent.io
+    override var io: ScriptIO by parent::io
 
     override val comparator: Comparator<Any?>
         get() = parent.comparator
@@ -57,6 +61,10 @@ private class ScopedRuntime(
             else -> parent.set(variable, value, type)
         }
     }
+
+    override fun isEmpty(): Boolean {
+        return variables.isEmpty() && parent.isEmpty()
+    }
 }
 
 public abstract class DefaultRuntime : ScriptRuntime {
@@ -69,6 +77,10 @@ public abstract class DefaultRuntime : ScriptRuntime {
 
     override fun contains(variable: Any?): Boolean {
         return variable in variables
+    }
+
+    override fun remove(variable: Any?) : Any?  {
+        return variables.remove(variable)
     }
 
     override fun set(variable: Any?, value: Any?, type: VariableType?) {
@@ -98,7 +110,13 @@ public abstract class DefaultRuntime : ScriptRuntime {
         return block(child)
     }
 
+    override fun isEmpty(): Boolean {
+        return variables.isEmpty()
+    }
+
     override fun reset(){
         variables.clear()
     }
 }
+
+

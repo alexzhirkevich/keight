@@ -26,7 +26,7 @@ class JsConsoleTest {
         err.assertEqualsTo(null)
         out = null
 
-        "console.err('123')".eval(io).assertEqualsTo(Unit)
+        "console.error('123')".eval(io).assertEqualsTo(Unit)
 
         err.assertEqualsTo("123")
         out.assertEqualsTo(null)
@@ -63,7 +63,7 @@ class JsConsoleTest {
         err.assertEqualsTo(null)
         out = null
 
-        "console.err(123, 456, '789')".eval(io).assertEqualsTo(Unit)
+        "console.error(123, 456, '789')".eval(io).assertEqualsTo(Unit)
 
         err.assertEqualsTo(listOf(123L, 456L, "789"))
         out.assertEqualsTo(null)

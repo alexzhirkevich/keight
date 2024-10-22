@@ -9,14 +9,14 @@ public interface ScriptIO {
 
 public object DefaultScriptIO : ScriptIO {
     override fun out(message: Any?) {
-        println(message)
+        print(message)
     }
 
     override fun err(message: Any?) {
         if (message is Throwable){
             message.printStackTrace()
         } else {
-            println(message)
+            print(message)
         }
     }
 }

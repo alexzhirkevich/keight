@@ -6,7 +6,7 @@ import io.github.alexzhirkevich.keight.es.Object
 
 internal fun JsConsole() = Object("console") {
     "log".func(FunctionParam("data", isVararg = true)) { out(it, io::out) }
-    "err".func(FunctionParam("data", isVararg = true)) { out(it, io::err) }
+    "error".func(FunctionParam("data", isVararg = true)) { out(it, io::err) }
 }
 
 private fun ScriptRuntime.out(message : List<Any?>, out : (Any?) -> Unit){

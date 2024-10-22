@@ -24,7 +24,7 @@ public open class JSRuntime(
     }
 
     private fun recreate() {
-        set("console", JsConsole(), VariableType.Const)
+        set("console", JsConsole(), VariableType.Global)
 
         init {
             val number = get("Number") as ESNumber

@@ -18,7 +18,7 @@ public interface ESAny {
     ): Any? {
         return when {
             function == "toString" && arguments.isEmpty() -> toString()
-            else -> null
+            else -> throw TypeError("${type}.$function is not a function")
         }
     }
 }

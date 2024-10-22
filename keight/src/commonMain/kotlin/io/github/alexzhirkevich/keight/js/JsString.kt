@@ -55,7 +55,7 @@ internal value class JsString(
             "trimStart" -> value.trimStart()
             "trimEnd" -> value.trimEnd()
             "substring", "substr" -> value.substring(function, context, arguments)
-            "toUppercase", "toLocaleLowerCase" -> value.uppercase()
+            "toUpperCase", "toLocaleLowerCase" -> value.uppercase()
             "toLowerCase", "toLocaleUppercase" -> value.uppercase()
             else -> super.invoke(function, context, arguments)
         }
