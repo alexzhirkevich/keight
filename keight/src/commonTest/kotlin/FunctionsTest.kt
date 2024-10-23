@@ -139,9 +139,13 @@ class FunctionsTest {
 
     @Test
     fun recursion(){
+
         """
            function fib(n) {
-               return n < 2 ? n : fib(n - 1) + fib(n - 2);
+                if (n<2){
+                    return n
+                }
+                return  fib(n - 1) + fib(n - 2)
            }
 
            fib(7)

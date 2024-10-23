@@ -1,3 +1,5 @@
+import io.github.alexzhirkevich.keight.common.Function
+import io.github.alexzhirkevich.keight.es.ESObject
 import io.github.alexzhirkevich.keight.es.ReferenceError
 import io.github.alexzhirkevich.keight.es.SyntaxError
 import io.github.alexzhirkevich.keight.es.TypeError
@@ -216,9 +218,95 @@ class SyntaxTest {
         "1 + 2 ** 3 * 4 / 5 >> 6".eval().assertEqualsTo(0L)
 
         "2 ** 3 / 3 ** 2".eval().assertEqualsTo(0.8888888888888888)
-     // (2 ** 3) / (3 ** 2)
+        // (2 ** 3) / (3 ** 2)
 
         "4 / 3 / 2".eval().assertEqualsTo(0.6666)
     }
 
+    @Test
+    fun comments() {
+        """
+            // comment
+            "string"
+        """.eval().assertEqualsTo("string")
+
+        """
+            "string"
+            // comment
+            // comment
+            // comment
+        """.eval().assertEqualsTo("string")
+
+        """
+            /* comment */
+            "string"
+        """.eval().assertEqualsTo("string")
+
+        """
+            "string"
+            /* comment */
+            /* comment */
+            /* comment */
+        """.eval().assertEqualsTo("string")
+
+        """
+            /* multiline
+            comment */
+            "string"
+             /* multiline
+            comment */
+        """.eval().assertEqualsTo("string")
+
+        """
+            "string"
+            /* multiline
+            comment */
+        """.eval().assertEqualsTo("string")
+
+        "'str' + /* commment */ 'ing'".eval().assertEqualsTo("string")
+
+        val func = "/**/function /**/name/**/(/**/arg1,/**/arg2/**/){/**/}".eval() as Function
+        func.name.assertEqualsTo("name")
+        func.parameters.let {
+            it[0].name.assertEqualsTo("arg1")
+            it[1].name.assertEqualsTo("arg2")
+        }
+
+        """
+            /**/var i
+            /**/for/**/(/**/i =/**/ 0/**/ ;/**/i<2/**/ /**/ ;/**/i++/**/){/**/}
+            /**/i/**/
+        """.trimIndent().eval().assertEqualsTo(2L)
+
+        """
+            var i = 0
+            /**/while/**/(/**/i < 2/**/){/**/i++/**/}
+            i
+        """.trimIndent().eval().assertEqualsTo(2L)
+
+        """
+            let /**/ obj = /**/{ /**/name/**/ : /**/'test'/**/}
+        """.trimIndent().eval().let {
+            it as ESObject
+            it["name"].toString().assertEqualsTo("test")
+        }
+    }
+
+    @Test
+    fun ternary_operator() {
+        "false ? 1 : 2".eval().assertEqualsTo(2L)
+        "true ? 1 : 2".eval().assertEqualsTo(1L)
+    }
+
+    @Test
+    fun recursion_with_ternary_return(){
+
+        """
+           function fib(n) {
+               return (n < 2 ? n : fib(n - 1) + fib(n - 2));
+           }
+
+           fib(7)
+        """.trimIndent().eval().assertEqualsTo(13L)
+    }
 }

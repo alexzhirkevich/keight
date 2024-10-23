@@ -43,7 +43,7 @@ internal class Function(
     fun copy(
         body: Expression = this.body,
         extraVariables: Map<String, Pair<VariableType, Any?>> = emptyMap(),
-    ) : Function{
+    ): Function {
         return Function(
             name = name,
             parameters = parameters,
@@ -57,7 +57,7 @@ internal class Function(
     init {
         val varargs = parameters.count { it.isVararg }
 
-        if (varargs > 1 || varargs == 1 && !parameters.last().isVararg){
+        if (varargs > 1 || varargs == 1 && !parameters.last().isVararg) {
             throw SyntaxError("Rest parameter must be last formal parameter")
         }
     }
@@ -66,22 +66,22 @@ internal class Function(
         args: List<Expression>,
         context: ScriptRuntime,
     ): Any? {
-        return try {
-            val arguments = buildMap {
-                parameters.fastForEachIndexed { i, p ->
-                    val value = if (p.isVararg) {
-                        args.drop(i).fastMap { it(context) }
-                    } else {
-                        (args.argForNameOrIndex(i, p.name) ?: p.default)
-                            ?.invoke(context)
-                            ?: Unit
-                    }
-                    this[p.name] = VariableType.Local to value
+        val arguments = buildMap {
+            parameters.fastForEachIndexed { i, p ->
+                val value = if (p.isVararg) {
+                    args.drop(i).fastMap { it(context) }
+                } else {
+                    (args.argForNameOrIndex(i, p.name) ?: p.default)
+                        ?.invoke(context)
+                        ?: Unit
                 }
-                thisRef?.let {
-                    this["this"] = VariableType.Const to it
-                }
+                this[p.name] = VariableType.Local to value
             }
+            thisRef?.let {
+                this["this"] = VariableType.Const to it
+            }
+        }
+        return try {
             context.withScope(arguments + extraVariables, body::invoke)
         } catch (ret: BlockReturn) {
             ret.value
@@ -94,6 +94,7 @@ internal class OpFunctionExec(
     val receiver : Expression?,
     val parameters : List<Expression>,
 ) : Expression, Named {
+
     override fun invokeRaw(context: ScriptRuntime): Any? {
         val res = receiver?.invoke(context)
         val function = when {

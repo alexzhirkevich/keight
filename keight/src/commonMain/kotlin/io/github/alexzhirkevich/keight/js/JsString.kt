@@ -5,6 +5,7 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.argAtOrNull
 import io.github.alexzhirkevich.keight.common.checkNotEmpty
+import io.github.alexzhirkevich.keight.common.fastMap
 import io.github.alexzhirkevich.keight.common.valueAtIndexOrUnit
 import io.github.alexzhirkevich.keight.es.ESAny
 import io.github.alexzhirkevich.keight.es.checkArgs
@@ -27,7 +28,7 @@ internal value class JsString(
 
     override fun get(variable: Any?): Any {
         return when(variable){
-            "length" -> value.length
+            "length" -> value.length.toLong()
             else -> Unit
         }
     }
@@ -41,8 +42,10 @@ internal value class JsString(
             "charAt", "at" -> value.charAt(function, context, arguments)
             "indexOf", -> value.indexOf(false,function, context, arguments)
             "lastIndexOf", -> value.indexOf(true, function, context, arguments)
+            "concat" -> value.concat(function, context, arguments)
             "charCodeAt" -> value.charCodeAt(function, context, arguments)
             "endsWith" -> value.endsWith(function, context, arguments)
+            "split"->value.split(function, context, arguments)
             "startsWith" -> value.startsWith(function, context, arguments)
             "includes" -> value.includes(function, context, arguments)
             "padStart" -> value.padStart(function, context, arguments)
@@ -120,6 +123,14 @@ private fun String.indexOf(
     else indexOf(search)
 }
 
+private fun String.concat(
+    function: String,
+    context: ScriptRuntime,
+    arguments: List<Expression>
+): String {
+    return this + arguments.joinToString("") { it.invoke(context).toString() }
+}
+
 private fun String.charCodeAt(
     function: String,
     context: ScriptRuntime,
@@ -145,13 +156,27 @@ private fun String.endsWith(
     }
 }
 
+private fun String.split(
+    function: String,
+    context: ScriptRuntime,
+    arguments: List<Expression>
+) : List<String> {
+    val delimiters = arguments.argAt(0).invoke(context).toString()
+    return split(delimiters).let { it
+        if (delimiters.isEmpty()) {
+            it.subList(1, it.size - 1)
+        } else it
+    }
+}
+
 private fun String.startsWith(
     function: String,
     context: ScriptRuntime,
     arguments: List<Expression>
 ): Boolean {
+
     val searchString = arguments.argAt(0).invoke(context).toString()
-    val position = arguments.argAtOrNull(1)?.let(context::toNumber)?.toInt()
+    val position = arguments.argAtOrNull(1)?.invoke(context)?.let(context::toNumber)?.toInt()
     return if (position == null) {
         startsWith(searchString)
     } else {
@@ -224,7 +249,7 @@ private fun String.replace(
 ): String {
     checkArgs(arguments, 2, function)
     val pattern = arguments.argAt(0).invoke(context).toString()
-    val replacement = arguments.argAt(0).invoke(context).toString()
+    val replacement = arguments.argAt(1).invoke(context).toString()
 
     return when {
         pattern.isEmpty() -> replacement + this
@@ -248,7 +273,8 @@ private fun String.substring(
     context: ScriptRuntime,
     arguments: List<Expression>
 ): String {
-    val start = arguments.get(0).invoke(context).let(context::toNumber).toInt()
-    val end = arguments.get(0).invoke(context)?.let(context::toNumber)?.toInt()?.coerceAtMost(length) ?: length
+    val start = arguments.argAt(0).invoke(context).let(context::toNumber).toInt()
+    val end = arguments.argAtOrNull(1)?.invoke(context)
+        ?.let(context::toNumber)?.toInt()?.coerceAtMost(length) ?: length
     return substring(start, end)
 }

@@ -15,6 +15,7 @@ import io.github.alexzhirkevich.keight.common.OpAssign
 import io.github.alexzhirkevich.keight.common.OpAssignByIndex
 import io.github.alexzhirkevich.keight.common.OpBlock
 import io.github.alexzhirkevich.keight.common.OpBreak
+import io.github.alexzhirkevich.keight.common.OpCase
 import io.github.alexzhirkevich.keight.common.OpCompare
 import io.github.alexzhirkevich.keight.common.OpConstant
 import io.github.alexzhirkevich.keight.common.OpContinue
@@ -34,6 +35,7 @@ import io.github.alexzhirkevich.keight.common.OpLongLong
 import io.github.alexzhirkevich.keight.common.OpMakeArray
 import io.github.alexzhirkevich.keight.common.OpNot
 import io.github.alexzhirkevich.keight.common.OpReturn
+import io.github.alexzhirkevich.keight.common.OpSwitch
 import io.github.alexzhirkevich.keight.common.OpTryCatch
 import io.github.alexzhirkevich.keight.common.OpWhileLoop
 import io.github.alexzhirkevich.keight.common.ThrowableValue
@@ -50,7 +52,7 @@ internal enum class LogicalContext {
 }
 
 internal enum class BlockContext {
-    None, Loop, Function, Class
+    None, Loop, Switch, Function, Class
 }
 
 internal class ESInterpreterImpl(
@@ -79,9 +81,27 @@ internal class ESInterpreterImpl(
         }
     }
 
-    private fun prepareNextChar() {
-        while (ch.skip() && pos < expr.length) {
+    private tailrec fun prepareNextChar() {
+        if (pos >= expr.length)
+            return
+
+        if (ch.skip()) {
             nextChar()
+            return prepareNextChar()
+        }
+
+        if (nextSequenceIs("//")){
+            while (!nextCharIs(ignoreNewLines = false, '\n'::equals) && pos < expr.length) {
+                nextChar()
+            }
+            nextChar()
+            return prepareNextChar()
+        }
+        if (nextSequenceIs("/*")){
+            while (!eatSequence("*/") && pos < expr.length) {
+                nextChar()
+            }
+            return prepareNextChar()
         }
     }
 
@@ -93,7 +113,9 @@ internal class ESInterpreterImpl(
         ch = if (--pos > 0 && pos < expr.length) expr[pos] else ' '
     }
 
-    private fun Char.skip(ignoreNewLines: Boolean = true): Boolean = this == ' ' || this == '\n' && ignoreNewLines
+    private fun Char.skip(ignoreNewLines: Boolean = true): Boolean =
+        this == ' ' ||
+                this == '\n' && ignoreNewLines || this in JAVASCRIPT_OTHER_WHITESPACE
 
     private fun eat(charToEat: Char): Boolean {
         while (ch.skip() && pos < expr.length)
@@ -395,7 +417,7 @@ internal class ESInterpreterImpl(
             x is OpGetVariable -> OpAssign(
                 variableName = x.name,
                 receiver = x.receiver,
-                assignableValue = parseAssignment(globalContext, emptyList(),),
+                assignableValue = parseAssignment(globalContext, emptyList()),
                 type = x.assignmentType,
                 merge = merge
             ).also {
@@ -598,7 +620,7 @@ internal class ESInterpreterImpl(
                     langContext::mul
                 )
 
-                eatAndExpectNot('/', '='::equals) -> Delegate(
+                eatAndExpectNot('/') {it == '=' || it == '*' || it == '/'} -> Delegate(
                     x,
                     parseTermOp(globalContext, blockContext),
                     langContext::div
@@ -648,6 +670,8 @@ internal class ESInterpreterImpl(
         isExpressionStart: Boolean = false,
         allowContinueWithContext : Boolean = true
     ): Expression {
+        prepareNextChar()
+
         val parsedOp = when {
 
             isExpressionStart && nextCharIs(condition = '{'::equals) ->
@@ -858,14 +882,7 @@ internal class ESInterpreterImpl(
                 val startPos = pos
                 do {
                     nextChar()
-                } while (
-                    pos < expr.length && ch.isFun() && !(isReserved(
-                        expr.substring(
-                            startPos,
-                            pos
-                        )
-                    ) && ch == ' ')
-                )
+                } while (pos < expr.length && ch.isFun())
 
                 val func = expr.substring(startPos, pos).trim()
 
@@ -879,6 +896,8 @@ internal class ESInterpreterImpl(
     }
 
     private fun Expression.finish(blockContext: List<BlockContext>, allowContinueWithContext: Boolean): Expression {
+        prepareNextChar()
+
         return when {
             !allowContinueWithContext -> this
             // inplace function invocation
@@ -915,7 +934,7 @@ internal class ESInterpreterImpl(
     }
 
     private fun parseFunctionArgs(name: String?): List<Expression>? {
-
+        prepareNextChar()
         if (!nextCharIs(condition = '('::equals)) {
             return null
         }
@@ -945,7 +964,7 @@ internal class ESInterpreterImpl(
         func: String?,
         blockContext: List<BlockContext>
     ): Expression {
-
+        prepareNextChar()
         if (blockContext.lastOrNull() == BlockContext.Class){
             if (func == "static") {
                 if (EXPR_DEBUG_PRINT_ENABLED){
@@ -971,6 +990,27 @@ internal class ESInterpreterImpl(
             "function" -> {
                 OpConstant(parseFunctionDefinition(blockContext = blockContext))
             }
+            "switch" -> parseSwitch(blockContext)
+            "case" -> {
+                syntaxCheck(blockContext.last() == BlockContext.Switch) {
+                    "Unexpected token 'case'"
+                }
+                OpCase(parseFactorOp(globalContext, emptyList())).also {
+                    prepareNextChar()
+                    check(eat(':')) {
+                        "Expected ':' after 'case'"
+                    }
+                }
+            }
+            "default" -> {
+                syntaxCheck(blockContext.last() == BlockContext.Switch) {
+                    "Unexpected token 'default'"
+                }
+                check(eat(':')) {
+                    "Expected ':' after 'default'"
+                }
+                OpCase.Default
+            }
             "new" -> {
                 if (EXPR_DEBUG_PRINT_ENABLED){
                     println("parsing 'new' class instantiation")
@@ -993,7 +1033,7 @@ internal class ESInterpreterImpl(
                 }
 
                 OpWhileLoop(
-                    condition = parseWhileCondition(),
+                    condition = parseSingleArgument(),
                     body = parseBlock(blockContext = blockContext + BlockContext.Loop),
                     isFalse = langContext::isFalse
                 )
@@ -1010,17 +1050,17 @@ internal class ESInterpreterImpl(
                     "Illegal continue statement: no surrounding iteration statement"
                 }
 
-                OpContinue()
+                OpContinue
             }
 
             "break" -> {
                 if (EXPR_DEBUG_PRINT_ENABLED) {
                     println("parsing loop break")
                 }
-                syntaxCheck(BlockContext.Loop in blockContext){
+                syntaxCheck(BlockContext.Loop in blockContext || BlockContext.Switch in blockContext){
                     "Illegal break statement"
                 }
-                OpBreak()
+                OpBreak
             }
 
             "return" -> {
@@ -1030,7 +1070,7 @@ internal class ESInterpreterImpl(
                 syntaxCheck(BlockContext.Function in blockContext) {
                     "Illegal return statement"
                 }
-                val expr = parseExpressionOp(
+                val expr = parseAssignment(
                     context = globalContext,
                     blockContext = blockContext,
                 )
@@ -1207,7 +1247,7 @@ internal class ESInterpreterImpl(
         syntaxCheck(eatSequence("while")) {
             "Missing while condition in do/while block"
         }
-        val condition = parseWhileCondition()
+        val condition = parseSingleArgument()
 
         return OpDoWhileLoop(
             condition = condition,
@@ -1238,15 +1278,16 @@ internal class ESInterpreterImpl(
         )
     }
 
-    private fun parseWhileCondition(): Expression {
+    private fun parseSingleArgument(): Expression {
+        prepareNextChar()
         syntaxCheck(eat('(')) {
-            "Missing while loop condition"
+            "( was expected at pos $pos"
         }
 
-        val condition = parseExpressionOp(globalContext, blockContext = emptyList(),)
+        val condition = parseExpressionOp(globalContext, blockContext = emptyList())
 
         syntaxCheck(eat(')')) {
-            "Missing closing ')' in loop condition"
+            ") was expected at pos $pos"
         }
         return condition
     }
@@ -1256,6 +1297,7 @@ internal class ESInterpreterImpl(
             println("making try")
         }
         val tryBlock = parseBlock(requireBlock = true, blockContext = blockContext)
+        prepareNextChar()
         val catchBlock = if (eatSequence("catch")) {
 
             if (eat('(')) {
@@ -1277,6 +1319,8 @@ internal class ESInterpreterImpl(
             }
         } else null
 
+        prepareNextChar()
+
         val finallyBlock = if (eatSequence("finally")) {
             parseBlock(requireBlock = true, blockContext = blockContext)
         } else null
@@ -1287,6 +1331,15 @@ internal class ESInterpreterImpl(
             catchBlock = catchBlock?.second,
             finallyBlock = finallyBlock
         )
+    }
+
+    private fun parseSwitch(
+        parentBlockContext: List<BlockContext>
+    ) : Expression {
+        val value = parseSingleArgument()
+        val body = parseBlock(requireBlock = true, blockContext = parentBlockContext + BlockContext.Switch) as OpBlock
+
+        return OpSwitch(value = value, body.expressions,)
     }
 
     private fun parseForLoop(parentBlockContext: List<BlockContext>): Expression {
@@ -1421,8 +1474,8 @@ internal class ESInterpreterImpl(
         val start = pos
 
         val actualName = name ?: run {
-
-            while (ch != '(') {
+            prepareNextChar()
+            while (ch != '(' && ch.isFun()) {
                 nextChar()
             }
 
@@ -1511,6 +1564,8 @@ internal class ESInterpreterImpl(
         var funcIndex = 0
         val list = buildList {
             if (eat('{')) {
+                prepareNextChar()
+
                 while (!eat('}') && pos < expr.length) {
                     val expr = parseAssignment(globalContext, blockContext, isExpressionStart = true)
 
@@ -1630,8 +1685,23 @@ public inline fun syntaxCheck(value: Boolean, lazyMessage: () -> Any) {
 
 private val NumberFormatIndicators = NumberFormat.entries.mapNotNull { it.prefix }
 
-private val reservedKeywords = setOf(
-    "function","return","do","while","for"
-)
-
-private fun isReserved(keyword : String) = keyword in reservedKeywords
+private const val JAVASCRIPT_OTHER_WHITESPACE =
+    "\u2029" +  // paragraph separator
+    "\u00a0" +  // Latin-1 space
+    "\u1680" +  // Ogham space mark
+    "\u180e" +  // separator, Mongolian vowel
+    "\u2000" +  // en quad
+    "\u2001" +  // em quad
+    "\u2002" +  // en space
+    "\u2003" +  // em space
+    "\u2004" +  // three-per-em space
+    "\u2005" +  // four-per-em space
+    "\u2006" +  // six-per-em space
+    "\u2007" +  // figure space
+    "\u2008" +  // punctuation space
+    "\u2009" +  // thin space
+    "\u200a" +  // hair space
+    "\u202f" +  // narrow no-break space
+    "\u205f" +  // medium mathematical space
+    "\u3000" +  // ideographic space
+    "\ufeff" // byte order mark

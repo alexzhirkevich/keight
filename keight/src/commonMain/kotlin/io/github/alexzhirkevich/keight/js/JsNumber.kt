@@ -17,7 +17,10 @@ import kotlin.math.roundToLong
 
 internal class JsNumberClass(
     val number: JsNumber
-) : ESObjectBase("Number"), ESClass, JsWrapper<Number> by number, Comparable<JsWrapper<Number>> by number {
+) : ESObjectBase("Number"),
+    ESClass,
+    JsWrapper<Number> by number,
+    Comparable<JsWrapper<Number>> by number {
 
     override fun invoke(args: List<Expression>, context: ScriptRuntime): Any? = Unit
 
@@ -33,6 +36,7 @@ internal class JsNumberClass(
     }
 
     override val functions: List<Function> get() = emptyList()
+
     override val construct: Function? get() = null
 
     override val extends: Expression = Expression {

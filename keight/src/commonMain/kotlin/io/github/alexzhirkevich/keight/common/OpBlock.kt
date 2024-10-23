@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.common
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.invoke
+import kotlin.jvm.JvmInline
 
 
 internal class OpBlock(
@@ -33,13 +34,7 @@ internal class OpBlock(
     }
 
     private fun invoke(expression: Expression, context: ScriptRuntime) : Any? {
-        val res = expression.invoke(context)
-        return when(expression){
-            is OpReturn -> throw BlockReturn(res)
-            is OpContinue -> throw BlockContinue
-            is OpBreak -> throw BlockBreak
-            else -> res
-        }
+        return expression.invoke(context)
     }
 }
 
@@ -49,10 +44,23 @@ internal data object BlockContinue : BlockException()
 internal data object BlockBreak : BlockException()
 internal class BlockReturn(val value: Any?) : BlockException()
 
-internal class OpReturn(
+@JvmInline
+internal value class OpReturn(
     val value : Expression
-) : Expression by value
+) : Expression {
+    override fun invokeRaw(context: ScriptRuntime): Any? {
+        throw BlockReturn(value(context))
+    }
+}
 
-internal class OpContinue : Expression by OpConstant(Unit)
-internal class OpBreak : Expression by OpConstant(Unit)
+internal object OpContinue : Expression {
+    override fun invokeRaw(context: ScriptRuntime): Any? {
+        throw BlockContinue
+    }
+}
+internal object OpBreak : Expression {
+    override fun invokeRaw(context: ScriptRuntime): Any? {
+        throw BlockBreak
+    }
+}
 
