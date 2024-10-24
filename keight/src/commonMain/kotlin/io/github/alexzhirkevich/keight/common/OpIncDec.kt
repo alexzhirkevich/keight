@@ -5,7 +5,7 @@ import io.github.alexzhirkevich.keight.invoke
 
 internal fun  OpIncDecAssign(
     variable: Expression,
-    preAssign : Boolean,
+    isPrefix : Boolean,
     op: (Any?) -> Any?
 ) : Expression {
 
@@ -30,7 +30,7 @@ internal fun  OpIncDecAssign(
         else -> error("$variable is not assignable")
     }
 
-    if (preAssign) {
+    if (isPrefix) {
         return assignment
     }
 

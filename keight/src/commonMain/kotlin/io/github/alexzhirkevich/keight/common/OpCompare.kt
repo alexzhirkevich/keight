@@ -16,7 +16,7 @@ internal fun  OpCompare(
     )
 }
 
-internal fun  OpNot(
+internal fun OpNot(
     condition : Expression,
     isFalse : (Any?) -> Boolean,
 ) = Expression {

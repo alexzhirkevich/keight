@@ -25,7 +25,7 @@ class ModTest {
     @Test
     fun null_undefined() {
         "null % 5".eval().assertEqualsTo(0L)
-        "5  % null".eval().assertEqualsTo(Double.NaN)
+        "5 % null".eval().assertEqualsTo(Double.NaN)
         "0 % null".eval().assertEqualsTo(Double.NaN)
         "null % 0".eval().assertEqualsTo(Double.NaN)
         "null % null".eval().assertEqualsTo(Double.NaN)

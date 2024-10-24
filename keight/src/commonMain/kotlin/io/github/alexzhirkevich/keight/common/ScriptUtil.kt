@@ -13,7 +13,7 @@ internal fun  Delegate(
     op : (Any?, Any?) -> Any?
 ) = Expression { op(a(it), b(it)) }
 
-internal fun  Delegate(a : Expression, op : (Any?) -> Any?) = Expression {
+internal fun Delegate(a : Expression, op : (Any?) -> Any?) = Expression {
     op(a(it))
 }
 

@@ -89,6 +89,16 @@ internal class Function(
     }
 }
 
+internal fun OpExec(
+    callable : Expression,
+    arguments : List<Expression>
+) = Expression {
+    when (val c = callable(it)) {
+        is Callable -> c.invoke(arguments, it)
+        else -> throw TypeError("$c is not a function")
+    }
+}
+
 internal class OpFunctionExec(
     override val name : String,
     val receiver : Expression?,

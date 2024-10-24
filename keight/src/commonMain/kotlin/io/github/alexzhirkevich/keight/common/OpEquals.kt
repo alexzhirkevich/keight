@@ -5,12 +5,20 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.JsWrapper
 
-internal fun  OpEquals(
+internal fun OpEquals(
     a : Expression,
     b : Expression,
     isTyped : Boolean
 ) = Expression {
     OpEqualsImpl(a(it), b(it), isTyped, it)
+}
+
+internal fun OpNotEquals(
+    a : Expression,
+    b : Expression,
+    isTyped : Boolean
+) = Expression {
+    !OpEqualsImpl(a(it), b(it), isTyped, it)
 }
 
 internal fun OpEqualsImpl(a : Any?, b : Any?, typed : Boolean, runtime: ScriptRuntime) : Boolean {

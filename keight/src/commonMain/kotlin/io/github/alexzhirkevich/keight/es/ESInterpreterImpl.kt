@@ -39,6 +39,7 @@ import io.github.alexzhirkevich.keight.common.OpSwitch
 import io.github.alexzhirkevich.keight.common.OpTryCatch
 import io.github.alexzhirkevich.keight.common.OpWhileLoop
 import io.github.alexzhirkevich.keight.common.ThrowableValue
+import io.github.alexzhirkevich.keight.es.interpreter.NumberFormat
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.isAssignable
 import kotlin.contracts.ExperimentalContracts
@@ -342,57 +343,9 @@ internal class ESInterpreterImpl(
                     }
                 }
 
-                eatSequence("=>") -> OpConstant(parseArrowFunction(listOf(x), blockContext))
-
                 eatAndExpectNot('=', '='::equals) -> {
                     checkAssignment()
                     parseAssignmentValue(x, null)
-                }
-
-                eatSequence("++") -> {
-                    syntaxCheck(x.isAssignable()) {
-                        "Value is not assignable"
-                    }
-                    OpIncDecAssign(
-                        variable = x,
-                        preAssign = false,
-                        op = langContext::inc
-                    )
-                }
-
-                eatSequence("--") -> {
-                    syntaxCheck(x.isAssignable()) {
-                        "Value is not assignable"
-                    }
-                    OpIncDecAssign(
-                        variable = x,
-                        preAssign = false,
-                        op = langContext::dec
-                    )
-                }
-
-                eat('?') -> {
-                    if (EXPR_DEBUG_PRINT_ENABLED) {
-                        println("making ternary operator: onTrue...")
-                    }
-
-                    val bContext = blockContext.dropLastWhile { it == BlockContext.Class }
-                    val onTrue = parseAssignment(globalContext, bContext)
-
-                    if (!eat(':')) {
-                        throw SyntaxError("Unexpected end of input")
-                    }
-                    if (EXPR_DEBUG_PRINT_ENABLED) {
-                        println("making ternary operator: onFalse...")
-                    }
-                    val onFalse = parseAssignment(globalContext, bContext)
-
-                    OpIfCondition(
-                        condition = x,
-                        onTrue = onTrue,
-                        onFalse = onFalse,
-                        expressible = true
-                    )
                 }
 
                 else -> return x
@@ -444,6 +397,55 @@ internal class ESInterpreterImpl(
         while (true){
             prepareNextChar()
             x = when {
+
+                eatSequence("=>") -> OpConstant(parseArrowFunction(listOf(x), blockContext))
+
+                eatSequence("++") -> {
+                    syntaxCheck(x.isAssignable()) {
+                        "Value is not assignable"
+                    }
+                    OpIncDecAssign(
+                        variable = x,
+                        isPrefix = false,
+                        op = langContext::inc
+                    )
+                }
+
+                eatSequence("--") -> {
+                    syntaxCheck(x.isAssignable()) {
+                        "Value is not assignable"
+                    }
+                    OpIncDecAssign(
+                        variable = x,
+                        isPrefix = false,
+                        op = langContext::dec
+                    )
+                }
+
+                eat('?') -> {
+                    if (EXPR_DEBUG_PRINT_ENABLED) {
+                        println("making ternary operator: onTrue...")
+                    }
+
+                    val bContext = blockContext.dropLastWhile { it == BlockContext.Class }
+                    val onTrue = parseAssignment(globalContext, bContext)
+
+                    if (!eat(':')) {
+                        throw SyntaxError("Unexpected end of input")
+                    }
+                    if (EXPR_DEBUG_PRINT_ENABLED) {
+                        println("making ternary operator: onFalse...")
+                    }
+                    val onFalse = parseAssignment(globalContext, bContext)
+
+                    OpIfCondition(
+                        condition = x,
+                        onTrue = onTrue,
+                        onFalse = onFalse,
+                        expressible = true
+                    )
+                }
+
                 eatSequence("in ") -> {
                     val obj = parseExpressionOp(context, null, blockContext, isExpressionStart)
                     val tx = x
@@ -693,7 +695,7 @@ internal class ESInterpreterImpl(
                 }
                 OpIncDecAssign(
                     variable = variable,
-                    preAssign = true,
+                    isPrefix = true,
                     op = langContext::inc
                 )
             }
@@ -706,7 +708,7 @@ internal class ESInterpreterImpl(
                 }
                 OpIncDecAssign(
                     variable = variable,
-                    preAssign = true,
+                    isPrefix = true,
                     op = langContext::dec
                 )
             }
@@ -718,11 +720,11 @@ internal class ESInterpreterImpl(
                 Delegate(parseFactorOp(context, blockContext), langContext::neg)
 
             eatAndExpectNot('!', '='::equals) ->
-                OpNot(parseExpressionOp(context, blockContext = blockContext), langContext::isFalse)
+                OpNot(parseAssignment(context, blockContext = blockContext), langContext::isFalse)
 
             eat('~') -> {
                 // reverse bits
-                val expr = parseExpressionOp(context, blockContext = blockContext)
+                val expr = parseAssignment(context, blockContext = blockContext)
                 Expression {
                     langContext.toNumber(expr(it)).toLong().inv()
                 }
@@ -1660,16 +1662,7 @@ private val funMap = (('a'..'z').toList() + ('A'..'Z').toList() + '$' + '_' ).as
 private fun Char.isFun() = isDigit() || funMap[this] != null
 
 
-private enum class NumberFormat(
-    val radix : Int,
-    val alphabet : String,
-    val prefix : Char?
-) {
-    Dec(10, ".0123456789", null),
-    Hex(16, "0123456789abcdef", 'x'),
-    Oct(8, "01234567", 'o'),
-    Bin(2, "01", 'b')
-}
+
 
 @OptIn(ExperimentalContracts::class)
 public inline fun syntaxCheck(value: Boolean, lazyMessage: () -> Any) {
