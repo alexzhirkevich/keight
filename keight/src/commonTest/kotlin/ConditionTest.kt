@@ -4,7 +4,7 @@ class ConditionTest {
 
     @Test
     fun if_with_else() {
-        "var x = 1; if (true) { x = x+1 }; x".eval().assertEqualsTo(2L)
+        "var x = 1; if (true) { x = x + 1 }; x;".eval().assertEqualsTo(2L)
         "var x = 1; if (true) x+=1; x".eval().assertEqualsTo(2L)
         "var x = 1; if (1==1) { x = x+1 }; x".eval().assertEqualsTo(2L)
         "var x = 1; if (1==1) x +=1; x".eval().assertEqualsTo(2L)

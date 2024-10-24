@@ -8,7 +8,6 @@ class SumTest {
         "'b' + 'a' + + 'a' + 'a'".eval().assertEqualsTo("baNaNa")
         "[5] + 1".eval().assertEqualsTo("51")
         "[1,2] + [3,3]".eval().assertEqualsTo("1,23,3")
-
     }
 
     @Test

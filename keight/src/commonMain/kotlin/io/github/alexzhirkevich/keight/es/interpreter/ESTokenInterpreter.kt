@@ -6,6 +6,7 @@ import io.github.alexzhirkevich.keight.LangContext
 import io.github.alexzhirkevich.keight.Script
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
+import io.github.alexzhirkevich.keight.common.Callable
 import io.github.alexzhirkevich.keight.common.Delegate
 import io.github.alexzhirkevich.keight.common.Function
 import io.github.alexzhirkevich.keight.common.FunctionParam
@@ -13,12 +14,16 @@ import io.github.alexzhirkevich.keight.common.Named
 import io.github.alexzhirkevich.keight.common.OpAssign
 import io.github.alexzhirkevich.keight.common.OpAssignByIndex
 import io.github.alexzhirkevich.keight.common.OpBlock
+import io.github.alexzhirkevich.keight.common.OpBreak
+import io.github.alexzhirkevich.keight.common.OpCase
 import io.github.alexzhirkevich.keight.common.OpCompare
 import io.github.alexzhirkevich.keight.common.OpConstant
+import io.github.alexzhirkevich.keight.common.OpContinue
 import io.github.alexzhirkevich.keight.common.OpEquals
 import io.github.alexzhirkevich.keight.common.OpEqualsComparator
 import io.github.alexzhirkevich.keight.common.OpExec
 import io.github.alexzhirkevich.keight.common.OpExp
+import io.github.alexzhirkevich.keight.common.OpForLoop
 import io.github.alexzhirkevich.keight.common.OpGetVariable
 import io.github.alexzhirkevich.keight.common.OpGreaterComparator
 import io.github.alexzhirkevich.keight.common.OpIfCondition
@@ -30,6 +35,7 @@ import io.github.alexzhirkevich.keight.common.OpLongLong
 import io.github.alexzhirkevich.keight.common.OpMakeArray
 import io.github.alexzhirkevich.keight.common.OpNot
 import io.github.alexzhirkevich.keight.common.OpNotEquals
+import io.github.alexzhirkevich.keight.common.OpReturn
 import io.github.alexzhirkevich.keight.common.OpSwitch
 import io.github.alexzhirkevich.keight.common.OpTouple
 import io.github.alexzhirkevich.keight.es.BlockContext
@@ -37,12 +43,27 @@ import io.github.alexzhirkevich.keight.es.ESAny
 import io.github.alexzhirkevich.keight.es.ESClass
 import io.github.alexzhirkevich.keight.es.ESError
 import io.github.alexzhirkevich.keight.es.EXPR_DEBUG_PRINT_ENABLED
+import io.github.alexzhirkevich.keight.es.Object
 import io.github.alexzhirkevich.keight.es.StaticClassMember
 import io.github.alexzhirkevich.keight.es.SyntaxError
 import io.github.alexzhirkevich.keight.es.syntaxCheck
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.isAssignable
 import kotlin.math.pow
+
+private fun ListIterator<Token>.skipAll(token: Token) {
+    while (eat(Token.NewLine)){ }
+}
+
+
+private inline fun ListIterator<Token>.eat(token: Token) : Boolean {
+    if (nextSignificant() == token){
+        return true
+    } else {
+        prevSignificant()
+        return false
+    }
+}
 
 private fun <T> ListIterator<T>.nextIs(condition : (T) -> Boolean) : Boolean {
     if (!hasNext())
@@ -52,8 +73,28 @@ private fun <T> ListIterator<T>.nextIs(condition : (T) -> Boolean) : Boolean {
 }
 
 private inline fun <reified R : Token> ListIterator<Token>.nextIsInstance() : Boolean {
-    return nextIs { it is R }
+    if (!hasNext())
+        return false
+
+    return (nextSignificant() is R).also { prevSignificant() }
 }
+
+private fun ListIterator<Token>.nextSignificant() : Token {
+    var n = next()
+    while (n is Token.NewLine){
+        n = next()
+    }
+    return n
+}
+
+private fun ListIterator<Token>.prevSignificant() : Token {
+    var n = previous()
+    while (n is Token.NewLine){
+        n = previous()
+    }
+    return n
+}
+
 
 internal class ESTokenInterpreter(
     script : String,
@@ -62,9 +103,7 @@ internal class ESTokenInterpreter(
 ) {
     private val tokens = "{$script}".toList().listIterator().tokens()
         .filterNot { it is Token.Comment || it is Token.Whitespace }
-        .also { println(it.map { it::class.simpleName }) }
         .listIterator()
-
 
     fun interpret(): Script {
         val block = parseBlock(scoped = false, blockContext = emptyList())
@@ -138,19 +177,21 @@ internal class ESTokenInterpreter(
 
         while (true) {
             x = when (priority) {
-                0 -> when (val it = tokens.next()) {
+                0 -> when (val it = tokens.nextSignificant()) {
                     Token.Operator.Dot,
-                    Token.Operator.Bracket.SquareOpen -> parseMemberOf(
-                        receiver = x,
-                        isDot = it is Token.Operator.Dot
-                    )
+                    Token.Operator.Bracket.SquareOpen -> {
+                        parseMemberOf(
+                            receiver = x,
+                            isDot = it is Token.Operator.Dot
+                        )
+                    }
 
                     Token.Operator.Bracket.RoundOpen -> parseFunctionCall(
                         receiver = x,
                     )
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
-                1 -> when (val it = tokens.next()) {
+                1 -> when (val it = tokens.nextSignificant()) {
                     is Token.Operator.Arithmetic.Inc,
                     is Token.Operator.Arithmetic.Dec ->{
                         syntaxCheck(x.isAssignable()) {
@@ -163,10 +204,10 @@ internal class ESTokenInterpreter(
                                 langContext::inc else langContext::dec
                         )
                     }
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
 
-                2 -> when (tokens.next()) {
+                2 -> when (tokens.nextSignificant()) {
                     Token.Operator.Arithmetic.Exp -> {
                         OpExp(
                             x = x,
@@ -175,9 +216,9 @@ internal class ESTokenInterpreter(
                             )
                         )
                     }
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
-                3 -> when (tokens.next()) {
+                3 -> when (tokens.nextSignificant()) {
                     Token.Operator.Arithmetic.Mul -> Delegate(
                         x,
                         parseOperator(blockContext, isExpressionStart, priority-1),
@@ -193,9 +234,9 @@ internal class ESTokenInterpreter(
                         parseOperator(blockContext, isExpressionStart, priority-1),
                         langContext::mod
                     )
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
-                4 -> when (tokens.next()) {
+                4 -> when (tokens.nextSignificant()) {
                     Token.Operator.Arithmetic.Plus -> Delegate(
                         x,
                         parseOperator(blockContext, isExpressionStart, priority-1),
@@ -207,9 +248,9 @@ internal class ESTokenInterpreter(
                         langContext::sub
                     )
 
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
-                5 ->  when (tokens.next()) {
+                5 ->  when (tokens.nextSignificant()) {
                     Token.Operator.Bitwise.Shl -> OpLongInt(
                         x,
                         parseOperator(blockContext, isExpressionStart, priority-1),
@@ -226,15 +267,15 @@ internal class ESTokenInterpreter(
                         parseOperator(blockContext, isExpressionStart, priority-1),
                         Long::ushr
                     )
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
 
                 }
-                6 ->  when (tokens.next()) {
+                6 ->  when (tokens.nextSignificant()) {
                     Token.Operator.In -> parseInKeyword(x)
                     Token.Operator.Instanceof -> TODO()
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
-                7 ->  when (tokens.next()) {
+                7 ->  when (tokens.nextSignificant()) {
                     Token.Operator.Compare.Less -> OpCompare(
                         x,
                         parseOperator(blockContext, isExpressionStart, priority),
@@ -257,9 +298,9 @@ internal class ESTokenInterpreter(
                         OpGreaterComparator(a, b, r) || OpEqualsComparator(a, b,r)
                     }
 
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
-                8 -> when (tokens.next()) {
+                8 -> when (tokens.nextSignificant()) {
                     Token.Operator.Compare.Eq -> OpEquals(
                         x, parseOperator(blockContext, isExpressionStart, priority), false
                     )
@@ -273,33 +314,33 @@ internal class ESTokenInterpreter(
                         x, parseOperator(blockContext, isExpressionStart, priority), true
                     )
 
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
-                9 -> when (tokens.next()) {
+                9 -> when (tokens.nextSignificant()) {
                     Token.Operator.Bitwise.And -> OpLongLong(
                         x,
                         parseOperator(blockContext, isExpressionStart, priority),
                         Long::and
                     )
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
-                10 -> when (tokens.next()) {
+                10 -> when (tokens.nextSignificant()) {
                     Token.Operator.Bitwise.Xor -> OpLongLong(
                         x,
                         parseOperator(blockContext, isExpressionStart, priority),
                         Long::xor
                     )
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
-                11 -> when (tokens.next()) {
+                11 -> when (tokens.nextSignificant()) {
                     Token.Operator.Bitwise.Or -> OpLongLong(
                         x,
                         parseOperator(blockContext, isExpressionStart, priority),
                         Long::or
                     )
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
-                12 -> when (tokens.next()) {
+                12 -> when (tokens.nextSignificant()) {
                     Token.Operator.Logical.And -> {
                         val a = x
                         val b = parseOperator(blockContext, isExpressionStart, priority)
@@ -307,10 +348,10 @@ internal class ESTokenInterpreter(
                             !langContext.isFalse(a(it)) && !langContext.isFalse(b(it))
                         }
                     }
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
 
-                13 ->  when (tokens.next()) {
+                13 ->  when (tokens.nextSignificant()) {
                     Token.Operator.Logical.Or -> {
                         val a = x
                         val b = parseOperator(blockContext, isExpressionStart, priority)
@@ -318,26 +359,26 @@ internal class ESTokenInterpreter(
                             !langContext.isFalse(a(it)) || !langContext.isFalse(b(it))
                         }
                     }
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
 
-                14 -> when (tokens.next()) {
+                14 -> when (tokens.nextSignificant()) {
                     Token.Operator.QuestionMark -> parseTernary(
                         condition = x,
                         blockContext = blockContext
                     )
                     Token.Operator.Arrow -> OpConstant(parseArrowFunction(blockContext, x))
 
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
 
-                15 -> when (val next = tokens.next()) {
+                15 -> when (val next = tokens.nextSignificant()) {
                     is Token.Operator.Assign -> parseAssignmentValue(
                         x,
                         getMergeForAssignment(next)
                     )
 
-                    else -> return x.also { tokens.previous() }
+                    else -> return x.also { tokens.prevSignificant() }
                 }
                 else -> {
                     error("Invalid operator priority - $priority")
@@ -351,7 +392,7 @@ internal class ESTokenInterpreter(
         isExpressionStart: Boolean = false,
         allowContinueWithContext: Boolean = true
     ): Expression {
-        return when (val next = tokens.next()) {
+        return when (val next = tokens.nextSignificant()) {
             is Token.Str -> OpConstant(langContext.fromKotlin(next.value))
 
             is Token.Operator.Dot, is Token.Num -> {
@@ -410,16 +451,15 @@ internal class ESTokenInterpreter(
                 if (isExpressionStart) {
                     parseBlock(blockContext = blockContext)
                 } else {
-                    //parseObject
+                    parseObject()
                 }
-                TODO()
             }
 
             Token.Operator.Bracket.RoundOpen -> parseExpressionGrouping()
             Token.Operator.Bracket.SquareOpen -> parseArrayCreation()
 
             is Token.Keyword -> parseKeyword(next, blockContext)
-            is Token.Operator.Typeof -> TODO()
+            is Token.Operator.Typeof -> parseTypeof()
             is Token.Property -> OpGetVariable(next.name, receiver = null)
 
             else -> throw SyntaxError("Unexpected token $next")
@@ -440,21 +480,33 @@ internal class ESTokenInterpreter(
             Token.Keyword.True -> OpConstant(true)
             Token.Keyword.False -> OpConstant(false)
             Token.Keyword.Null -> OpConstant(null)
-            Token.Keyword.Break -> TODO()
-            Token.Keyword.Case -> TODO()
+            Token.Keyword.Break -> OpBreak
+            Token.Keyword.Switch -> parseSwitch(blockContext)
+            Token.Keyword.Case,
+            Token.Keyword.Default -> {
+                syntaxCheck(blockContext.last() == BlockContext.Switch) {
+                    "Unexpected token 'case'"
+                }
+                val case = if (keyword is Token.Keyword.Case)
+                    parseFactor(emptyList())
+                else OpCase.Default
+
+                syntaxCheck(tokens.nextSignificant() is Token.Operator.SemiColon) {
+                    "Expected ':' after 'case'"
+                }
+                OpCase(case)
+            }
             Token.Keyword.Catch -> TODO()
             Token.Keyword.Class -> TODO()
-            Token.Keyword.Continue -> TODO()
-            Token.Keyword.Default -> TODO()
+            Token.Keyword.Continue -> OpContinue
             Token.Keyword.Do -> TODO()
             Token.Keyword.Else -> TODO()
             Token.Keyword.Finally -> TODO()
-            Token.Keyword.For -> TODO()
+            Token.Keyword.For -> parseForLoop(blockContext)
             Token.Keyword.Function -> OpConstant(parseFunction(blockContext = blockContext))
             Token.Keyword.If -> parseIf(blockContext)
             Token.Keyword.New -> TODO()
-            Token.Keyword.Return -> TODO()
-            Token.Keyword.Switch -> parseSwitch(blockContext)
+            Token.Keyword.Return -> OpReturn(parseStatement())
             Token.Keyword.Throw -> TODO()
             Token.Keyword.Try -> TODO()
             Token.Keyword.While -> TODO()
@@ -510,6 +562,31 @@ internal class ESTokenInterpreter(
         }
     }
 
+    private fun parseTypeof() : Expression {
+        val isArg = tokens.nextSignificant() is Token.Operator.Bracket.RoundOpen
+        if (!isArg){
+            tokens.prevSignificant()
+        }
+        val expr = parseStatement(unaryOnly = true)
+
+        if (isArg) {
+            syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.RoundClose) {
+                "Missing )"
+            }
+        }
+        return Expression {
+            when (val v = expr(it)) {
+                null -> "object"
+                Unit -> "undefined"
+                true, false -> "boolean"
+
+                is ESAny -> v.type
+                is Callable -> "function"
+                else -> v::class.simpleName
+            }
+        }
+    }
+
     private fun parseArrayCreation(): Expression {
         val expressions = buildList {
             if (tokens.nextIsInstance<Token.Operator.Bracket.SquareClose>()) {
@@ -517,10 +594,10 @@ internal class ESTokenInterpreter(
             }
             do {
                 add(parseStatement())
-            } while (tokens.next() is Token.Operator.Comma)
-            tokens.previous()
+            } while (tokens.nextSignificant() is Token.Operator.Comma)
+            tokens.prevSignificant()
         }
-        syntaxCheck(tokens.next() is Token.Operator.Bracket.SquareClose) {
+        syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.SquareClose) {
             "Expected ')'"
         }
 
@@ -535,10 +612,10 @@ internal class ESTokenInterpreter(
 
             do {
                 add(parseStatement(emptyList()))
-            } while (tokens.next() is Token.Operator.Comma)
-            tokens.previous()
+            } while (tokens.nextSignificant() is Token.Operator.Comma)
+            tokens.prevSignificant()
         }
-        syntaxCheck(tokens.next() is Token.Operator.Bracket.RoundClose) {
+        syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.RoundClose) {
             "Expected ')'"
         }
 
@@ -555,7 +632,7 @@ internal class ESTokenInterpreter(
                 variable = receiver,
                 index = parseStatement()
             ).also {
-                syntaxCheck(tokens.next() is Token.Operator.Bracket.SquareClose) {
+                syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.SquareClose) {
                     "Missing ']'"
                 }
             }
@@ -583,18 +660,11 @@ internal class ESTokenInterpreter(
         condition : Expression,
         blockContext: List<BlockContext>
     ) : Expression {
-        if (EXPR_DEBUG_PRINT_ENABLED) {
-            println("making ternary operator: onTrue...")
-        }
-
         val bContext = blockContext.dropLastWhile { it == BlockContext.Class }
         val onTrue = parseStatement(bContext)
 
-        syntaxCheck(tokens.next() is Token.Operator.Colon) {
+        syntaxCheck(tokens.nextSignificant() is Token.Operator.Colon) {
             "Unexpected end of input"
-        }
-        if (EXPR_DEBUG_PRINT_ENABLED) {
-            println("making ternary operator: onFalse...")
         }
         val onFalse = parseStatement(bContext)
 
@@ -607,20 +677,27 @@ internal class ESTokenInterpreter(
     }
 
     private fun parseSwitch(blockContext: List<BlockContext>) : Expression {
-        val value = parseStatement()
-        val body = parseBlock(requireBlock = true, blockContext = blockContext + BlockContext.Switch) as OpBlock
-        return OpSwitch(value = value, body.expressions,)
+        val value = parseStatement() as OpTouple
+        val body = parseBlock(
+            requireBlock = true,
+            blockContext = blockContext + BlockContext.Switch
+        ) as OpBlock
+        return OpSwitch(
+            value = value.expressions.single(),
+            cases = body.expressions
+        )
     }
 
     private fun parseIf(blockContext: List<BlockContext>) : Expression {
-        val condition = parseStatement()
+
+        val condition = (parseStatement() as OpTouple).expressions.single()
 
         val onTrue = parseBlock(blockContext = blockContext)
 
-        val onFalse = if (tokens.nextIsInstance<Token.Keyword.Else>()) {
-            tokens.next()
+        val onFalse = if (tokens.eat(Token.Keyword.Else)) {
             parseBlock(blockContext = blockContext)
         } else null
+
 
         return OpIfCondition(
             condition = condition,
@@ -628,6 +705,54 @@ internal class ESTokenInterpreter(
             onFalse = onFalse
         )
     }
+
+    private fun parseForLoop(parentBlockContext: List<BlockContext>): Expression {
+
+        syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.RoundOpen) {
+            "Invalid for loop"
+        }
+
+        val assign = if (tokens.eat(Token.Operator.SemiColon))
+            null else parseStatement()
+
+        syntaxCheck(assign is OpAssign?) {
+            "Invalid for loop"
+        }
+
+        if (assign != null) {
+            syntaxCheck(tokens.nextSignificant() is Token.Operator.SemiColon) {
+                "Invalid for loop"
+            }
+        }
+        val comparison = if (tokens.eat(Token.Operator.SemiColon))
+            null else parseStatement()
+
+        if (comparison != null) {
+            syntaxCheck(tokens.nextSignificant() is Token.Operator.SemiColon) {
+                "Invalid for loop"
+            }
+        }
+
+        val increment = if (tokens.eat(Token.Operator.Bracket.RoundClose))
+            null else parseStatement()
+
+        if (increment != null) {
+            syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.RoundClose) {
+                "Invalid for loop"
+            }
+        }
+
+        val body = parseBlock(blockContext = parentBlockContext + BlockContext.Loop)
+
+        return OpForLoop(
+            assignment = assign,
+            increment = increment,
+            comparison = comparison,
+            isFalse = langContext::isFalse,
+            body = body
+        )
+    }
+
 
     private fun parseArrowFunction(blockContext: List<BlockContext>, args: Expression) : Function {
         val fArgs = when(args){
@@ -651,8 +776,8 @@ internal class ESTokenInterpreter(
     ) : Function {
 
         val actualName = name ?: run {
-            if (tokens.nextIsInstance<Token.Property>()){
-                (tokens.next() as Token.Property).name
+            if (tokens.nextIsInstance<Token.Property>()) {
+                (tokens.nextSignificant() as Token.Property).name
             } else {
                 ""
             }
@@ -686,6 +811,42 @@ internal class ESTokenInterpreter(
         )
     }
 
+    private fun parseObject(
+        extraFields: Map<String, Expression> = emptyMap()
+    ): Expression {
+        val props = buildMap {
+            while (!tokens.nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
+                val variableName = when(val name = parseFactor(emptyList())){
+                    is OpGetVariable -> name.name
+                    is OpConstant -> name.value.toString()
+                    else -> throw SyntaxError("Invalid object declaration")
+                }
+
+                syntaxCheck(tokens.nextSignificant() is Token.Operator.Colon) {
+                    "Invalid syntax"
+                }
+
+                this[variableName] = parseStatement()
+                when {
+                    tokens.nextIsInstance<Token.Operator.Comma>() -> tokens.nextSignificant()
+                    tokens.nextIsInstance<Token.Operator.Bracket.CurlyClose>() -> {}
+                    else -> throw SyntaxError("Invalid object declaration")
+                }
+            }
+            check(tokens.nextSignificant() is Token.Operator.Bracket.CurlyClose){
+                "} was expected"
+            }
+        } + extraFields
+
+        return Expression { r ->
+            Object("") {
+                props.forEach {
+                    it.key eq it.value.invoke(r)
+                }
+            }
+        }
+    }
+
     private fun parseBlock(
         scoped: Boolean = true,
         requireBlock: Boolean = false,
@@ -694,21 +855,15 @@ internal class ESTokenInterpreter(
     ): Expression {
         var funcIndex = 0
         val list = buildList {
-            if (tokens.nextIsInstance<Token.Operator.Bracket.CurlyOpen>()) {
-                tokens.next()
+            if (tokens.eat(Token.Operator.Bracket.CurlyOpen)) {
                 while (!tokens.nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
+
                     val expr = parseStatement(blockContext, isExpressionStart = true)
 
                     if (size == 0 && expr is OpGetVariable && tokens.nextIsInstance<Token.Operator.Colon>()) {
-//                        return parseObject(
-//                            mapOf(
-//                                expr.name to parseExpressionOp(
-//                                    globalContext,
-//                                    null,
-//                                    emptyList()
-//                                )
-//                            )
-//                        )
+                        return parseObject(
+                            mapOf(expr.name to parseStatement())
+                        )
                     }
 
                     when {
@@ -749,14 +904,19 @@ internal class ESTokenInterpreter(
                     }
                     if (tokens.hasNext() && !tokens.nextIsInstance<Token.Operator.Bracket.CurlyClose>()){
                         syntaxCheck(skipStatementSeparators()){
-                            "Unexpected identifier"
+                            "Unexpected identifier ${tokens.nextSignificant()}"
                         }
                     }
                 }
+                check(tokens.nextSignificant() is Token.Operator.Bracket.CurlyClose){
+                    "} was expected"
+                }
+
             } else {
                 if (requireBlock) {
                     throw SyntaxError("Unexpected token: block start was expected")
                 }
+                tokens.skipAll(Token.NewLine)
                 add(parseStatement(blockContext))
             }
         }
@@ -797,7 +957,7 @@ internal class ESTokenInterpreter(
                 )
             }
 
-            else -> throw SyntaxError("Unexpected identifier")
+            else -> throw SyntaxError("Unexpected identifier $expr")
         }
     }
 }
