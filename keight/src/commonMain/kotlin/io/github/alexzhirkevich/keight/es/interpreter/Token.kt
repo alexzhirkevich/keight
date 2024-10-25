@@ -25,7 +25,7 @@ internal sealed interface Token {
     ) : Token
 
     @JvmInline
-    value class Property(val name : String) : Token
+    value class Identifier(val name : String) : Token
 
     @JvmInline
     value class Comment(val value : String) : Token
@@ -38,7 +38,7 @@ internal sealed interface Token {
     sealed interface Operator : Token {
 
         object Comma : Operator
-        object Dot : Operator
+        object Period : Operator
         object Colon  : Operator
         object SemiColon : Operator
         object Arrow : Operator
@@ -46,6 +46,7 @@ internal sealed interface Token {
         object In : Operator
         object Instanceof : Operator
         object Typeof : Operator
+        object New : Operator
 
         sealed interface Bracket : Token {
             object RoundOpen : Operator
@@ -130,7 +131,6 @@ internal sealed interface Token {
         object Function : Keyword
         object Return : Keyword
         object Class : Keyword
-        object New : Keyword
         object Switch : Keyword
         object Case : Keyword
         object Default : Keyword

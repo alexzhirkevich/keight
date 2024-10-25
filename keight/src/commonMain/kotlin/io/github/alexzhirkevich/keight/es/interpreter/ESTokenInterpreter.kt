@@ -1,7 +1,6 @@
 package io.github.alexzhirkevich.keight.es.interpreter
 
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.InterpretationContext
 import io.github.alexzhirkevich.keight.LangContext
 import io.github.alexzhirkevich.keight.Script
 import io.github.alexzhirkevich.keight.ScriptRuntime
@@ -19,6 +18,7 @@ import io.github.alexzhirkevich.keight.common.OpCase
 import io.github.alexzhirkevich.keight.common.OpCompare
 import io.github.alexzhirkevich.keight.common.OpConstant
 import io.github.alexzhirkevich.keight.common.OpContinue
+import io.github.alexzhirkevich.keight.common.OpDoWhileLoop
 import io.github.alexzhirkevich.keight.common.OpEquals
 import io.github.alexzhirkevich.keight.common.OpEqualsComparator
 import io.github.alexzhirkevich.keight.common.OpExec
@@ -38,11 +38,13 @@ import io.github.alexzhirkevich.keight.common.OpNotEquals
 import io.github.alexzhirkevich.keight.common.OpReturn
 import io.github.alexzhirkevich.keight.common.OpSwitch
 import io.github.alexzhirkevich.keight.common.OpTouple
+import io.github.alexzhirkevich.keight.common.OpTryCatch
+import io.github.alexzhirkevich.keight.common.OpWhileLoop
+import io.github.alexzhirkevich.keight.common.ThrowableValue
 import io.github.alexzhirkevich.keight.es.BlockContext
 import io.github.alexzhirkevich.keight.es.ESAny
 import io.github.alexzhirkevich.keight.es.ESClass
 import io.github.alexzhirkevich.keight.es.ESError
-import io.github.alexzhirkevich.keight.es.EXPR_DEBUG_PRINT_ENABLED
 import io.github.alexzhirkevich.keight.es.Object
 import io.github.alexzhirkevich.keight.es.StaticClassMember
 import io.github.alexzhirkevich.keight.es.SyntaxError
@@ -95,14 +97,24 @@ private fun ListIterator<Token>.prevSignificant() : Token {
     return n
 }
 
-
 internal class ESTokenInterpreter(
-    script : String,
+    script: String,
     private val langContext: LangContext,
-    private val globalContext : InterpretationContext,
 ) {
-    private val tokens = "{$script}".toList().listIterator().tokens()
-        .filterNot { it is Token.Comment || it is Token.Whitespace }
+    private val tokens: ListIterator<Token> = "{$script}".toList()
+        .listIterator()
+        .tokens()
+        .fold(mutableListOf<Token>()) { l, token ->
+            // skip comments, whitespaces, double newlines and newlines after semicolon
+            if (
+                token !is Token.Comment &&
+                token !is Token.Whitespace &&
+                (token !is Token.NewLine || (l.lastOrNull() !is Token.NewLine && l.lastOrNull() !is Token.Operator.SemiColon))
+            ) {
+                l.add(token)
+            }
+            l
+        }
         .listIterator()
 
     fun interpret(): Script {
@@ -124,52 +136,17 @@ internal class ESTokenInterpreter(
 
     private fun parseStatement(
         blockContext: List<BlockContext> = emptyList(),
-        unaryOnly: Boolean = false,
         isExpressionStart: Boolean = false,
-        variableName: String? = null
     ): Expression {
-        return  if (variableName == null) {
-            if (unaryOnly) {
-                parseFactor(blockContext, isExpressionStart)
-            } else {
-                parseOperator(blockContext = blockContext, isExpressionStart = isExpressionStart)
-            }
-        } else {
-            OpGetVariable(variableName, receiver = null)
-        }
-    }
-
-    private fun parseAssignmentValue(
-        x: Expression,
-        merge: ((Any?, Any?) -> Any?)? = null
-    ): Expression {
-        return when {
-            x is OpIndex && x.variable is OpGetVariable -> OpAssignByIndex(
-                variableName = x.variable.name,
-                scope = x.variable.assignmentType,
-                index = x.index,
-                assignableValue = parseStatement(emptyList()),
-                merge = merge
-            )
-
-            x is OpGetVariable -> OpAssign(
-                variableName = x.name,
-                receiver = x.receiver,
-                assignableValue = parseStatement(emptyList()),
-                type = x.assignmentType,
-                merge = merge
-            )
-
-            else -> throw SyntaxError("Invalid assignment")
-        }
+        return parseOperator(blockContext = blockContext, isExpressionStart = isExpressionStart)
     }
 
     private fun parseOperator(
         blockContext: List<BlockContext> = emptyList(),
         isExpressionStart: Boolean = false,
         priority: Int = 15
-    ): Expression {
-        var x = if (priority == 0) {
+    ) : Expression {
+        var x =  if (priority == 0) {
             parseFactor(blockContext, isExpressionStart)
         } else {
             parseOperator(blockContext, isExpressionStart, priority - 1)
@@ -177,18 +154,20 @@ internal class ESTokenInterpreter(
 
         while (true) {
             x = when (priority) {
-                0 -> when (val it = tokens.nextSignificant()) {
-                    Token.Operator.Dot,
+                0 -> when (tokens.nextSignificant()) {
+                    Token.Operator.Bracket.RoundOpen -> {
+                        tokens.prevSignificant()
+                        x as OpGetVariable
+                        val args = parseExpressionGrouping().expressions
+                        println("exec ${x.name} of ${x.receiver} with args $args")
+                        OpExec(x, args)
+                    }
+                    Token.Operator.Period,
                     Token.Operator.Bracket.SquareOpen -> {
-                        parseMemberOf(
-                            receiver = x,
-                            isDot = it is Token.Operator.Dot
-                        )
+                        tokens.prevSignificant()
+                        parseMemberOf(x)
                     }
 
-                    Token.Operator.Bracket.RoundOpen -> parseFunctionCall(
-                        receiver = x,
-                    )
                     else -> return x.also { tokens.prevSignificant() }
                 }
                 1 -> when (val it = tokens.nextSignificant()) {
@@ -208,14 +187,10 @@ internal class ESTokenInterpreter(
                 }
 
                 2 -> when (tokens.nextSignificant()) {
-                    Token.Operator.Arithmetic.Exp -> {
-                        OpExp(
-                            x = x,
-                            degree = parseOperator(
-                                blockContext, isExpressionStart, priority
-                            )
-                        )
-                    }
+                    Token.Operator.Arithmetic.Exp -> OpExp(
+                        x = x,
+                        degree = parseOperator(blockContext, isExpressionStart, priority)
+                    )
                     else -> return x.also { tokens.prevSignificant() }
                 }
                 3 -> when (tokens.nextSignificant()) {
@@ -380,30 +355,32 @@ internal class ESTokenInterpreter(
 
                     else -> return x.also { tokens.prevSignificant() }
                 }
-                else -> {
-                    error("Invalid operator priority - $priority")
-                }
+                else -> error("Invalid operator priority - $priority")
             }
         }
     }
 
+
     private fun parseFactor(
         blockContext: List<BlockContext>,
-        isExpressionStart: Boolean = false,
-        allowContinueWithContext: Boolean = true
+        isExpressionStart: Boolean = false
     ): Expression {
-        return when (val next = tokens.nextSignificant()) {
+        val expr =  when (val next = tokens.nextSignificant()) {
             is Token.Str -> OpConstant(langContext.fromKotlin(next.value))
 
-            is Token.Operator.Dot, is Token.Num -> {
+            is Token.Operator.Period, is Token.Num -> {
                 val num = if (next is Token.Num) {
                     next.value
                 } else {
                     val number = tokens.next()
-                    syntaxCheck(number is Token.Num && !number.isFloat) {
+                    syntaxCheck(
+                        number is Token.Num
+                                && !number.isFloat
+                                && number.format == NumberFormat.Dec
+                    ) {
                         unexpected(".")
                     }
-                    "0.${number.value}".toFloat()
+                    "0.${number.value}".toDouble()
                 }
                 OpConstant(num)
             }
@@ -449,67 +426,55 @@ internal class ESTokenInterpreter(
 
             Token.Operator.Bracket.CurlyOpen -> {
                 if (isExpressionStart) {
-                    parseBlock(blockContext = blockContext)
+                    tokens.prevSignificant()
+                    parseBlock(blockContext = blockContext, requireBlock = true)
                 } else {
                     parseObject()
                 }
             }
 
-            Token.Operator.Bracket.RoundOpen -> parseExpressionGrouping()
-            Token.Operator.Bracket.SquareOpen -> parseArrayCreation()
-
-            is Token.Keyword -> parseKeyword(next, blockContext)
+            Token.Operator.Bracket.RoundOpen -> {
+                tokens.prevSignificant()
+                parseExpressionGrouping()
+            }
+            Token.Operator.Bracket.SquareOpen -> {
+                tokens.prevSignificant()
+                parseArrayCreation()
+            }
+            is Token.Operator.New -> TODO()
             is Token.Operator.Typeof -> parseTypeof()
-            is Token.Property -> OpGetVariable(next.name, receiver = null)
+            is Token.Keyword -> parseKeyword(next, blockContext)
+            is Token.Identifier -> OpGetVariable(next.name, receiver = null)
 
-            else -> throw SyntaxError("Unexpected token $next")
+            else -> throw SyntaxError(unexpected(next::class.simpleName.orEmpty()))
         }
+
+        return expr
+
     }
 
-    private fun parseKeyword(keyword: Token.Keyword, blockContext: List<BlockContext>): Expression {
-        return when(keyword){
-            Token.Keyword.Var,
-            Token.Keyword.Let,
-            Token.Keyword.Const, -> parseVariable(
-                when(keyword){
-                    Token.Keyword.Var -> VariableType.Global
-                    Token.Keyword.Let -> VariableType.Local
-                    else -> VariableType.Const
-                }
+    private fun parseAssignmentValue(
+        x: Expression,
+        merge: ((Any?, Any?) -> Any?)? = null
+    ): Expression {
+        return when {
+            x is OpIndex && x.variable is OpGetVariable -> OpAssignByIndex(
+                variableName = x.variable.name,
+                scope = x.variable.assignmentType,
+                index = x.index,
+                assignableValue = parseStatement(),
+                merge = merge
             )
-            Token.Keyword.True -> OpConstant(true)
-            Token.Keyword.False -> OpConstant(false)
-            Token.Keyword.Null -> OpConstant(null)
-            Token.Keyword.Break -> OpBreak
-            Token.Keyword.Switch -> parseSwitch(blockContext)
-            Token.Keyword.Case,
-            Token.Keyword.Default -> {
-                syntaxCheck(blockContext.last() == BlockContext.Switch) {
-                    "Unexpected token 'case'"
-                }
-                val case = if (keyword is Token.Keyword.Case)
-                    parseFactor(emptyList())
-                else OpCase.Default
 
-                syntaxCheck(tokens.nextSignificant() is Token.Operator.SemiColon) {
-                    "Expected ':' after 'case'"
-                }
-                OpCase(case)
-            }
-            Token.Keyword.Catch -> TODO()
-            Token.Keyword.Class -> TODO()
-            Token.Keyword.Continue -> OpContinue
-            Token.Keyword.Do -> TODO()
-            Token.Keyword.Else -> TODO()
-            Token.Keyword.Finally -> TODO()
-            Token.Keyword.For -> parseForLoop(blockContext)
-            Token.Keyword.Function -> OpConstant(parseFunction(blockContext = blockContext))
-            Token.Keyword.If -> parseIf(blockContext)
-            Token.Keyword.New -> TODO()
-            Token.Keyword.Return -> OpReturn(parseStatement())
-            Token.Keyword.Throw -> TODO()
-            Token.Keyword.Try -> TODO()
-            Token.Keyword.While -> TODO()
+            x is OpGetVariable -> OpAssign(
+                variableName = x.name,
+                receiver = x.receiver,
+                assignableValue = parseStatement(),
+                type = x.assignmentType,
+                merge = merge
+            )
+
+            else -> throw SyntaxError("Invalid assignment")
         }
     }
 
@@ -562,24 +527,91 @@ internal class ESTokenInterpreter(
         }
     }
 
-    private fun parseTypeof() : Expression {
-        val isArg = tokens.nextSignificant() is Token.Operator.Bracket.RoundOpen
-        if (!isArg){
-            tokens.prevSignificant()
-        }
-        val expr = parseStatement(unaryOnly = true)
+    private fun parseKeyword(keyword: Token.Keyword, blockContext: List<BlockContext>): Expression {
+        return when(keyword){
+            Token.Keyword.Var,
+            Token.Keyword.Let,
+            Token.Keyword.Const, -> parseVariable(
+                when(keyword){
+                    Token.Keyword.Var -> VariableType.Global
+                    Token.Keyword.Let -> VariableType.Local
+                    else -> VariableType.Const
+                }
+            )
+            Token.Keyword.True -> OpConstant(true)
+            Token.Keyword.False -> OpConstant(false)
+            Token.Keyword.Null -> OpConstant(null)
 
-        if (isArg) {
-            syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.RoundClose) {
-                "Missing )"
+            Token.Keyword.Switch -> parseSwitch(blockContext)
+            Token.Keyword.Case,
+            Token.Keyword.Default -> {
+                syntaxCheck(blockContext.last() == BlockContext.Switch) {
+                    "Unexpected token 'case'"
+                }
+                val case = if (keyword is Token.Keyword.Case)
+                    parseFactor(emptyList())
+                else OpCase.Default
+
+                syntaxCheck(tokens.nextSignificant() is Token.Operator.Colon) {
+                    "Expected ':' after 'case'"
+                }
+                OpCase(case)
             }
+
+            Token.Keyword.For -> parseForLoop(blockContext)
+            Token.Keyword.While -> parseWhileLoop(blockContext)
+            Token.Keyword.Do -> parseDoWhileLoop(blockContext)
+            Token.Keyword.Continue -> OpContinue.also {
+                syntaxCheck(blockContext.lastOrNull() == BlockContext.Loop) {
+                    unexpected("continue")
+                }
+            }
+            Token.Keyword.Break -> OpBreak.also {
+                val context = blockContext.lastOrNull()
+                syntaxCheck(context == BlockContext.Loop || context == BlockContext.Switch){
+                    unexpected("break")
+                }
+            }
+
+            Token.Keyword.If -> parseIf(blockContext)
+            Token.Keyword.Else -> throw SyntaxError(unexpected("else"))
+
+            Token.Keyword.Function -> OpConstant(parseFunction(blockContext = blockContext))
+            Token.Keyword.Return -> {
+                syntaxCheck(BlockContext.Function in blockContext){
+                    unexpected("return")
+                }
+                OpReturn(parseStatement())
+            }
+
+            Token.Keyword.Class -> TODO()
+
+            Token.Keyword.Throw -> {
+                val throwable = parseStatement()
+                Expression {
+                    val t = throwable(it)
+                    throw if (t is Throwable) t else ThrowableValue(t)
+                }
+            }
+            Token.Keyword.Try -> parseTryCatch(blockContext)
+            Token.Keyword.Finally -> throw SyntaxError(unexpected("finally"))
+            Token.Keyword.Catch -> throw SyntaxError(unexpected("catch"))
+        }
+    }
+
+    private fun parseTypeof() : Expression {
+        val isArg = tokens.nextIsInstance<Token.Operator.Bracket.RoundOpen>()
+        val expr = if (isArg) {
+            parseExpressionGrouping()
+        }  else {
+            parseOperator(priority = 1)
         }
         return Expression {
             when (val v = expr(it)) {
                 null -> "object"
                 Unit -> "undefined"
                 true, false -> "boolean"
-
+                is CharSequence -> "string"
                 is ESAny -> v.type
                 is Callable -> "function"
                 else -> v::class.simpleName
@@ -588,6 +620,8 @@ internal class ESTokenInterpreter(
     }
 
     private fun parseArrayCreation(): Expression {
+        check(tokens.eat(Token.Operator.Bracket.SquareOpen))
+
         val expressions = buildList {
             if (tokens.nextIsInstance<Token.Operator.Bracket.SquareClose>()) {
                 return@buildList
@@ -605,44 +639,44 @@ internal class ESTokenInterpreter(
     }
 
     private fun parseExpressionGrouping(): OpTouple {
-        val expressions = buildList {
-            if (tokens.nextIsInstance<Token.Operator.Bracket.RoundClose>()) {
-                return@buildList
-            }
+        check(tokens.eat(Token.Operator.Bracket.RoundOpen))
 
+        val expressions = if (tokens.nextIsInstance<Token.Operator.Bracket.RoundClose>()) {
+            emptyList()
+        } else buildList {
             do {
                 add(parseStatement(emptyList()))
             } while (tokens.nextSignificant() is Token.Operator.Comma)
             tokens.prevSignificant()
         }
-        syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.RoundClose) {
+        syntaxCheck(tokens.eat(Token.Operator.Bracket.RoundClose)) {
             "Expected ')'"
         }
 
         return OpTouple(expressions)
     }
 
-    private fun parseMemberOf(receiver: Expression, isDot: Boolean): Expression {
-        return if (isDot) {
-            val memberName = parseFactor(emptyList())
-            check(memberName is OpGetVariable)
-            OpGetVariable(name = memberName.name, receiver = receiver)
-        } else {
-            OpIndex(
-                variable = receiver,
-                index = parseStatement()
-            ).also {
-                syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.SquareClose) {
-                    "Missing ']'"
+    private fun parseMemberOf(receiver: Expression): Expression {
+        return when (tokens.nextSignificant()){
+            is Token.Operator.Period -> {
+                val next = tokens.nextSignificant()
+                syntaxCheck(next is Token.Identifier) {
+                    "Illegal symbol after '.'"
+                }
+                OpGetVariable(name = next.name, receiver = receiver)
+            }
+            is Token.Operator.Bracket.SquareOpen -> {
+                OpIndex(
+                    variable = receiver,
+                    index = parseStatement()
+                ).also {
+                    syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.SquareClose) {
+                        "Missing ']'"
+                    }
                 }
             }
+            else -> throw IllegalStateException("Illegal 'member of' syntax")
         }
-    }
-
-    private fun parseFunctionCall(receiver: Expression): Expression {
-        tokens.previous()
-        val args = parseStatement() as OpTouple
-        return OpExec(receiver, args.expressions)
     }
 
     private fun parseInKeyword(subject : Expression) : Expression {
@@ -666,12 +700,11 @@ internal class ESTokenInterpreter(
         syntaxCheck(tokens.nextSignificant() is Token.Operator.Colon) {
             "Unexpected end of input"
         }
-        val onFalse = parseStatement(bContext)
 
         return OpIfCondition(
             condition = condition,
             onTrue = onTrue,
-            onFalse = onFalse,
+            onFalse = parseStatement(bContext),
             expressible = true
         )
     }
@@ -753,6 +786,58 @@ internal class ESTokenInterpreter(
         )
     }
 
+    private fun parseWhileLoop(parentBlockContext: List<BlockContext>): Expression {
+        return OpWhileLoop(
+            condition = parseExpressionGrouping().expressions.single(),
+            body = parseBlock(blockContext = parentBlockContext + BlockContext.Loop),
+            isFalse = langContext::isFalse
+        )
+    }
+
+    private fun parseDoWhileLoop(blockContext: List<BlockContext>) : Expression {
+        val body = parseBlock(requireBlock = true, blockContext = blockContext + BlockContext.Loop)
+
+        syntaxCheck(tokens.eat(Token.Keyword.While)) {
+            "Missing while condition in do/while block"
+        }
+        val condition = parseExpressionGrouping().expressions.single()
+
+        return OpDoWhileLoop(
+            condition = condition,
+            body = body as OpBlock,
+            isFalse = langContext::isFalse
+        )
+    }
+
+    private fun parseTryCatch(blockContext: List<BlockContext>): Expression {
+        val tryBlock = parseBlock(requireBlock = true, blockContext = blockContext)
+        val catchBlock = if (tokens.eat(Token.Keyword.Catch)) {
+            if (tokens.eat(Token.Operator.Bracket.RoundOpen)) {
+                val next = tokens.nextSignificant()
+                syntaxCheck(next is Token.Identifier && tokens.eat(Token.Operator.Bracket.RoundClose)){
+                    "Invalid syntax after 'catch'"
+                }
+                next.name to parseBlock(
+                    scoped = false,
+                    requireBlock = true,
+                    blockContext = blockContext
+                )
+            } else {
+                null to parseBlock(requireBlock = true, blockContext = blockContext)
+            }
+        } else null
+
+        val finallyBlock = if (tokens.eat(Token.Keyword.Finally)) {
+            parseBlock(requireBlock = true, blockContext = blockContext)
+        } else null
+
+        return OpTryCatch(
+            tryBlock = tryBlock,
+            catchVariableName = catchBlock?.first,
+            catchBlock = catchBlock?.second,
+            finallyBlock = finallyBlock
+        )
+    }
 
     private fun parseArrowFunction(blockContext: List<BlockContext>, args: Expression) : Function {
         val fArgs = when(args){
@@ -776,8 +861,8 @@ internal class ESTokenInterpreter(
     ) : Function {
 
         val actualName = name ?: run {
-            if (tokens.nextIsInstance<Token.Property>()) {
-                (tokens.nextSignificant() as Token.Property).name
+            if (tokens.nextIsInstance<Token.Identifier>()) {
+                (tokens.nextSignificant() as Token.Identifier).name
             } else {
                 ""
             }
@@ -860,7 +945,7 @@ internal class ESTokenInterpreter(
 
                     val expr = parseStatement(blockContext, isExpressionStart = true)
 
-                    if (size == 0 && expr is OpGetVariable && tokens.nextIsInstance<Token.Operator.Colon>()) {
+                    if (isEmpty() && expr is OpGetVariable && tokens.eat(Token.Operator.Colon)) {
                         return parseObject(
                             mapOf(expr.name to parseStatement())
                         )
@@ -876,9 +961,6 @@ internal class ESTokenInterpreter(
                         expr is OpConstant && (expr.value is Function && !expr.value.isClassMember || expr.value is ESClass) -> {
                             val name = (expr.value as Named).name
 
-                            if (EXPR_DEBUG_PRINT_ENABLED){
-                                println("registering '$name' as class or top level function")
-                            }
                             add(
                                 index = funcIndex++,
                                 element = OpAssign(
@@ -902,11 +984,7 @@ internal class ESTokenInterpreter(
                         }
                         else -> add(expr)
                     }
-                    if (tokens.hasNext() && !tokens.nextIsInstance<Token.Operator.Bracket.CurlyClose>()){
-                        syntaxCheck(skipStatementSeparators()){
-                            "Unexpected identifier ${tokens.nextSignificant()}"
-                        }
-                    }
+                    skipStatementSeparators()
                 }
                 check(tokens.nextSignificant() is Token.Operator.Bracket.CurlyClose){
                     "} was expected"
@@ -914,20 +992,44 @@ internal class ESTokenInterpreter(
 
             } else {
                 if (requireBlock) {
-                    throw SyntaxError("Unexpected token: block start was expected")
+                    throw SyntaxError("Block start was expected")
                 }
                 tokens.skipAll(Token.NewLine)
-                add(parseStatement(blockContext))
+
+                do {
+                    add(parseStatement(blockContext))
+                } while (tokens.eat(Token.Operator.Comma))
             }
         }
         return OpBlock(list, scoped)
+    }
+
+    private fun parseVariable(type: VariableType) : Expression {
+
+        return when (val expr = parseStatement()) {
+            is OpAssign -> OpAssign(
+                type = type,
+                variableName = expr.variableName,
+                assignableValue = expr.assignableValue,
+                merge = null
+            )
+
+            is OpGetVariable -> OpAssign(
+                type = type,
+                variableName = expr.name,
+                assignableValue = OpConstant(Unit),
+                merge = null
+            )
+
+            else -> throw SyntaxError(unexpected(expr::class.simpleName.orEmpty()))
+        }
     }
 
     private fun skipStatementSeparators() : Boolean {
         var skipped = false
         while (tokens.hasNext()) {
             val next = tokens.next()
-            if (next !is Token.NewLine && next !is Token.Operator.SemiColon){
+            if (next !is Token.NewLine && next !is Token.Operator.SemiColon && next !is Token.Operator.Comma){
                 tokens.previous()
                 break
             }
@@ -935,32 +1037,7 @@ internal class ESTokenInterpreter(
         }
         return skipped
     }
-
-    private fun parseVariable(type: VariableType) : Expression {
-
-        return when (val expr = parseStatement()) {
-            is OpAssign -> {
-                OpAssign(
-                    type = type,
-                    variableName = expr.variableName,
-                    assignableValue = expr.assignableValue,
-                    merge = null
-                )
-            }
-
-            is OpGetVariable -> {
-                OpAssign(
-                    type = type,
-                    variableName = expr.name,
-                    assignableValue = OpConstant(Unit),
-                    merge = null
-                )
-            }
-
-            else -> throw SyntaxError("Unexpected identifier $expr")
-        }
-    }
 }
 
-private fun unexpected(expr : String) : String = "Unexpected '$expr'"
+private fun unexpected(expr : String) : String = "Unexpected token '$expr'"
 

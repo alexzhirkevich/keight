@@ -33,6 +33,9 @@ public interface ScriptRuntime : LangContext {
     public fun reset()
 }
 
+public operator fun ScriptRuntime.set(variable: Any?, value: Any?): Unit =
+    set(variable, fromKotlin(value), null)
+
 private class ScopedRuntime(
     private val parent : ScriptRuntime
 ) : DefaultRuntime(), LangContext by parent {

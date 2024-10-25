@@ -29,12 +29,13 @@ internal fun ListIterator<Char>.tokens() : List<Token> {
                 ':' -> Token.Operator.Colon
                 ';' -> Token.Operator.SemiColon
                 ',' -> Token.Operator.Comma
-                '.' -> Token.Operator.Dot
+                '.' -> Token.Operator.Period
+                '?' -> Token.Operator.QuestionMark
                 '\n' -> Token.NewLine
                 in STRING_START -> string(c)
                 in NUMBERS -> number(c)
                 in JAVASCRIPT_WHITESPACE -> Token.Whitespace(c)
-                in PROPERTY_ALPHABET -> property(c) // + keywords
+                in IDENTIFIER_ALPHABET -> identifier(c) // + keywords
                 else -> continue
             }
             add(token)
@@ -374,7 +375,7 @@ private fun ListIterator<Char>.number(start : Char) : Token.Num {
     return Token.Num(number, numberFormat, isFloat)
 }
 
-private fun ListIterator<Char>.property(start : Char) : Token {
+private fun ListIterator<Char>.identifier(start : Char) : Token {
     val value = StringBuilder(start.toString())
 
     while (hasNext()) {
@@ -404,7 +405,6 @@ private fun ListIterator<Char>.property(start : Char) : Token {
         "function" -> Token.Keyword.Function
         "return" -> Token.Keyword.Return
         "class" -> Token.Keyword.Class
-        "new" -> Token.Keyword.New
         "switch" -> Token.Keyword.Switch
         "case" -> Token.Keyword.Case
         "default" -> Token.Keyword.Default
@@ -413,11 +413,12 @@ private fun ListIterator<Char>.property(start : Char) : Token {
         "catch" -> Token.Keyword.Catch
         "finally" -> Token.Keyword.Finally
 
+        "new" -> Token.Operator.New
         "in" -> Token.Operator.In
         "instanceof" -> Token.Operator.Instanceof
         "typeof" -> Token.Operator.Typeof
 
-        else -> Token.Property(string)
+        else -> Token.Identifier(string)
     }
 }
 
@@ -448,5 +449,5 @@ private val JAVASCRIPT_WHITESPACE = hashSetOf(
     '\ufeff'   // byte order mark
 )
 
-private val PROPERTY_ALPHABET = (('a'..'z').toList() + ('A'..'Z').toList() + '$' + '_' ).toHashSet()
-private val PROPERTY_ALPHABET_WITH_NUM = (PROPERTY_ALPHABET + NUMBERS).toHashSet()
+private val IDENTIFIER_ALPHABET = (('a'..'z').toList() + ('A'..'Z').toList() + '$' + '_' ).toHashSet()
+private val PROPERTY_ALPHABET_WITH_NUM = (IDENTIFIER_ALPHABET + NUMBERS).toHashSet()

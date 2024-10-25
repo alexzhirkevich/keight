@@ -43,15 +43,20 @@ internal class OpGetVariable(
         return if (assignmentType != null) {
             context.set(name, 0f, assignmentType)
         } else {
-            when (val res = receiver?.invoke(context)) {
-                is ESAny -> res[name]
-                else ->
-                    if (name in context) {
-                        context[name]
-                    } else {
-                        unresolvedReference(name)
-                    }
-            }
+            getImpl(receiver, context)
+        }
+    }
+
+    private tailrec fun getImpl(res: Any?, context: ScriptRuntime): Any? {
+        return when (res) {
+            is Expression -> getImpl(res.invoke(context), context)
+            is ESAny -> res[name]
+            else ->
+                if (name in context) {
+                    context[name]
+                } else {
+                    unresolvedReference(name)
+                }
         }
     }
 }

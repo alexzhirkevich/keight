@@ -21,14 +21,7 @@ public interface ESObject : ESAny {
         context: ScriptRuntime,
         arguments: List<Expression>
     ): Any? {
-        val f = get(function)
-        if (f !is Callable) {
-            when (f) {
-                "toString" -> return toString()
-                else -> unresolvedReference(function)
-            }
-        }
-        return f.invoke(arguments, context)
+        TODO()
     }
 }
 
@@ -69,7 +62,10 @@ internal open class ESObjectBase(
         get() = map.entries.map { listOf(it.key, it.value) }
 
     override fun get(variable: Any?): Any? {
-        return if (contains(variable)) map[variable] else Unit
+        return if (contains(variable))
+            map[variable]
+        else
+            super.get(variable)
     }
     override fun set(variable: Any?, value: Any?) {
         map[variable] = value

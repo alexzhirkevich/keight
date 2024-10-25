@@ -40,7 +40,7 @@ internal fun ESMath() : ESObject {
         "hypot".func(
             "values",
             params = { FunctionParam(it, isVararg = true) }
-        ) { opVararg(it, ::hypotN) }
+        ) { opVararg(it, { 0 }, ::hypotN) }
         "imul".func("x", "y",) { op2(it, ::imul) }
         "log".func("x") { op1(it, ::ln) }
         "log10".func("x") { op1(it, ::log10) }
@@ -50,12 +50,12 @@ internal fun ESMath() : ESObject {
             "values",
             params = { FunctionParam(it, isVararg = true) }
         ) {
-            opVararg(it, List<Double>::max)
+            opVararg(it, { Double.NEGATIVE_INFINITY }, List<Double>::max)
         }
         "min".func(
             "values",
             params = { FunctionParam(it, isVararg = true) }
-        ) { opVararg(it, List<Double>::min) }
+        ) { opVararg(it, { Double.POSITIVE_INFINITY }, List<Double>::min) }
         "pow".func("x", "y",) { op2(it, Double::pow) }
         "random".func("x") { Expression { Random.nextDouble() } }
         "round".func("x") { op1(it, ::round) }
@@ -90,10 +90,12 @@ private fun  ScriptRuntime.op2(
 
 private fun ScriptRuntime.opVararg(
     args: List<Any?>,
+    onEmpty : () -> Number,
     func: (List<Double>) -> Number,
 ): Any? {
-    check(args.isNotEmpty()){
 
+    if (args.isEmpty() || (args[0] as List<*>).isEmpty()){
+        return onEmpty()
     }
     val a = (args[0] as List<*>).fastMap {
         toNumber(it, strict = false).toDouble()

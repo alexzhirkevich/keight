@@ -20,8 +20,7 @@ public class ESInterpreter(
 
         return ESTokenInterpreter(
             script = script,
-            langContext = langContext,
-            globalContext = interpretationContext
+            langContext = langContext
         ).interpret()
     }
 }

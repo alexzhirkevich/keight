@@ -24,7 +24,7 @@ internal class ESObjectAccessor : ESFunctionBase("Object") {
         fKeys, fEntries
     )
 
-    override fun invoke(args: List<Expression>, context: ScriptRuntime): Any? {
-        return args.single().invoke(context) as ESObject
+    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        return args.single().invoke(runtime) as ESObject
     }
 }

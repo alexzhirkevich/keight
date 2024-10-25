@@ -73,7 +73,6 @@ class ObjectTest {
         "Object.entries({ name : 'test', x : 1 })".eval()
             .assertEqualsTo(listOf(listOf("name", "test"), listOf("x", 1L)))
         ("Object.entries(1)".eval() as List<*>).size.assertEqualsTo(0)
-
     }
 
     @Test

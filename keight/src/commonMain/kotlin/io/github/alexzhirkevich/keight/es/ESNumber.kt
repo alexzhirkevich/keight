@@ -79,8 +79,8 @@ internal class ESNumber : ESFunctionBase("Number") {
         }
     }
 
-    override fun invoke(args: List<Expression>, context: ScriptRuntime): Number {
-        return context.toNumber(args.single().invoke(context))
+    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Number {
+        return runtime.toNumber(args.single().invoke(runtime))
     }
 
     override fun newInstance(args: List<Expression>, context: ScriptRuntime): JsNumberClass {

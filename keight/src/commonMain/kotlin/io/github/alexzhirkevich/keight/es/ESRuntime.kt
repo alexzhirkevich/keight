@@ -6,6 +6,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptIO
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
+import io.github.alexzhirkevich.keight.set
 import kotlin.jvm.JvmInline
 
 public abstract class ESRuntime(
@@ -21,6 +22,10 @@ public abstract class ESRuntime(
 
     init {
         init()
+    }
+
+    override fun contains(variable: Any?): Boolean {
+        return super<DefaultRuntime>.contains(variable)
     }
 
     override fun reset() {
@@ -46,20 +51,21 @@ public abstract class ESRuntime(
 
     private fun getInternal(variable: Any?) : Any? {
         if (variable in this){
-            return super.get(variable)
+            return super<DefaultRuntime>.get(variable)
         }
 
-        val globalThis = get("globalThis") as? ESAny? ?: return super.get(variable)
+        val globalThis = get("globalThis") as? ESAny?
+            ?: return super<DefaultRuntime>.get(variable)
 
         if (variable in globalThis){
             return globalThis[variable]
         }
 
-        return super.get(variable)
+        return super<DefaultRuntime>.get(variable)
     }
 
     final override fun set(variable: Any?, value: Any?) {
-        set(variable, fromKotlin(value), VariableType.Local)
+        (this as ScriptRuntime).set(variable, value)
     }
 
     override fun invoke(

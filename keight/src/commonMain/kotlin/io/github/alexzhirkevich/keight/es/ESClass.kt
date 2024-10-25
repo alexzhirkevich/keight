@@ -89,9 +89,9 @@ internal open class ESClassBase(
 
     final override var constructorClass: Expression = OpConstant(this)
 
-    override fun invoke(args: List<Expression>, context: ScriptRuntime): Any? {
+    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
 
-        val superConstructor = (extends?.invoke(context) as? ESClass)?.construct?.let {
+        val superConstructor = (extends?.invoke(runtime) as? ESClass)?.construct?.let {
             it.copy(
                 body = { r ->
                     if (isSuperInitialized) {
@@ -108,7 +108,7 @@ internal open class ESClassBase(
 
         val clazz = ESClassBase(
             name = name,
-            functions = (superFunctions(context) + functions).map(Function::copy),
+            functions = (superFunctions(runtime) + functions).map(Function::copy),
             construct = construct?.copy(
                 extraVariables = if (superConstructor != null){
                     mapOf("super" to (VariableType.Const to superConstructor))
@@ -125,7 +125,7 @@ internal open class ESClassBase(
         }
         clazz.construct?.thisRef = clazz
 
-        clazz.construct?.invoke(args, context)
+        clazz.construct?.invoke(args, runtime)
 
         return clazz
     }

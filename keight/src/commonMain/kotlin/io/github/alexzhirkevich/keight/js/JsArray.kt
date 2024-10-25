@@ -11,7 +11,6 @@ import io.github.alexzhirkevich.keight.common.fastFilter
 import io.github.alexzhirkevich.keight.common.fastMap
 import io.github.alexzhirkevich.keight.common.valueAtIndexOrUnit
 import io.github.alexzhirkevich.keight.es.ESAny
-import io.github.alexzhirkevich.keight.es.checkArgs
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 
@@ -20,10 +19,27 @@ internal value class JsArray(
     override val value : MutableList<Any?>
 ) : ESAny, JsWrapper<MutableList<Any?>>, MutableList<Any?> by value {
 
-    override fun get(variable: Any?): Any {
-        return when (variable){
+    override fun get(variable: Any?): Any? {
+        return when (variable) {
             "length" -> value.size
-            else -> Unit
+
+            "indexOf" -> IndexOf(value)
+            "lastIndexOf" -> LastIndexOf(value)
+            "forEach" -> ForEach(value)
+            "map" -> Map(value)
+            "filter" -> Filter(value)
+            "reduce" -> Reduce(value)
+            "reduceRight" -> ReduceRight(value)
+            "some" -> Some(value)
+            "every" -> Every(value)
+            "reverse" -> Reverse(value)
+            "toReversed" -> ToReversed(value)
+            "sort" -> Sort(value)
+            "toSorted" -> ToSorted(value)
+            "slice" -> Slice(value)
+            "at" -> At(value)
+            "includes" -> Includes(value)
+            else -> super.get(variable)
         }
     }
 
@@ -31,124 +47,188 @@ internal value class JsArray(
         return value.joinToString(separator = ",")
     }
 
-    override fun invoke(
-        function: String,
-        context: ScriptRuntime,
-        arguments: List<Expression>
-    ): Any? {
-        return when (function){
-            "indexOf" -> value.indexOf(false,function, context, arguments)
-            "lastIndexOf" -> value.indexOf(true,function, context, arguments)
-            "forEach" -> {
-                op(context, arguments, function) { callable ->
-                    value.forEach {
-                        callable.invoke(listOf(OpConstant(it)), context)
-                    }
-                }
-            }
-            "map" -> {
-                op(context, arguments, function) { callable ->
-                    value.fastMap {
-                        callable.invoke(listOf(OpConstant(it)), context)
-                    }
-                }
-            }
-            "filter" -> {
-                op(context, arguments, function) { callable ->
-                    value.fastFilter {
-                       !context.isFalse(callable.invoke(listOf(OpConstant(it)), context))
-                    }
-                }
-            }
-            "reduce" -> {
-                val v = if (arguments.size > 1) {
-                    listOf(arguments[1].invoke(context)) + value
-                } else {
-                    value
-                }
-                op(context, arguments, function) { callable ->
-                    v.reduce { acc, any ->
-                        callable.invoke(
-                            listOf(
-                                OpConstant(acc),
-                                OpConstant(any),
-                            ),
-                            context
-                        )
-                    }
-                }
-            }
-            "reduceRight" -> {
-                val v = if (arguments.size > 1) {
-                    value + arguments[1].invoke(context)
-                } else {
-                    value
-                }
-                op(context, arguments, function) { callable ->
-                    v.reduceRight { acc, any ->
-                        callable.invoke(
-                            listOf(
-                                OpConstant(acc),
-                                OpConstant(any),
-                            ),
-                            context
-                        )
-                    }
-                }
-            }
-            "some" -> {
-                op(context, arguments, function) { callable ->
-                    value.any {
-                        !context.isFalse(callable.invoke(listOf(OpConstant(it)), context))
-                    }
-                }
-            }
-            "very" -> {
-                op(context, arguments, function) { callable ->
-                    value.all {
-                        !context.isFalse(callable.invoke(listOf(OpConstant(it)), context))
-                    }
-                }
-            }
-            "reverse" -> value.reverse()
-            "toReversed" -> JsArray(value.reversed().toMutableList())
-            "sort" -> {
-                value.sortWith(context.comparator)
-                this
-            }
-            "toSorted" -> JsArray(value.sortedWith(context.comparator).toMutableList())
-            "slice" -> {
-                if (arguments.isEmpty()){
-                    this
-                } else {
-                    val start = arguments[0].invoke(context).let(context::toNumber).toInt()
-                    val end = if (arguments.size < 2)
-                        value.size
-                    else
-                        arguments[1].invoke(context).let(context::toNumber).toInt().coerceIn(0, value.size)
+    @JvmInline
+    private value class IndexOf(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            return value.indexOf(false, runtime, args)
+        }
+    }
 
-                    value.slice(start..<end)
+    @JvmInline
+    private value class LastIndexOf(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            return value.indexOf(true, runtime, args)
+        }
+    }
+
+    @JvmInline
+    private value class ForEach(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            return op(runtime, args) { callable ->
+                value.forEach {
+                    callable.invoke(listOf(OpConstant(it)), runtime)
                 }
             }
-            "at" -> {
-                val idx = arguments[0].invoke(context).let(context::toNumber).toInt()
-                value.valueAtIndexOrUnit(idx)
+        }
+    }
+
+    @JvmInline
+    private value class Map(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            return op(runtime, args) { callable ->
+                value.fastMap {
+                    callable.invoke(listOf(OpConstant(it)), runtime)
+                }
             }
-            "includes" -> {
-                val v = arguments[0].invoke(context)
-                val fromIndex = arguments.getOrNull(1)?.let(context::toNumber)?.toInt() ?: 0
-                value.indexOf(v) > fromIndex
+        }
+    }
+
+    @JvmInline
+    private value class Filter(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            return op(runtime, args) { callable ->
+                value.fastFilter {
+                    !runtime.isFalse(callable.invoke(listOf(OpConstant(it)), runtime))
+                }
             }
-            else -> super.invoke(function, context, arguments)
+        }
+    }
+
+    @JvmInline
+    private value class Reduce(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            val v = if (args.size > 1) {
+                listOf(args[1].invoke(runtime)) + value
+            } else {
+                value
+            }
+            return op(runtime, args) { callable ->
+                v.reduce { acc, any ->
+                    callable.invoke(
+                        listOf(
+                            OpConstant(acc),
+                            OpConstant(any),
+                        ),
+                        runtime
+                    )
+                }
+            }
+        }
+    }
+
+    @JvmInline
+    private value class ReduceRight(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            val v = if (args.size > 1) {
+                value + args[1].invoke(runtime)
+            } else {
+                value
+            }
+            return op(runtime, args) { callable ->
+                v.reduceRight { acc, any ->
+                    callable.invoke(
+                        listOf(
+                            OpConstant(acc),
+                            OpConstant(any),
+                        ),
+                        runtime
+                    )
+                }
+            }
+        }
+    }
+
+    @JvmInline
+    private value class Some(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            return op(runtime, args) { callable ->
+                value.any {
+                    !runtime.isFalse(callable.invoke(listOf(OpConstant(it)), runtime))
+                }
+            }
+        }
+    }
+
+    @JvmInline
+    private value class Every(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            return op(runtime, args) { callable ->
+                value.any {
+                    !runtime.isFalse(callable.invoke(listOf(OpConstant(it)), runtime))
+                }
+            }
+        }
+    }
+
+    @JvmInline
+    private value class Reverse(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime) {
+            return value.reverse()
+        }
+    }
+
+    @JvmInline
+    private value class ToReversed(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            return value.reversed()
+        }
+    }
+
+    @JvmInline
+    private value class Sort(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime) {
+            return value.sortWith(runtime.comparator)
+        }
+    }
+
+    @JvmInline
+    private value class ToSorted(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime) : Any?{
+            return value.sortedWith(runtime.comparator)
+        }
+    }
+
+    @JvmInline
+    private value class Slice(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime) : Any?{
+            return if (args.isEmpty()) {
+                value
+            } else {
+                val start = args[0].invoke(runtime).let(runtime::toNumber).toInt()
+                val end = if (args.size < 2)
+                    value.size
+                else
+                    args[1].invoke(runtime).let(runtime::toNumber).toInt()
+                        .coerceIn(0, value.size)
+
+                value.slice(start..<end)
+            }
+        }
+    }
+
+    @JvmInline
+    private value class At(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime) : Any?{
+            val idx = args[0].invoke(runtime).let(runtime::toNumber).toInt()
+            return value.valueAtIndexOrUnit(idx)
+        }
+    }
+
+    @JvmInline
+    private value class Includes(val value: MutableList<Any?>) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime) : Any?{
+            val v = args[0].invoke(runtime)
+            val fromIndex = args.getOrNull(1)?.let(runtime::toNumber)?.toInt() ?: 0
+            return value.indexOf(v) > fromIndex
         }
     }
 }
 
+
 private fun <R> op(
-    runtime : ScriptRuntime,
+    runtime: ScriptRuntime,
     arguments: List<Expression>,
-    function: String,
-    op : (Callable) -> R
+    op: (Callable) -> R
 ) : R {
     val func = arguments[0].invoke(runtime)
     if (func !is Callable){
@@ -159,11 +239,9 @@ private fun <R> op(
 
 private fun List<*>.indexOf(
     last : Boolean,
-    function: String,
     context: ScriptRuntime,
     arguments: List<Expression>
 ): Any {
-    checkArgs(arguments, 1, function)
     val search = checkNotEmpty(arguments.argAt(0).invoke(context))
 
     return if (last)

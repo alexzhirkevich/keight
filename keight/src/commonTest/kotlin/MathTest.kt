@@ -25,5 +25,12 @@ class MathTest {
         "Math.hypot(5, 12)".eval().assertEqualsTo(13.0)
         "Math.hypot(3, 4, 5)".eval().assertEqualsTo(7.071068)
         "Math.hypot(-5)".eval().assertEqualsTo(5.0)
+        "Math.hypot()".eval().assertEqualsTo(0)
+
+        "Math.min(1,2)".eval().assertEqualsTo(1.0)
+        "Math.min()".eval().assertEqualsTo(Double.POSITIVE_INFINITY)
+
+        "Math.max(1,2)".eval().assertEqualsTo(2.0)
+        "Math.max()".eval().assertEqualsTo(Double.NEGATIVE_INFINITY)
     }
 }

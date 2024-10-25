@@ -9,7 +9,11 @@ import kotlin.test.assertFailsWith
 class SyntaxTest {
 
     @Test
-    fun newline_property() {
+    fun newline_property_chaining() {
+        """
+            Math.imul(3,4).toString()
+        """.trimIndent().eval().assertEqualsTo("12")
+
         """
             Math
                 .imul(3,4)

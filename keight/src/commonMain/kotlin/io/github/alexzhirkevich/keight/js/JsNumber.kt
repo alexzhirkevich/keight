@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.argAtOrNull
+import io.github.alexzhirkevich.keight.common.Callable
 import io.github.alexzhirkevich.keight.common.Function
 import io.github.alexzhirkevich.keight.es.ESAny
 import io.github.alexzhirkevich.keight.es.ESClass
@@ -22,7 +23,7 @@ internal class JsNumberClass(
     JsWrapper<Number> by number,
     Comparable<JsWrapper<Number>> by number {
 
-    override fun invoke(args: List<Expression>, context: ScriptRuntime): Any? = Unit
+    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? = Unit
 
     override fun toString(): String {
         return number.toString()
@@ -32,7 +33,7 @@ internal class JsNumberClass(
         get() = "Number"
 
     override fun get(variable: Any?): Any? {
-        return number[variable] ?: super.get(variable)
+        return number[variable] ?: super<ESObjectBase>.get(variable)
     }
 
     override val functions: List<Function> get() = emptyList()
@@ -54,36 +55,15 @@ internal value class JsNumber(
     override val type: String get() = "number"
 
     override fun get(variable: Any?): Any? {
-        unresolvedReference(variable.toString())
+        return when(variable){
+            "toFixed" -> ToFixed(value)
+            "toPrecision" -> ToPrecision(value)
+            else -> super.get(variable)
+        }
     }
 
     override fun toString(): String {
         return value.toString()
-    }
-
-    override fun invoke(
-        function: String,
-        context: ScriptRuntime,
-        arguments: List<Expression>
-    ): Any? {
-        return when(function){
-            "toFixed" -> {
-                checkArgsNotNull(arguments, function)
-                val digit = arguments.argAtOrNull(0)?.invoke(context)?.let(context::toNumber)?.toInt()
-                value.toFixed(digit ?: 0)
-            }
-            "toPrecision" -> {
-                checkArgsNotNull(arguments, function)
-                val digit = arguments.argAtOrNull(0)?.invoke(context)?.let(context::toNumber)?.toInt()
-                value.toPrecision(digit)
-            }
-
-            else -> super.invoke(function, context, arguments)
-        }
-    }
-
-    override fun contains(variable: Any?): Boolean {
-        return variable == "toFixed" || variable == "toPrecision"
     }
 
     override fun compareTo(other: JsWrapper<Number>): Int {
@@ -91,30 +71,34 @@ internal value class JsNumber(
     }
 }
 
-private fun Number.toPrecision(digits: Int?) : Double {
-
-    if (digits == null){
-        return toDouble()
+@JvmInline
+private value class ToPrecision(val value: Number) : Callable {
+    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Double {
+        val digits = args.argAtOrNull(0)?.invoke(runtime) ?: return value.toDouble()
+        return value.toDouble().roundTo(runtime.toNumber(digits).toInt() - 1)
     }
-    return toDouble().roundTo(digits-1)
 }
 
-private fun Number.toFixed(digits: Int) : String {
+@JvmInline
+private value class ToFixed(val value: Number) : Callable {
+    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+        val digits = args.argAtOrNull(0)?.invoke(runtime)?.let(runtime::toNumber)?.toInt() ?: 0
 
-    if (digits == 0) {
-        return toDouble().roundToLong().toString()
+        if (digits == 0) {
+            return value.toDouble().roundToLong().toString()
+        }
+
+        val stringNumber = value.toDouble().roundTo(digits).toString()
+
+        val intPart = stringNumber.substringBefore(".")
+        val floatPart = stringNumber.substringAfter(".", "").take(digits)
+
+        if (floatPart.isBlank()) {
+            return intPart
+        }
+
+        return (intPart + "." + floatPart.padEnd(digits, '0'))
     }
-
-    val stringNumber = toDouble().roundTo(digits).toString()
-
-    val intPart = stringNumber.substringBefore(".")
-    val floatPart = stringNumber.substringAfter(".", "").take(digits)
-
-    if (floatPart.isBlank()) {
-        return intPart
-    }
-
-    return (intPart + "." + floatPart.padEnd(digits, '0'))
 }
 
 private val pow10 by lazy {

@@ -4,8 +4,8 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.argAtOrNull
+import io.github.alexzhirkevich.keight.common.Callable
 import io.github.alexzhirkevich.keight.common.checkNotEmpty
-import io.github.alexzhirkevich.keight.common.fastMap
 import io.github.alexzhirkevich.keight.common.valueAtIndexOrUnit
 import io.github.alexzhirkevich.keight.es.ESAny
 import io.github.alexzhirkevich.keight.es.checkArgs
@@ -26,228 +26,238 @@ internal value class JsString(
         return value
     }
 
-    override fun get(variable: Any?): Any {
+    override fun get(variable: Any?): Any? {
         return when(variable){
             "length" -> value.length.toLong()
-            else -> Unit
+            "charAt", "at" -> CharAt(value)
+            "indexOf" -> IndexOf(value)
+            "lastIndexOf" -> LastIndexOf(value)
+            "concat" -> Concat(value)
+            "charCodeAt" -> CharCodeAt(value)
+            "endsWith" -> EndsWith(value)
+            "split" -> Split(value)
+            "startsWith" -> StartsWith(value)
+            "includes" -> Includes(value)
+            "padStart" -> PadStart(value)
+            "padEnd" -> PadEnd(value)
+            "match" -> Match(value)
+            "replace" -> Replace(value)
+            "replaceAll" -> ReplaceAll(value)
+            "repeat" -> Repeat(value)
+            "substring","substr" -> Substring(value)
+            "trim" -> Trim(value)
+            "trimStart" -> TrimStart(value)
+            "trimEnd" -> TrimEnd(value)
+            "toUpperCase", "toLocaleUpperCase" -> ToUpperCase(value)
+            "toLowerCase", "toLocaleLowerCase" -> ToLowerCase(value)
+            else -> super.get(variable)
         }
-    }
-
-    override fun invoke(
-        function: String,
-        context: ScriptRuntime,
-        arguments: List<Expression>
-    ): Any? {
-        return when (function) {
-            "charAt", "at" -> value.charAt(function, context, arguments)
-            "indexOf", -> value.indexOf(false,function, context, arguments)
-            "lastIndexOf", -> value.indexOf(true, function, context, arguments)
-            "concat" -> value.concat(function, context, arguments)
-            "charCodeAt" -> value.charCodeAt(function, context, arguments)
-            "endsWith" -> value.endsWith(function, context, arguments)
-            "split"->value.split(function, context, arguments)
-            "startsWith" -> value.startsWith(function, context, arguments)
-            "includes" -> value.includes(function, context, arguments)
-            "padStart" -> value.padStart(function, context, arguments)
-            "padEnd" -> value.padEnd(function, context, arguments)
-            "match" -> value.match(function, context, arguments)
-            "replace" -> value.replace(false, function, context, arguments)
-            "replaceAll" -> value.replace(true, function, context, arguments)
-            "repeat" -> value.repeat(function, context, arguments)
-            "trim" -> value.trim()
-            "trimStart" -> value.trimStart()
-            "trimEnd" -> value.trimEnd()
-            "substring", "substr" -> value.substring(function, context, arguments)
-            "toUpperCase", "toLocaleLowerCase" -> value.uppercase()
-            "toLowerCase", "toLocaleUppercase" -> value.uppercase()
-            else -> super.invoke(function, context, arguments)
-        }
-    }
-
-    override fun contains(variable: Any?): Boolean {
-        return variable in methods
     }
 
     override fun compareTo(other: JsString): Int {
         return value.compareTo(other.value)
     }
-}
 
-private var methods = setOf(
-    "charAt",
-    "at",
-    "indexOf",
-    "lastIndexOf",
-    "charCodeAt",
-    "endsWith",
-    "startsWith",
-    "includes",
-    "padStart",
-    "padEnd",
-    "match",
-    "replace",
-    "replaceAll",
-    "repeat",
-    "trim",
-    "trimStart",
-    "trimEnd",
-    "substring",
-    "substr",
-    "toUppercase",
-    "toLocaleUppercase",
-    "toLowerCase",
-    "toLocaleLowerCase",
-)
-
-private fun String.charAt(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): Any {
-    checkArgs(arguments, 1, function)
-    val idx = arguments.argAt(0).invoke(context).let(context::toNumber).toInt()
-    return valueAtIndexOrUnit(idx)
-}
-
-private fun String.indexOf(
-    last : Boolean,
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): Any {
-    checkArgs(arguments, 1, function)
-    val search = checkNotEmpty(arguments.argAt(0).invoke(context).toString()[0])
-
-    return if (last)
-        lastIndexOf(search)
-    else indexOf(search)
-}
-
-private fun String.concat(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): String {
-    return this + arguments.joinToString("") { it.invoke(context).toString() }
-}
-
-private fun String.charCodeAt(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): Int {
-    checkArgs(arguments, 1, function)
-    val ind = arguments.argAt(0).invoke(context).let(context::toNumber).toInt()
-    return get(ind).code
-}
-
-private fun String.endsWith(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): Boolean {
-    checkArgsNotNull(arguments, function)
-    val searchString = arguments.argAt(0).invoke(context).toString()
-    val position = arguments.argAtOrNull(1)?.invoke(context)?.let(context::toNumber)?.toInt()
-    return if (position == null) {
-        endsWith(searchString)
-    } else {
-        take(position.toInt()).endsWith(searchString)
-    }
-}
-
-private fun String.split(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-) : List<String> {
-    val delimiters = arguments.argAt(0).invoke(context).toString()
-    return split(delimiters).let { it
-        if (delimiters.isEmpty()) {
-            it.subList(1, it.size - 1)
-        } else it
-    }
-}
-
-private fun String.startsWith(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): Boolean {
-
-    val searchString = arguments.argAt(0).invoke(context).toString()
-    val position = arguments.argAtOrNull(1)?.invoke(context)?.let(context::toNumber)?.toInt()
-    return if (position == null) {
-        startsWith(searchString)
-    } else {
-        drop(position.toInt()).startsWith(searchString)
-    }
-}
-
-
-private fun String.includes(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): Boolean {
-    val searchString = arguments.argAt(0).invoke(context).toString()
-    val position = arguments.argAtOrNull(1)?.invoke(context)?.let(context::toNumber)?.toInt()
-
-    return if (position == null) {
-        contains(searchString)
-    } else {
-        drop(position.toInt()).contains(searchString)
-    }
-}
-private fun String.padStart(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): String {
-    val targetLength = arguments.argAt(0).invoke(context).let(context::toNumber).toInt()
-    val padString = arguments.argAtOrNull(1)?.invoke(context)?.toString() ?: " "
-    val toAppend = targetLength - length
-
-    return buildString(targetLength) {
-        while (length < toAppend) {
-            append(padString.take(toAppend - length))
-        }
-        append(this@padStart)
-    }
-}
-private fun String.padEnd(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): String {
-    val targetLength = arguments.argAt(0).invoke(context).let(context::toNumber).toInt()
-    val padString = arguments.argAtOrNull(1)?.invoke(context)?.toString() ?: " "
-
-    return buildString(targetLength) {
-        append(this@padEnd)
-        while (length < targetLength) {
-            append(padString.take(targetLength - length))
+    @JvmInline
+    private value class CharAt(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            val idx = args.argAt(0).invoke(runtime).let(runtime::toNumber).toInt()
+            return valueAtIndexOrUnit(idx)
         }
     }
-}
 
-private fun String.match(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): Boolean {
-    checkArgs(arguments, 1, function)
-    val regex = arguments.argAt(0).invoke(context).toString()
-    return matches(regex.toRegex())
+    @JvmInline
+    private value class IndexOf(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Int {
+            val search = checkNotEmpty(args.argAt(0).invoke(runtime).toString()[0])
+            return value.indexOf(search)
+        }
+    }
+
+    @JvmInline
+    private value class LastIndexOf(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Int {
+            val search = checkNotEmpty(args.argAt(0).invoke(runtime).toString()[0])
+            return value.lastIndexOf(search)
+        }
+    }
+
+    @JvmInline
+    private value class Concat(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            return value + args.joinToString("") { it.invoke(runtime).toString() }
+        }
+    }
+
+    @JvmInline
+    private value class CharCodeAt(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Int {
+            val ind = args.argAt(0).invoke(runtime).let(runtime::toNumber).toInt()
+            return value[ind].code
+        }
+    }
+
+
+    @JvmInline
+    private value class EndsWith(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Boolean {
+            val searchString = args.argAt(0).invoke(runtime).toString()
+            val position = args.argAtOrNull(1)?.invoke(runtime)?.let(runtime::toNumber)?.toInt()
+            return if (position == null) {
+                value.endsWith(searchString)
+            } else {
+                value.take(position.toInt()).endsWith(searchString)
+            }
+        }
+    }
+
+    @JvmInline
+    private value class Split(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): List<String> {
+            val delimiters = args.argAt(0).invoke(runtime).toString()
+            return value.split(delimiters).let { it
+                if (delimiters.isEmpty()) {
+                    it.subList(1, it.size - 1)
+                } else it
+            }
+        }
+    }
+
+    @JvmInline
+    private value class StartsWith(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Boolean {
+            val searchString = args.argAt(0).invoke(runtime).toString()
+            val position = args.argAtOrNull(1)?.invoke(runtime)?.let(runtime::toNumber)?.toInt()
+            return if (position == null) {
+                value.startsWith(searchString)
+            } else {
+                value.drop(position.toInt()).startsWith(searchString)
+            }
+        }
+    }
+
+    @JvmInline
+    private value class Includes(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Boolean {
+            val searchString = args.argAt(0).invoke(runtime).toString()
+            val position = args.argAtOrNull(1)?.invoke(runtime)?.let(runtime::toNumber)?.toInt()
+
+            return value.indexOf(searchString, startIndex = position ?: 0) >=0
+        }
+    }
+
+    @JvmInline
+    private value class PadStart(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            val targetLength = args.argAt(0).invoke(runtime).let(runtime::toNumber).toInt()
+            val padString = args.argAtOrNull(1)?.invoke(runtime)?.toString() ?: " "
+            val toAppend = targetLength - value.length
+
+            return buildString(targetLength) {
+                while (length < toAppend) {
+                    append(padString.take(toAppend - length))
+                }
+                append(value)
+            }
+        }
+    }
+
+    @JvmInline
+    private value class PadEnd(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            val targetLength = args.argAt(0).invoke(runtime).let(runtime::toNumber).toInt()
+            val padString = args.argAtOrNull(1)?.invoke(runtime)?.toString() ?: " "
+
+            return buildString(targetLength) {
+                append(value)
+                while (length < targetLength) {
+                    append(padString.take(targetLength - length))
+                }
+            }
+        }
+    }
+
+    @JvmInline
+    private value class Match(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Boolean {
+            val regex = args.argAt(0).invoke(runtime).toString()
+            return value.matches(regex.toRegex())
+        }
+    }
+
+    @JvmInline
+    private value class Replace(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            return value.replace(false, runtime, args)
+        }
+    }
+    @JvmInline
+    private value class ReplaceAll(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            return value.replace(true, runtime, args)
+        }
+    }
+
+    @JvmInline
+    private value class Repeat(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            val count = args.argAt(0).invoke(runtime).let(runtime::toNumber).toInt()
+            return value.repeat(count)
+        }
+    }
+
+    @JvmInline
+    private value class Substring(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            val start = args.argAt(0).invoke(runtime).let(runtime::toNumber).toInt()
+            val end = args.argAtOrNull(1)?.invoke(runtime)
+                ?.let(runtime::toNumber)?.toInt()?.coerceAtMost(value.length) ?: value.length
+            return value.substring(start, end)
+        }
+    }
+
+    @JvmInline
+    private value class Trim(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            return value.trim()
+        }
+    }
+
+    @JvmInline
+    private value class TrimStart(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            return value.trimStart()
+        }
+    }
+
+    @JvmInline
+    private value class TrimEnd(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            return value.trimEnd()
+        }
+    }
+
+    @JvmInline
+    private value class ToUpperCase(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            return value.uppercase()
+        }
+    }
+
+    @JvmInline
+    private value class ToLowerCase(val value: String) : Callable {
+        override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
+            return value.lowercase()
+        }
+    }
+
 }
 
 private fun String.replace(
     all : Boolean,
-    function: String,
     context: ScriptRuntime,
     arguments: List<Expression>
 ): String {
-    checkArgs(arguments, 2, function)
     val pattern = arguments.argAt(0).invoke(context).toString()
     val replacement = arguments.argAt(1).invoke(context).toString()
 
@@ -258,23 +268,4 @@ private fun String.replace(
     }
 }
 
-private fun String.repeat(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): String {
-    checkArgs(arguments, 1, function)
-    val count = arguments.argAt(0).invoke(context).let(context::toNumber).toInt()
-    return repeat(count)
-}
 
-private fun String.substring(
-    function: String,
-    context: ScriptRuntime,
-    arguments: List<Expression>
-): String {
-    val start = arguments.argAt(0).invoke(context).let(context::toNumber).toInt()
-    val end = arguments.argAtOrNull(1)?.invoke(context)
-        ?.let(context::toNumber)?.toInt()?.coerceAtMost(length) ?: length
-    return substring(start, end)
-}
