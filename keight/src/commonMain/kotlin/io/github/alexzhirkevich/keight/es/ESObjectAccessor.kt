@@ -2,7 +2,7 @@ package io.github.alexzhirkevich.keight.es
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.common.Function
+import io.github.alexzhirkevich.keight.expressions.Function
 import io.github.alexzhirkevich.keight.invoke
 
 internal class ESObjectAccessor : ESFunctionBase("Object") {

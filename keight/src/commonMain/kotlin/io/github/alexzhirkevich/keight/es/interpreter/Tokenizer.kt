@@ -1,9 +1,10 @@
 package io.github.alexzhirkevich.keight.es.interpreter
 
 import io.github.alexzhirkevich.keight.es.SyntaxError
-import io.github.alexzhirkevich.keight.es.syntaxCheck
 
-internal fun ListIterator<Char>.tokens() : List<Token> {
+internal fun ListIterator<Char>.tokens(
+    ignoreWhitespaces : Boolean = false
+) : List<Token> {
     return buildList {
         while (hasNext()) {
             val token = when (val c = next()) {
@@ -34,7 +35,12 @@ internal fun ListIterator<Char>.tokens() : List<Token> {
                 '\n' -> Token.NewLine
                 in STRING_START -> string(c)
                 in NUMBERS -> number(c)
-                in JAVASCRIPT_WHITESPACE -> Token.Whitespace(c)
+                in JAVASCRIPT_WHITESPACE -> if (ignoreWhitespaces) {
+                    continue
+                } else {
+                    Token.Whitespace(c)
+                }
+
                 in IDENTIFIER_ALPHABET -> identifier(c) // + keywords
                 else -> continue
             }

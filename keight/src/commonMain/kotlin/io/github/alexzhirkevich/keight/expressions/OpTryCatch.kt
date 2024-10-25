@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.common
+package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.VariableType
@@ -40,6 +40,8 @@ private fun TryCatchFinally(
 ) = Expression {
     try {
         tryBlock(it)
+    } catch (x: ScopeException) {
+        throw x
     } catch (t: Throwable) {
         if (catchVariableName != null) {
             val throwable = if (t is ThrowableValue) t.value else t

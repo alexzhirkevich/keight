@@ -1,7 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.common.FunctionParam
+import io.github.alexzhirkevich.keight.expressions.FunctionParam
 import io.github.alexzhirkevich.keight.es.Object
 
 internal fun JsConsole() = Object("console") {

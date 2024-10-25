@@ -1,7 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.LangContext
-import io.github.alexzhirkevich.keight.common.fastMap
+import io.github.alexzhirkevich.keight.fastMap
 import kotlin.math.absoluteValue
 
 public object JSLangContext : LangContext {

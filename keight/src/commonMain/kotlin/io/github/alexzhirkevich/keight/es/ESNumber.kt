@@ -2,10 +2,10 @@ package io.github.alexzhirkevich.keight.es
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.common.Function
-import io.github.alexzhirkevich.keight.common.FunctionParam
-import io.github.alexzhirkevich.keight.common.OpConstant
-import io.github.alexzhirkevich.keight.common.defaults
+import io.github.alexzhirkevich.keight.expressions.Function
+import io.github.alexzhirkevich.keight.expressions.FunctionParam
+import io.github.alexzhirkevich.keight.expressions.defaults
+import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.JsNumber
 import io.github.alexzhirkevich.keight.js.JsNumberClass

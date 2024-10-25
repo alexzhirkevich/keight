@@ -1,7 +1,7 @@
 package io.github.alexzhirkevich.keight.es
 
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.common.Function
+import io.github.alexzhirkevich.keight.expressions.Function
 
 internal interface ESFunction : ESClass {
     override val type: String

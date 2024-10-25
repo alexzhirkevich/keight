@@ -1,8 +1,8 @@
 package io.github.alexzhirkevich.keight.es
 
+import io.github.alexzhirkevich.keight.expressions.Callable
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.common.Callable
 import kotlin.jvm.JvmInline
 
 public interface ESAny {

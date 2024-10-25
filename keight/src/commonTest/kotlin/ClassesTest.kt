@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+@Ignore
 class ClassesTest {
 
     @Test

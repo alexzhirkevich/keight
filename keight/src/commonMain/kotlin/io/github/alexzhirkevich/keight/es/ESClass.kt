@@ -1,14 +1,15 @@
 package io.github.alexzhirkevich.keight.es
 
+import io.github.alexzhirkevich.keight.expressions.Callable
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.common.Callable
-import io.github.alexzhirkevich.keight.common.Function
-import io.github.alexzhirkevich.keight.common.Named
-import io.github.alexzhirkevich.keight.common.OpConstant
-import io.github.alexzhirkevich.keight.common.fastForEach
+import io.github.alexzhirkevich.keight.es.interpreter.syntaxCheck
 import io.github.alexzhirkevich.keight.invoke
+import io.github.alexzhirkevich.keight.expressions.Function
+import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.fastForEach
 
 internal interface ESClass : ESObject, Callable, Named {
 

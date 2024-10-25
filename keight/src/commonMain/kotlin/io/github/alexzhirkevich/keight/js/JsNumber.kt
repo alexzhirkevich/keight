@@ -3,13 +3,11 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.argAtOrNull
-import io.github.alexzhirkevich.keight.common.Callable
-import io.github.alexzhirkevich.keight.common.Function
+import io.github.alexzhirkevich.keight.expressions.Callable
+import io.github.alexzhirkevich.keight.expressions.Function
 import io.github.alexzhirkevich.keight.es.ESAny
 import io.github.alexzhirkevich.keight.es.ESClass
 import io.github.alexzhirkevich.keight.es.ESObjectBase
-import io.github.alexzhirkevich.keight.es.checkArgsNotNull
-import io.github.alexzhirkevich.keight.es.unresolvedReference
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 import kotlin.math.pow

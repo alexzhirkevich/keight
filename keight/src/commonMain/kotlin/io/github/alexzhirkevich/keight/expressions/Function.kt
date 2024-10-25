@@ -1,16 +1,17 @@
-package io.github.alexzhirkevich.keight.common
+package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.argForNameOrIndex
-import io.github.alexzhirkevich.keight.es.ESAny
 import io.github.alexzhirkevich.keight.es.ESObject
 import io.github.alexzhirkevich.keight.es.ESObjectBase
 import io.github.alexzhirkevich.keight.es.SyntaxError
 import io.github.alexzhirkevich.keight.es.TypeError
-import io.github.alexzhirkevich.keight.es.unresolvedReference
+import io.github.alexzhirkevich.keight.fastForEachIndexed
+import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.invoke
 
 public class FunctionParam(
@@ -169,36 +170,6 @@ private fun OpExecImpl(
     }
 }
 
-internal class OpFunctionExec(
-    override val name : String,
-    val receiver : Expression?,
-    val parameters : List<Expression>,
-) : Expression, Named {
-
-    override fun invokeRaw(context: ScriptRuntime): Any? {
-        val res = receiver?.invoke(context)
-        val function = when(res) {
-            null -> context[name]
-            is Callable  -> res
-            is ESObject -> res[name]
-            is ESAny -> {
-                return res.invoke(name, context, parameters)
-            }
-
-            else -> null
-        }
-        if (function is Unit) {
-            unresolvedReference(name)
-        }
-        if (function !is Callable) {
-            throw TypeError("$name ($function) is not a function")
-        }
-        return function.invoke(
-            args = parameters,
-            runtime = context,
-        )
-    }
-}
 
 @Suppress("unchecked_cast")
 private fun execKotlinFunction(

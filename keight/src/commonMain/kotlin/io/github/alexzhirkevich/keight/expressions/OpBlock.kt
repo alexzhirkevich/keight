@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.common
+package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
@@ -8,11 +8,12 @@ import kotlin.jvm.JvmInline
 
 internal class OpBlock(
     val expressions: List<Expression>,
-    private val scoped : Boolean,
+    private val isScoped : Boolean,
+    private val isExpressible : Boolean = true
 ) : Expression {
 
     override fun invokeRaw(context: ScriptRuntime): Any? {
-        return if (scoped) {
+        return if (isScoped) {
             context.withScope(block = ::invokeInternal)
         } else {
             invokeInternal(context)
@@ -30,7 +31,9 @@ internal class OpBlock(
             }
         }
 
-        return invoke(expressions.last(), context)
+        invoke(expressions.last(), context).let {
+            return if (isExpressible) it else Unit
+        }
     }
 
     private fun invoke(expression: Expression, context: ScriptRuntime) : Any? {
@@ -39,10 +42,10 @@ internal class OpBlock(
 }
 
 
-internal sealed class BlockException : Throwable()
-internal data object BlockContinue : BlockException()
-internal data object BlockBreak : BlockException()
-internal class BlockReturn(val value: Any?) : BlockException()
+internal sealed class ScopeException : Throwable()
+internal data object BlockContinue : ScopeException()
+internal data object BlockBreak : ScopeException()
+internal class BlockReturn(val value: Any?) : ScopeException()
 
 @JvmInline
 internal value class OpReturn(

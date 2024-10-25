@@ -20,9 +20,7 @@ public abstract class ESRuntime(
     override val keys: Set<String> get() = emptySet()
     override val entries: List<List<Any?>> get() = emptyList()
 
-    init {
-        init()
-    }
+    init { init() }
 
     override fun contains(variable: Any?): Boolean {
         return super<DefaultRuntime>.contains(variable)
@@ -36,12 +34,21 @@ public abstract class ESRuntime(
     private fun init() {
         set("Math", ESMath(), VariableType.Global)
         set("Object", ESObjectAccessor(), VariableType.Global)
-        set("Number", ESNumber(), VariableType.Global)
         set("globalThis", this, VariableType.Global)
         set("this", this, VariableType.Const)
         set("Infinity", Double.POSITIVE_INFINITY, VariableType.Const)
         set("NaN", Double.NaN, VariableType.Const)
         set("undefined", Unit, VariableType.Const)
+
+        val number = ESNumber()
+        set("Number", number, VariableType.Global)
+
+        set("parseInt", number.parseInt, VariableType.Global)
+        set("parseFloat", number.parseFloat, VariableType.Global)
+        set("isFinite", number.isFinite, VariableType.Global)
+        set("isNan", number.isNan, VariableType.Global)
+        set("isInteger", number.isInteger, VariableType.Global)
+        set("isSafeInteger", number.isSafeInteger, VariableType.Global)
     }
 
     final override fun get(variable: Any?): Any? {
@@ -65,7 +72,7 @@ public abstract class ESRuntime(
     }
 
     final override fun set(variable: Any?, value: Any?) {
-        (this as ScriptRuntime).set(variable, value)
+        set(variable, fromKotlin(value), null)
     }
 
     override fun invoke(

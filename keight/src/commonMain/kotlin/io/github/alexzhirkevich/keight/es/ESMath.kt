@@ -2,9 +2,10 @@ package io.github.alexzhirkevich.keight.es
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.common.FunctionParam
-import io.github.alexzhirkevich.keight.common.fastMap
-import io.github.alexzhirkevich.keight.common.fastSumBy
+import io.github.alexzhirkevich.keight.expressions.FunctionParam
+import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.fastSumBy
+import io.github.alexzhirkevich.keight.es.interpreter.checkArgs
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.math.*
 import kotlin.random.Random

@@ -76,6 +76,27 @@ class LoopsTest {
             }
             i
         """.trimIndent().eval().assertEqualsTo(3L)
+
+    }
+
+    @Test
+    fun multiple_expressions(){
+        """
+            let a;
+            let b
+            for(a = 0, b = 2; a + b < 10; a++,b++){
+                
+            }
+            a + b
+        """.trimIndent().eval().assertEqualsTo(10L)
+
+        """
+            var i = 0;
+            while(false, i<3){
+                console.log(i++)
+            }
+            i
+        """.trimIndent().eval().assertEqualsTo(3L)
     }
 
     @Test

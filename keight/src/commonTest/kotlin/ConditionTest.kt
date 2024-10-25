@@ -32,4 +32,15 @@ class ConditionTest {
         "var x = 0; if (true) if (false) x = 0 else x += 1; x "
             .eval().assertEqualsTo(1L)
     }
+
+    @Test
+    fun multiple_expressions(){
+        """
+            var x;
+            if (false,true){
+                x = 1
+            }
+            x
+        """.trimIndent().eval().assertEqualsTo(1L)
+    }
 }

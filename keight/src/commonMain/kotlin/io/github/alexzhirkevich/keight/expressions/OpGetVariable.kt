@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.common
+package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
@@ -41,7 +41,7 @@ internal class OpGetVariable(
 
     override fun invokeRaw(context: ScriptRuntime, ): Any? {
         return if (assignmentType != null) {
-            context.set(name, 0f, assignmentType)
+            context.set(name, OpConstant(Unit), assignmentType)
         } else {
             getImpl(receiver, context)
         }

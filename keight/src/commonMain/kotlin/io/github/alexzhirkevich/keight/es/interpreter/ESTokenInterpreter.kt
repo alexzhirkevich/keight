@@ -5,97 +5,53 @@ import io.github.alexzhirkevich.keight.LangContext
 import io.github.alexzhirkevich.keight.Script
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.common.Callable
-import io.github.alexzhirkevich.keight.common.Delegate
-import io.github.alexzhirkevich.keight.common.Function
-import io.github.alexzhirkevich.keight.common.FunctionParam
-import io.github.alexzhirkevich.keight.common.Named
-import io.github.alexzhirkevich.keight.common.OpAssign
-import io.github.alexzhirkevich.keight.common.OpAssignByIndex
-import io.github.alexzhirkevich.keight.common.OpBlock
-import io.github.alexzhirkevich.keight.common.OpBreak
-import io.github.alexzhirkevich.keight.common.OpCase
-import io.github.alexzhirkevich.keight.common.OpCompare
-import io.github.alexzhirkevich.keight.common.OpConstant
-import io.github.alexzhirkevich.keight.common.OpContinue
-import io.github.alexzhirkevich.keight.common.OpDoWhileLoop
-import io.github.alexzhirkevich.keight.common.OpEquals
-import io.github.alexzhirkevich.keight.common.OpEqualsComparator
-import io.github.alexzhirkevich.keight.common.OpExec
-import io.github.alexzhirkevich.keight.common.OpExp
-import io.github.alexzhirkevich.keight.common.OpForLoop
-import io.github.alexzhirkevich.keight.common.OpGetVariable
-import io.github.alexzhirkevich.keight.common.OpGreaterComparator
-import io.github.alexzhirkevich.keight.common.OpIfCondition
-import io.github.alexzhirkevich.keight.common.OpIncDecAssign
-import io.github.alexzhirkevich.keight.common.OpIndex
-import io.github.alexzhirkevich.keight.common.OpLessComparator
-import io.github.alexzhirkevich.keight.common.OpLongInt
-import io.github.alexzhirkevich.keight.common.OpLongLong
-import io.github.alexzhirkevich.keight.common.OpMakeArray
-import io.github.alexzhirkevich.keight.common.OpNot
-import io.github.alexzhirkevich.keight.common.OpNotEquals
-import io.github.alexzhirkevich.keight.common.OpReturn
-import io.github.alexzhirkevich.keight.common.OpSwitch
-import io.github.alexzhirkevich.keight.common.OpTouple
-import io.github.alexzhirkevich.keight.common.OpTryCatch
-import io.github.alexzhirkevich.keight.common.OpWhileLoop
-import io.github.alexzhirkevich.keight.common.ThrowableValue
-import io.github.alexzhirkevich.keight.es.BlockContext
+import io.github.alexzhirkevich.keight.expressions.Callable
+import io.github.alexzhirkevich.keight.Delegate
+import io.github.alexzhirkevich.keight.expressions.Function
+import io.github.alexzhirkevich.keight.expressions.FunctionParam
+import io.github.alexzhirkevich.keight.Named
+import io.github.alexzhirkevich.keight.expressions.OpExec
+import io.github.alexzhirkevich.keight.expressions.OpAssign
+import io.github.alexzhirkevich.keight.expressions.OpAssignByIndex
+import io.github.alexzhirkevich.keight.expressions.OpBlock
+import io.github.alexzhirkevich.keight.expressions.OpBreak
+import io.github.alexzhirkevich.keight.expressions.OpCase
+import io.github.alexzhirkevich.keight.expressions.OpCompare
+import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.expressions.OpContinue
+import io.github.alexzhirkevich.keight.expressions.OpDoWhileLoop
+import io.github.alexzhirkevich.keight.expressions.OpEquals
+import io.github.alexzhirkevich.keight.expressions.OpEqualsComparator
+import io.github.alexzhirkevich.keight.expressions.OpExp
+import io.github.alexzhirkevich.keight.expressions.OpForLoop
+import io.github.alexzhirkevich.keight.expressions.OpGetVariable
+import io.github.alexzhirkevich.keight.expressions.OpGreaterComparator
+import io.github.alexzhirkevich.keight.expressions.OpIfCondition
+import io.github.alexzhirkevich.keight.expressions.OpIncDecAssign
+import io.github.alexzhirkevich.keight.expressions.OpIndex
+import io.github.alexzhirkevich.keight.expressions.OpLessComparator
+import io.github.alexzhirkevich.keight.expressions.OpLongInt
+import io.github.alexzhirkevich.keight.expressions.OpLongLong
+import io.github.alexzhirkevich.keight.expressions.OpMakeArray
+import io.github.alexzhirkevich.keight.expressions.OpNot
+import io.github.alexzhirkevich.keight.expressions.OpNotEquals
+import io.github.alexzhirkevich.keight.expressions.OpReturn
+import io.github.alexzhirkevich.keight.expressions.OpSwitch
+import io.github.alexzhirkevich.keight.expressions.OpTouple
+import io.github.alexzhirkevich.keight.expressions.OpTryCatch
+import io.github.alexzhirkevich.keight.expressions.OpWhileLoop
+import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.es.ESAny
 import io.github.alexzhirkevich.keight.es.ESClass
 import io.github.alexzhirkevich.keight.es.ESError
 import io.github.alexzhirkevich.keight.es.Object
 import io.github.alexzhirkevich.keight.es.StaticClassMember
 import io.github.alexzhirkevich.keight.es.SyntaxError
-import io.github.alexzhirkevich.keight.es.syntaxCheck
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.isAssignable
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 import kotlin.math.pow
-
-private fun ListIterator<Token>.skipAll(token: Token) {
-    while (eat(Token.NewLine)){ }
-}
-
-
-private inline fun ListIterator<Token>.eat(token: Token) : Boolean {
-    if (nextSignificant() == token){
-        return true
-    } else {
-        prevSignificant()
-        return false
-    }
-}
-
-private fun <T> ListIterator<T>.nextIs(condition : (T) -> Boolean) : Boolean {
-    if (!hasNext())
-        return false
-
-    return condition(next()).also { previous() }
-}
-
-private inline fun <reified R : Token> ListIterator<Token>.nextIsInstance() : Boolean {
-    if (!hasNext())
-        return false
-
-    return (nextSignificant() is R).also { prevSignificant() }
-}
-
-private fun ListIterator<Token>.nextSignificant() : Token {
-    var n = next()
-    while (n is Token.NewLine){
-        n = next()
-    }
-    return n
-}
-
-private fun ListIterator<Token>.prevSignificant() : Token {
-    var n = previous()
-    while (n is Token.NewLine){
-        n = previous()
-    }
-    return n
-}
 
 internal class ESTokenInterpreter(
     script: String,
@@ -103,12 +59,11 @@ internal class ESTokenInterpreter(
 ) {
     private val tokens: ListIterator<Token> = "{$script}".toList()
         .listIterator()
-        .tokens()
+        .tokens(ignoreWhitespaces = true)
         .fold(mutableListOf<Token>()) { l, token ->
-            // skip comments, whitespaces, double newlines and newlines after semicolon
+            // skip comments, double newlines and newlines after semicolon
             if (
                 token !is Token.Comment &&
-                token !is Token.Whitespace &&
                 (token !is Token.NewLine || (l.lastOrNull() !is Token.NewLine && l.lastOrNull() !is Token.Operator.SemiColon))
             ) {
                 l.add(token)
@@ -159,7 +114,6 @@ internal class ESTokenInterpreter(
                         tokens.prevSignificant()
                         x as OpGetVariable
                         val args = parseExpressionGrouping().expressions
-                        println("exec ${x.name} of ${x.receiver} with args $args")
                         OpExec(x, args)
                     }
                     Token.Operator.Period,
@@ -573,7 +527,13 @@ internal class ESTokenInterpreter(
                 }
             }
 
-            Token.Keyword.If -> parseIf(blockContext)
+            Token.Keyword.If ->  OpIfCondition(
+                condition = parseExpressionGrouping(),
+                onTrue = parseBlock(blockContext = blockContext),
+                onFalse = if (tokens.eat(Token.Keyword.Else)) {
+                    parseBlock(blockContext = blockContext)
+                } else null
+            )
             Token.Keyword.Else -> throw SyntaxError(unexpected("else"))
 
             Token.Keyword.Function -> OpConstant(parseFunction(blockContext = blockContext))
@@ -721,36 +681,15 @@ internal class ESTokenInterpreter(
         )
     }
 
-    private fun parseIf(blockContext: List<BlockContext>) : Expression {
-
-        val condition = (parseStatement() as OpTouple).expressions.single()
-
-        val onTrue = parseBlock(blockContext = blockContext)
-
-        val onFalse = if (tokens.eat(Token.Keyword.Else)) {
-            parseBlock(blockContext = blockContext)
-        } else null
-
-
-        return OpIfCondition(
-            condition = condition,
-            onTrue = onTrue,
-            onFalse = onFalse
-        )
-    }
-
     private fun parseForLoop(parentBlockContext: List<BlockContext>): Expression {
 
         syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.RoundOpen) {
-            "Invalid for loop"
+            "For loop must be followed by '('"
         }
 
         val assign = if (tokens.eat(Token.Operator.SemiColon))
-            null else parseStatement()
-
-        syntaxCheck(assign is OpAssign?) {
-            "Invalid for loop"
-        }
+            null
+        else parseBlock(scoped = false, blockContext = emptyList())
 
         if (assign != null) {
             syntaxCheck(tokens.nextSignificant() is Token.Operator.SemiColon) {
@@ -767,7 +706,7 @@ internal class ESTokenInterpreter(
         }
 
         val increment = if (tokens.eat(Token.Operator.Bracket.RoundClose))
-            null else parseStatement()
+            null else parseBlock(scoped = false, blockContext = emptyList())
 
         if (increment != null) {
             syntaxCheck(tokens.nextSignificant() is Token.Operator.Bracket.RoundClose) {
@@ -788,7 +727,7 @@ internal class ESTokenInterpreter(
 
     private fun parseWhileLoop(parentBlockContext: List<BlockContext>): Expression {
         return OpWhileLoop(
-            condition = parseExpressionGrouping().expressions.single(),
+            condition = parseExpressionGrouping(),
             body = parseBlock(blockContext = parentBlockContext + BlockContext.Loop),
             isFalse = langContext::isFalse
         )
@@ -800,7 +739,7 @@ internal class ESTokenInterpreter(
         syntaxCheck(tokens.eat(Token.Keyword.While)) {
             "Missing while condition in do/while block"
         }
-        val condition = parseExpressionGrouping().expressions.single()
+        val condition = parseExpressionGrouping()
 
         return OpDoWhileLoop(
             condition = condition,
@@ -994,8 +933,9 @@ internal class ESTokenInterpreter(
                 if (requireBlock) {
                     throw SyntaxError("Block start was expected")
                 }
-                tokens.skipAll(Token.NewLine)
-
+                while (tokens.eat(Token.Operator.New)){
+                    //skip
+                }
                 do {
                     add(parseStatement(blockContext))
                 } while (tokens.eat(Token.Operator.Comma))
@@ -1005,23 +945,36 @@ internal class ESTokenInterpreter(
     }
 
     private fun parseVariable(type: VariableType) : Expression {
+        val expressions = buildList<Expression> {
+            do {
+                val variable = when (val expr = parseStatement()) {
+                    is OpAssign -> OpAssign(
+                        type = type,
+                        variableName = expr.variableName,
+                        assignableValue = expr.assignableValue,
+                        merge = null
+                    )
 
-        return when (val expr = parseStatement()) {
-            is OpAssign -> OpAssign(
-                type = type,
-                variableName = expr.variableName,
-                assignableValue = expr.assignableValue,
-                merge = null
+                    is OpGetVariable -> OpAssign(
+                        type = type,
+                        variableName = expr.name,
+                        assignableValue = OpConstant(Unit),
+                        merge = null
+                    )
+
+                    else -> throw SyntaxError(unexpected(expr::class.simpleName.orEmpty()))
+                }
+                add(variable)
+            } while (tokens.eat(Token.Operator.Comma))
+        }
+        return if (expressions.size == 1) {
+            expressions.single()
+        } else {
+            OpBlock(
+                expressions = expressions,
+                isScoped = false,
+                isExpressible = false
             )
-
-            is OpGetVariable -> OpAssign(
-                type = type,
-                variableName = expr.name,
-                assignableValue = OpConstant(Unit),
-                merge = null
-            )
-
-            else -> throw SyntaxError(unexpected(expr::class.simpleName.orEmpty()))
         }
     }
 
@@ -1039,5 +992,70 @@ internal class ESTokenInterpreter(
     }
 }
 
+internal enum class BlockContext {
+    None, Loop, Switch, Function, Class
+}
+
 private fun unexpected(expr : String) : String = "Unexpected token '$expr'"
+
+
+@OptIn(ExperimentalContracts::class)
+internal fun checkArgs(args : List<*>?, count : Int, func : String) {
+    contract {
+        returns() implies (args != null)
+    }
+    checkNotNull(args){
+        "$func call was missing"
+    }
+    require(args.size == count){
+        "$func takes $count arguments, but ${args.size} got"
+    }
+}
+
+
+@OptIn(ExperimentalContracts::class)
+public inline fun syntaxCheck(value: Boolean, lazyMessage: () -> Any) {
+    contract {
+        returns() implies value
+    }
+
+    if (!value) {
+        val message = lazyMessage()
+        throw SyntaxError(message.toString())
+    }
+}
+
+
+
+private inline fun ListIterator<Token>.eat(token: Token) : Boolean {
+    if (nextSignificant() == token){
+        return true
+    } else {
+        prevSignificant()
+        return false
+    }
+}
+
+private inline fun <reified R : Token> ListIterator<Token>.nextIsInstance() : Boolean {
+    if (!hasNext())
+        return false
+
+    return (nextSignificant() is R).also { prevSignificant() }
+}
+
+private fun ListIterator<Token>.nextSignificant() : Token {
+    var n = next()
+    while (n is Token.NewLine){
+        n = next()
+    }
+    return n
+}
+
+private fun ListIterator<Token>.prevSignificant() : Token {
+    var n = previous()
+    while (n is Token.NewLine){
+        n = previous()
+    }
+    return n
+}
 

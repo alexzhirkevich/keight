@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.common
+package io.github.alexzhirkevich.keight
 
 internal interface Named {
 
