@@ -1,6 +1,6 @@
 import io.github.alexzhirkevich.keight.Module
 import io.github.alexzhirkevich.keight.evaluate
-import io.github.alexzhirkevich.keight.js.JSEngine
+import io.github.alexzhirkevich.keight.JavaScriptEngine
 import io.github.alexzhirkevich.keight.js.JSON
 import kotlin.test.Test
 
@@ -8,7 +8,7 @@ class JsonTest {
 
     @Test
     fun parse() {
-        with(JSEngine(modules = arrayOf(Module.JSON))) {
+        with(JavaScriptEngine(modules = arrayOf(Module.JSON))) {
             evaluate(
                 """
                     let string = `{ 
@@ -32,7 +32,7 @@ class JsonTest {
 
     @Test
     fun stringify() {
-        with(JSEngine(modules = arrayOf(Module.JSON))) {
+        with(JavaScriptEngine(modules = arrayOf(Module.JSON))) {
             evaluate(
                 """
                     let object = { 

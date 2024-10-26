@@ -1,9 +1,8 @@
-import io.github.alexzhirkevich.keight.es.ReferenceError
-import io.github.alexzhirkevich.keight.es.SyntaxError
-import io.github.alexzhirkevich.keight.es.TypeError
+import io.github.alexzhirkevich.keight.js.ReferenceError
+import io.github.alexzhirkevich.keight.js.SyntaxError
+import io.github.alexzhirkevich.keight.js.TypeError
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 
 class VariablesTest {
 

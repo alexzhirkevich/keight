@@ -1,32 +1,32 @@
-package io.github.alexzhirkevich.keight.es
+package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.expressions.Function
-import io.github.alexzhirkevich.keight.expressions.FunctionParam
-import io.github.alexzhirkevich.keight.js.JsWrapper
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.properties.ReadOnlyProperty
 
-public interface ESObject : ESAny {
+public interface JSObject : JsAny {
 
     public val keys: Set<String>
+
+    public val values: List<Any?>
+
     public val entries: List<List<Any?>>
 
     public operator fun set(variable: Any?, value: Any?)
+}
 
-    override fun invoke(
-        function: String,
-        context: ScriptRuntime,
-        arguments: List<Expression>
-    ): Any? {
-        TODO()
-    }
+private const val PROTOTYPE = "prototype"
+
+internal val JSObject.prototype : Any? get() = get(PROTOTYPE)
+
+internal fun JSObject.setPrototype(prototype : Any?) {
+    this[PROTOTYPE] = prototype
 }
 
 private class ObjectMap(
     val backedMap : MutableMap<Any?, Any?> = mutableMapOf(),
-) : MutableMap<Any?, Any?> by backedMap{
+) : MutableMap<Any?, Any?> by backedMap {
+
     override fun get(key: Any?): Any? {
         return backedMap[mapKey(key)]
     }
@@ -47,15 +47,17 @@ private class ObjectMap(
     }
 }
 
-internal open class ESObjectBase(
-    open val name : String,
+internal open class JSObjectImpl(
+    open val name : String = "",
     map : MutableMap<Any?, Any?> = mutableMapOf()
-) : ESObject {
+) : JSObject {
 
     private val map = ObjectMap(map)
 
     override val keys: Set<String>
         get() = map.keys.map { it.toString() }.toSet()
+
+    override val values: List<Any?> get() = map.values.toList()
 
     override val entries: List<List<Any?>>
         get() = map.entries.map { listOf(it.key, it.value) }
@@ -105,14 +107,14 @@ public sealed interface ObjectScope {
 
 private class ObjectScopeImpl(
     name: String,
-    val o : ESObject = ESObjectBase(name)
+    val o : JSObject = JSObjectImpl(name)
 ) : ObjectScope {
 
     override fun String.func(
         vararg args: FunctionParam,
         body: ScriptRuntime.(args: List<Any?>) -> Any?
     ) {
-        this eq Function(
+        this eq JSFunction(
             this,
             parameters = args.toList(),
             body = { ctx ->
@@ -128,16 +130,16 @@ private class ObjectScopeImpl(
     }
 }
 
-public fun Object(name: String, contents : Map<Any?, Any?>) : ESObject {
-    return ESObjectBase(name, contents.toMutableMap())
+public fun Object(name: String, contents : Map<Any?, Any?>) : JSObject {
+    return JSObjectImpl(name, contents.toMutableMap())
 }
 
-public fun  Object(name: String, builder : ObjectScope.() -> Unit) : ESObject {
+public fun  Object(name: String, builder : ObjectScope.() -> Unit) : JSObject {
     return ObjectScopeImpl(name).also(builder).o
 }
 
 
-internal fun ESObject.init(scope: ObjectScope.() -> Unit) {
+internal fun JSObject.init(scope: ObjectScope.() -> Unit) {
     ObjectScopeImpl("", this).apply(scope)
 }
 
@@ -145,7 +147,7 @@ internal fun func(
     vararg args: String,
     params: (String) -> FunctionParam = { FunctionParam(it) },
     body: ScriptRuntime.(args: List<Any?>) -> Any?
-) : PropertyDelegateProvider<ESObject, ReadOnlyProperty<ESObject, Function>> =  func(
+) : PropertyDelegateProvider<JSObject, ReadOnlyProperty<JSObject, JSFunction>> =  func(
     args = args.map(params).toTypedArray(),
     body = body
 )
@@ -153,28 +155,29 @@ internal fun func(
 internal fun func(
     vararg args: FunctionParam,
     body: ScriptRuntime.(args: List<Any?>) -> Any?
-): PropertyDelegateProvider<ESObject, ReadOnlyProperty<ESObject, Function>> =  PropertyDelegateProvider { obj, prop ->
-    obj.set(prop.name, Function(
-        name = prop.name,
+): PropertyDelegateProvider<JSObject, ReadOnlyProperty<JSObject, JSFunction>> =  PropertyDelegateProvider { obj, prop ->
+    val name = prop.name.trimStart('_')
+    obj[name] = JSFunction(
+        name = name,
         parameters = args.toList(),
         body = {
             with(it) {
                 body(args.map { get(it.name) })
             }
         }
-    ))
+    )
 
     ReadOnlyProperty { thisRef, property ->
-        thisRef[property.name] as Function
+        thisRef[property.name] as JSFunction
     }
 }
 
 
-internal fun  String.func(
+internal fun String.func(
     vararg args: FunctionParam,
     body: ScriptRuntime.(args: List<Any?>) -> Any?
-) = Function(
-    this,
+) = JSFunction(
+    trimStart('_'),
     parameters = args.toList(),
     body = {
         with(it) {
@@ -188,7 +191,7 @@ internal fun  String.func(
     vararg args: String,
     params: (String) -> FunctionParam = { FunctionParam(it) },
     body: ScriptRuntime.(args: List<Any?>) -> Any?
-) : Function = func(
+) : JSFunction = func(
     args = args.map(params).toTypedArray(),
     body = body
 )

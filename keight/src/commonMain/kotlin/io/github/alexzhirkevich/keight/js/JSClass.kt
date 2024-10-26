@@ -1,21 +1,19 @@
-package io.github.alexzhirkevich.keight.es
+package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.expressions.Callable
+import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.es.interpreter.syntaxCheck
 import io.github.alexzhirkevich.keight.invoke
-import io.github.alexzhirkevich.keight.expressions.Function
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastForEach
 
-internal interface ESClass : ESObject, Callable, Named {
+internal interface JSClass : JSObject, Named, Constructor {
 
-    val functions : List<Function>
+    val functions : List<JSFunction>
 
-    val construct: Function?
+    val construct: JSFunction?
 
     val extends : Expression?
 
@@ -27,29 +25,26 @@ internal interface ESClass : ESObject, Callable, Named {
 
     override val type: String
         get() = "object"
-
-    fun newInstance(args: List<Expression>, context: ScriptRuntime) : Any? =
-        invoke(args, context)
 }
 
-internal fun ESClass.superFunctions(runtime: ScriptRuntime) : List<Function> {
-    val extendsClass = extends?.invoke(runtime) as? ESClass
+internal fun JSClass.superFunctions(runtime: ScriptRuntime) : List<JSFunction> {
+    val extendsClass = extends?.invoke(runtime) as? JSClass
         ?: return emptyList()
 
     return (extendsClass.superFunctions(runtime) + extendsClass.functions).associateBy { it.name }.values.toList()
 }
 
-internal tailrec fun ESClass.instanceOf(
+internal tailrec fun JSClass.instanceOf(
     any: Any?,
     runtime: ScriptRuntime,
     extends: Expression? = this.extends
 ) : Boolean {
 
-    if (constructorClass?.invoke(runtime) == any || any is ESObjectAccessor) {
+    if (constructorClass?.invoke(runtime) == any || any is JSObjectFunction) {
         return true
     }
 
-    val e = extends?.invoke(runtime)?.let { it as? ESClass? } ?: return false
+    val e = extends?.invoke(runtime)?.let { it as? JSClass? } ?: return false
 
     if (e == any) {
         return true
@@ -60,16 +55,16 @@ internal tailrec fun ESClass.instanceOf(
 
 internal sealed interface StaticClassMember {
 
-    fun assignTo(clazz : ESClass, runtime: ScriptRuntime)
+    fun assignTo(clazz : JSClass, runtime: ScriptRuntime)
 
     class Variable(val name : String, val init : Expression) : StaticClassMember {
-        override fun assignTo(clazz: ESClass, runtime: ScriptRuntime) {
+        override fun assignTo(clazz: JSClass, runtime: ScriptRuntime) {
             clazz[name] = init(runtime)
         }
     }
 
-    class Method(val function: Function) : StaticClassMember {
-        override fun assignTo(clazz: ESClass, runtime: ScriptRuntime) {
+    class Method(val function: JSFunction) : StaticClassMember {
+        override fun assignTo(clazz: JSClass, runtime: ScriptRuntime) {
             clazz[function.name] = function
         }
     }
@@ -77,11 +72,15 @@ internal sealed interface StaticClassMember {
 
 internal open class ESClassBase(
     override val name : String,
-    final override val functions : List<Function>,
-    final override val construct: Function?,
+    final override val functions : List<JSFunction>,
+    final override val construct: JSFunction?,
     final override val extends: Expression?,
     final override val static: List<StaticClassMember>
-) : ESObjectBase(name), ESClass {
+) : JSFunction(
+    name = name,
+    parameters = construct?.parameters.orEmpty(),
+    body = construct?.body ?: OpConstant(Unit)
+), JSClass {
 
     private var isSuperInitialized = false
 
@@ -90,35 +89,26 @@ internal open class ESClassBase(
 
     final override var constructorClass: Expression = OpConstant(this)
 
-    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+    override fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
 
-        val superConstructor = (extends?.invoke(runtime) as? ESClass)?.construct?.let {
-            it.copy(
-                body = { r ->
-                    if (isSuperInitialized) {
-                        throw ReferenceError("Super constructor may only be called once")
-                    } else {
-                        it.body(r).also { isSuperInitialized = true }
-                    }
-                }
-            )
-        }
-        if (superConstructor == null && extends != null) {
+        val parent = (extends?.invoke(runtime) as? JSClass)?.construct
+
+        if (parent == null && extends != null) {
             isSuperInitialized = true
         }
 
         val clazz = ESClassBase(
             name = name,
-            functions = (superFunctions(runtime) + functions).map(Function::copy),
+            functions = (superFunctions(runtime) + functions).map(JSFunction::copy),
             construct = construct?.copy(
-                extraVariables = if (superConstructor != null){
-                    mapOf("super" to (VariableType.Const to superConstructor))
+                extraVariables = if (parent != null){
+                    mapOf("super" to (VariableType.Const to parent))
                 } else emptyMap()
             ),
             extends = extends,
             static = static,
         )
-        superConstructor?.thisRef = clazz
+        parent?.thisRef = clazz
 
         clazz.constructorClass = constructorClass
         clazz.functions.fastForEach {
@@ -143,15 +133,4 @@ internal open class ESClassBase(
         }
         return "$name {$properties}"
     }
-}
-
-internal fun ESClassInstantiation(
-    name: String,
-    args : List<Expression>
-) = Expression {
-    val clazz = it[name]
-    syntaxCheck(clazz is ESClass) {
-        "$name is not a constructor"
-    }
-    clazz.newInstance(args, it)
 }

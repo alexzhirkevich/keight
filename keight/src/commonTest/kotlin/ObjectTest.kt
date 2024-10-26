@@ -1,5 +1,5 @@
-import io.github.alexzhirkevich.keight.es.ESObject
-import io.github.alexzhirkevich.keight.js.JSRuntime
+import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.JSRuntime
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -9,7 +9,7 @@ class ObjectTest {
     @Test
     fun context(){
 
-        val obj = "{ name : 'test'}".eval() as ESObject
+        val obj = "{ name : 'test'}".eval() as JSObject
 
         obj["name"].toString().assertEqualsTo("test")
 

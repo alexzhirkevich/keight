@@ -1,15 +1,14 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.es.SyntaxError
-import io.github.alexzhirkevich.keight.es.TypeError
-import kotlin.jvm.JvmInline
+import io.github.alexzhirkevich.keight.js.SyntaxError
+import io.github.alexzhirkevich.keight.js.TypeError
 
 
 public enum class VariableType {
     Global, Local, Const
 }
 
-public interface ScriptRuntime : LangContext {
+public interface ScriptRuntime : ScriptContext {
 
     public var io : ScriptIO
 
@@ -38,7 +37,7 @@ public operator fun ScriptRuntime.set(variable: Any?, value: Any?): Unit =
 
 private class ScopedRuntime(
     private val parent : ScriptRuntime
-) : DefaultRuntime(), LangContext by parent {
+) : DefaultRuntime(), ScriptContext by parent {
 
     override var io: ScriptIO by parent::io
 

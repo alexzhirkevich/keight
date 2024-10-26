@@ -1,11 +1,24 @@
-package io.github.alexzhirkevich.keight.es.interpreter
+package io.github.alexzhirkevich.keight.js.interpreter
 
-import io.github.alexzhirkevich.keight.es.SyntaxError
+import io.github.alexzhirkevich.keight.js.SyntaxError
 
-internal fun ListIterator<Char>.tokens(
+internal fun String.tokenize(
+    ignoreWhitespaces: Boolean =  true
+) : List<Token> = toList()
+    .listIterator()
+    .tokenize(
+        untilEndOfBlock = false,
+        ignoreWhitespaces = ignoreWhitespaces
+    )
+
+private fun ListIterator<Char>.tokenize(
+    untilEndOfBlock : Boolean,
     ignoreWhitespaces : Boolean = false
 ) : List<Token> {
     return buildList {
+
+        var blockStack = 0
+
         while (hasNext()) {
             val token = when (val c = next()) {
                 '=' -> assign() // +eq, arrow
@@ -20,9 +33,16 @@ internal fun ListIterator<Char>.tokens(
                 '<' -> less() // +shl
                 '>' -> greater() // +shr, ushr
                 '!' -> not() // + neq
+                '.' -> period() // + spread
                 '~' -> Token.Operator.Bitwise.Reverse
-                '{' -> Token.Operator.Bracket.CurlyOpen
-                '}' -> Token.Operator.Bracket.CurlyClose
+                '{' -> Token.Operator.Bracket.CurlyOpen.also {
+                    blockStack++
+                }
+                '}' -> Token.Operator.Bracket.CurlyClose.also {
+                    if (--blockStack < 0 && untilEndOfBlock) {
+                        return@buildList
+                    }
+                }
                 '(' -> Token.Operator.Bracket.RoundOpen
                 ')' -> Token.Operator.Bracket.RoundClose
                 '[' -> Token.Operator.Bracket.SquareOpen
@@ -30,9 +50,9 @@ internal fun ListIterator<Char>.tokens(
                 ':' -> Token.Operator.Colon
                 ';' -> Token.Operator.SemiColon
                 ',' -> Token.Operator.Comma
-                '.' -> Token.Operator.Period
                 '?' -> Token.Operator.QuestionMark
                 '\n' -> Token.NewLine
+                '`' -> templateString(ignoreWhitespaces)
                 in STRING_START -> string(c)
                 in NUMBERS -> number(c)
                 in JAVASCRIPT_WHITESPACE -> if (ignoreWhitespaces) {
@@ -40,12 +60,24 @@ internal fun ListIterator<Char>.tokens(
                 } else {
                     Token.Whitespace(c)
                 }
-
-                in IDENTIFIER_ALPHABET -> identifier(c) // + keywords
-                else -> continue
+//                in IDENTIFIER_ALPHABET -> identifier(c) // + keywords
+                else -> identifier(c)
             }
             add(token)
         }
+    }
+}
+
+private fun ListIterator<Char>.period() : Token {
+    val pos = nextIndex()
+
+    return if (hasNext() && next() == '.' && hasNext() && next() == '.'){
+        Token.Operator.Spread
+    } else {
+        while (nextIndex() != pos) {
+            previous()
+        }
+        Token.Operator.Period
     }
 }
 
@@ -71,7 +103,6 @@ private fun ListIterator<Char>.eq() : Token {
         else -> Token.Operator.Compare.Eq.also { previous() }
     }
 }
-
 
 private fun ListIterator<Char>.plus() : Token.Operator {
     if (!hasNext()){
@@ -306,12 +337,11 @@ private fun ListIterator<Char>.comment(isSingleLine : Boolean) : Token.Comment {
 
 private fun ListIterator<Char>.string(start : Char) : Token.Str {
     val value = StringBuilder()
-    val isTemplate = start == '`'
 
     do {
         val next = next()
         value.append(next)
-    } while (hasNext() && next != start && (isTemplate || next != '\n'))
+    } while (hasNext() && next != start)
 
     return Token.Str(value.deleteAt(value.lastIndex).toString())
 }
@@ -321,8 +351,17 @@ private fun ListIterator<Char>.number(start : Char) : Token.Num {
     var numberFormat = NumberFormat.Dec
     var isFloat = false
     var ch = start
+    var wasE = false
     do {
         when (ch) {
+            'e','E' -> {
+                if (wasE)
+                    break
+                wasE = true
+                if (numberFormat == NumberFormat.Dec) {
+                    isFloat = true
+                }
+            }
             '.' -> {
                 if (isFloat) {
                     break
@@ -428,7 +467,61 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
     }
 }
 
-private val STRING_START = hashSetOf('"', '\'', '`')
+private fun ListIterator<Char>.templateString(
+    ignoreWhitespaces: Boolean
+) : Token.TemplateString {
+    val tokens = buildList {
+
+        val str = StringBuilder()
+
+        val addStr = {
+            add(TemplateStringToken.Str(str.toString()))
+            str.clear()
+        }
+
+        do {
+            val next = next()
+
+            if (next == '`') {
+                break
+            }
+
+            when {
+                next == '$' -> {
+                    when(val nNext = next()){
+                        '{' -> {
+                            addStr()
+                            add(
+                                TemplateStringToken.Template(
+                                    buildList {
+                                        add(Token.Operator.Bracket.CurlyOpen)
+                                        addAll(
+                                            tokenize(
+                                                untilEndOfBlock = true,
+                                                ignoreWhitespaces = ignoreWhitespaces
+                                            )
+                                        )
+                                        add(Token.Operator.Bracket.CurlyClose)
+                                    },
+                                )
+                            )
+                        }
+                        else -> {
+                            str.append(next)
+                            str.append(nNext)
+                        }
+                    }
+                }
+
+                else -> str.append(next)
+            }
+        } while (true)
+    }
+
+    return Token.TemplateString(tokens)
+}
+
+private val STRING_START = hashSetOf('"', '\'')
 private val NUMBERS = hashSetOf('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 private val NumberFormatIndicators = NumberFormat.entries.mapNotNull { it.prefix }
 

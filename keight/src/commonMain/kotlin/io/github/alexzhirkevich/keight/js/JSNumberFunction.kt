@@ -1,16 +1,15 @@
-package io.github.alexzhirkevich.keight.es
+package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.expressions.Function
-import io.github.alexzhirkevich.keight.expressions.FunctionParam
-import io.github.alexzhirkevich.keight.expressions.defaults
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.invoke
-import io.github.alexzhirkevich.keight.js.JsNumber
-import io.github.alexzhirkevich.keight.js.JsNumberClass
 
-internal class ESNumber : ESFunctionBase("Number") {
+internal class JSNumberFunction : JSFunction(
+    name = "Number",
+    parameters = listOf(FunctionParam("number", default = OpConstant(0L))),
+    body = OpConstant(Unit)
+) {
 
     val isFinite by func("number") {
         val arg = it.getOrNull(0) ?: return@func false
@@ -61,10 +60,6 @@ internal class ESNumber : ESFunctionBase("Number") {
         toNumber(arg).toDouble().isNaN()
     }
 
-    override val functions: List<Function> = listOf(
-        isFinite, isInteger, parseInt, isNan, isSafeInteger, parseFloat
-    )
-
     override fun get(variable: Any?): Any? {
         return when (variable) {
             "EPSILON" -> Double.MIN_VALUE
@@ -80,11 +75,15 @@ internal class ESNumber : ESFunctionBase("Number") {
     }
 
     override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Number {
-        return runtime.toNumber(args.single().invoke(runtime))
+        return if (args.isEmpty()){
+            runtime.toNumber(0)
+        } else {
+            runtime.toNumber(args.first().invoke(runtime))
+        }
     }
 
-    override fun newInstance(args: List<Expression>, context: ScriptRuntime): JsNumberClass {
-        return JsNumberClass(JsNumber(invoke(args, context)))
+    override fun construct(args: List<Expression>, runtime: ScriptRuntime): JsNumberObject {
+        return JsNumberObject(JsNumberWrapper(invoke(args, runtime)))
     }
 }
 

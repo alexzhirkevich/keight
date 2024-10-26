@@ -1,4 +1,4 @@
-import io.github.alexzhirkevich.keight.es.ReferenceError
+import io.github.alexzhirkevich.keight.js.ReferenceError
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 

@@ -1,6 +1,6 @@
 package io.github.alexzhirkevich.keight
 
-public interface LangContext {
+public interface ScriptContext {
 
     public fun isFalse(a : Any?) : Boolean
 

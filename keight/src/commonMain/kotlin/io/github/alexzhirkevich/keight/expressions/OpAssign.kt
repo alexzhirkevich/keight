@@ -3,9 +3,9 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.es.ESAny
-import io.github.alexzhirkevich.keight.es.ESObject
-import io.github.alexzhirkevich.keight.es.TypeError
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.invoke
 
 internal class OpAssign(
@@ -14,7 +14,7 @@ internal class OpAssign(
     val receiver : Expression?=null,
     var isStatic : Boolean = false,
     val assignableValue : Expression,
-    private val merge : ((Any?, Any?) -> Any?)?
+    private val merge : (ScriptRuntime.(Any?, Any?) -> Any?)?
 ) : Expression {
 
     override fun invokeRaw(context: ScriptRuntime): Any? {
@@ -25,7 +25,7 @@ internal class OpAssign(
             context[variableName]
         } else {
             when (r){
-                is ESAny -> r[variableName]
+                is JsAny -> r[variableName]
                 else -> null
             }
         }
@@ -35,7 +35,7 @@ internal class OpAssign(
         }
 
         val value = if (current != null && merge != null) {
-            merge.invoke(current, v)
+            merge.invoke(context, current, v)
         } else v
 
         if (receiver == null) {
@@ -46,8 +46,8 @@ internal class OpAssign(
             )
         } else {
             when (r) {
-                is ESObject -> r[variableName] = value
-                else -> throw TypeError("Cannot set properties of ${if (r == Unit) "undefined" else r} (setting '$variableName')")
+                is JSObject -> r[variableName] = value
+                else -> throw TypeError("Cannot set properties of ${if (r == Unit) "undefined" else r}")
             }
         }
 

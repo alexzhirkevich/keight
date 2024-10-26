@@ -1,7 +1,25 @@
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-class EsNumberTest {
+class NumberTest {
+
+    @Test
+    fun format(){
+        "123".eval().assertEqualsTo(123L)
+        "123.1".eval().assertEqualsTo(123.1)
+        ".1".eval().assertEqualsTo(.1)
+
+        "0xfF".eval().assertEqualsTo(0xff.toLong())
+        "0b11".eval().assertEqualsTo(0b11.toLong())
+        "0o123".eval().assertEqualsTo(83L)
+
+        "1e5".eval().assertEqualsTo(1e5)
+    }
+
+    @Test
+    fun eq(){
+        assertTrue { "5 === 5.0".eval() as Boolean }
+    }
 
     @Test
     fun toFixed(){
@@ -75,17 +93,17 @@ class EsNumberTest {
 
     @Test
     fun methods_in_global_Scope(){
-        assertTrue { "Number.isFinite == isFinite".eval() as Boolean }
-        assertTrue { "Number.isFinite == globalThis.isFinite".eval() as Boolean }
-        assertTrue { "Number.isNan == isNan".eval() as Boolean }
-        assertTrue { "Number.isNan == globalThis.isNan".eval() as Boolean }
-        assertTrue { "Number.parseFloat == parseFloat".eval() as Boolean }
-        assertTrue { "Number.parseFloat == globalThis.parseFloat".eval() as Boolean }
-        assertTrue { "Number.isInteger == isInteger".eval() as Boolean }
-        assertTrue { "Number.isInteger == globalThis.isInteger".eval() as Boolean }
-        assertTrue { "Number.isSafeInteger == isSafeInteger".eval() as Boolean }
-        assertTrue { "Number.isSafeInteger == globalThis.isSafeInteger".eval() as Boolean }
-        assertTrue { "Number.parseInt == parseInt".eval() as Boolean }
-        assertTrue { "Number.parseInt == globalThis.parseInt".eval() as Boolean }
+        assertTrue { "Number.isFinite === isFinite".eval() as Boolean }
+        assertTrue { "Number.isFinite === globalThis.isFinite".eval() as Boolean }
+        assertTrue { "Number.isNan === isNan".eval() as Boolean }
+        assertTrue { "Number.isNan === globalThis.isNan".eval() as Boolean }
+        assertTrue { "Number.parseFloat === parseFloat".eval() as Boolean }
+        assertTrue { "Number.parseFloat === globalThis.parseFloat".eval() as Boolean }
+        assertTrue { "Number.isInteger === isInteger".eval() as Boolean }
+        assertTrue { "Number.isInteger === globalThis.isInteger".eval() as Boolean }
+        assertTrue { "Number.isSafeInteger === isSafeInteger".eval() as Boolean }
+        assertTrue { "Number.isSafeInteger === globalThis.isSafeInteger".eval() as Boolean }
+        assertTrue { "Number.parseInt === parseInt".eval() as Boolean }
+        assertTrue { "Number.parseInt === globalThis.parseInt".eval() as Boolean }
     }
 }

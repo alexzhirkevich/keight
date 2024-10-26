@@ -1,7 +1,9 @@
-import io.github.alexzhirkevich.keight.es.ReferenceError
-import io.github.alexzhirkevich.keight.es.TypeError
+import io.github.alexzhirkevich.keight.js.ReferenceError
+import io.github.alexzhirkevich.keight.js.TypeError
+import io.github.alexzhirkevich.keight.JSRuntime
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class FunctionsTest {
 
@@ -31,7 +33,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun defaultArgs(){
+    fun defaultArgs() {
         """
             function test(a, b = 2)
             {
@@ -59,7 +61,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun scope(){
+    fun scope() {
         """
             let x = 1
             
@@ -88,7 +90,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun variable_func(){
+    fun variable_func() {
         """
             const test = function(a,b) { return a + b }
             test(1,2)
@@ -112,7 +114,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun arrow(){
+    fun arrow() {
         """
             const test = (a,b) => a + b
             test(1,2)
@@ -138,7 +140,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun recursion(){
+    fun recursion() {
 
         """
            function fib(n) {
@@ -150,5 +152,25 @@ class FunctionsTest {
 
            fib(7)
         """.trimIndent().eval().assertEqualsTo(13L)
+    }
+
+    @Test
+    fun constructor_function() {
+
+        val runtime = JSRuntime()
+
+        """
+            function Person(name,age){
+                this.name = name
+                this.age = age
+            }
+        """.eval(runtime)
+
+        "new Person('John', 25).name".eval(runtime).assertEqualsTo("John")
+        "new Person('John', 25).age".eval(runtime).assertEqualsTo(25L)
+
+        assertTrue {
+            "new Person('John', 25).prototype === Person".eval(runtime) as Boolean
+        }
     }
 }

@@ -1,6 +1,7 @@
-package io.github.alexzhirkevich.keight.es
+package io.github.alexzhirkevich.keight.js
 
-public open class ESError(message : String?, cause : Throwable?) : Exception(message, cause), ESAny {
+public open class JSError(message : String?, cause : Throwable?) : Exception(message, cause),
+    JsAny {
     override fun get(variable: Any?): Any? {
         return when(variable){
             "message" -> message
@@ -15,11 +16,11 @@ public open class ESError(message : String?, cause : Throwable?) : Exception(mes
     }
 }
 
-public class SyntaxError(message : String? = null, cause : Throwable? = null) : ESError(message, cause)
+public class SyntaxError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
 
-public class TypeError(message : String? = null, cause : Throwable? = null) : ESError(message, cause)
+public class TypeError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
 
-public class ReferenceError(message : String? = null, cause : Throwable? = null) : ESError(message, cause)
+public class ReferenceError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
 
 internal fun unresolvedReference(ref : String, obj : String? = null) : Nothing =
     if (obj != null)

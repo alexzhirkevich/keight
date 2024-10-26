@@ -1,10 +1,10 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.LangContext
+import io.github.alexzhirkevich.keight.ScriptContext
 import io.github.alexzhirkevich.keight.fastMap
 import kotlin.math.absoluteValue
 
-public object JSLangContext : LangContext {
+internal object JSLangContext : ScriptContext {
 
     override fun isFalse(a: Any?): Boolean {
         return a == null
@@ -61,25 +61,25 @@ public object JSLangContext : LangContext {
     override fun fromKotlin(a: Any?): Any? {
         return when (a) {
             is JsWrapper<*> -> a
-            is Number -> JsNumber(a)
-            is UByte -> JsNumber(a.toLong())
-            is UShort -> JsNumber(a.toLong())
-            is UInt -> JsNumber(a.toLong())
+            is Number -> JsNumberWrapper(a)
+            is UByte -> JsNumberWrapper(a.toLong())
+            is UShort -> JsNumberWrapper(a.toLong())
+            is UInt -> JsNumberWrapper(a.toLong())
             is ULong -> {
                 check(a < Long.MAX_VALUE.toULong()){
                     "Unsigned numbers grater than Long.MAX_VALUE can't be imported to JavaScript"
                 }
-                JsNumber(a.toLong())
+                JsNumberWrapper(a.toLong())
             }
-            is Collection<*> -> JsArray(a.map(::fromKotlin).toMutableList())
-            is CharSequence -> JsString(a.toString())
+            is Collection<*> -> JsArrayWrapper(a.map(::fromKotlin).toMutableList())
+            is CharSequence -> JsStringWrapper(a.toString())
             else -> a
         }
     }
 
     override fun toKotlin(a: Any?): Any? {
         return when (a) {
-            is JsArray -> a.value.fastMap(::toKotlin)
+            is JsArrayWrapper -> a.value.fastMap(::toKotlin)
             is JsWrapper<*> -> toKotlin(a.value)
             else -> a
         }

@@ -3,6 +3,13 @@ import kotlin.test.Test
 
 internal class JsStringExpressionsTest {
 
+
+    @Test
+    fun template(){
+        "const x = 1, y ='test';`hello \${x} world \${y}`".eval()
+            .assertEqualsTo("hello 1 world test")
+    }
+
     @Test
     fun endsWith() {
         "'test123'.endsWith('123')".eval().assertEqualsTo(true)

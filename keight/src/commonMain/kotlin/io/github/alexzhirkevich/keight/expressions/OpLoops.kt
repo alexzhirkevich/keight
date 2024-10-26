@@ -9,7 +9,6 @@ internal class OpForLoop(
     private val assignment : Expression?,
     private val increment: Expression?,
     private val comparison : Expression?,
-    private val isFalse : (Any?) -> Boolean,
     private val body: Expression
 ) : Expression {
 
@@ -17,7 +16,7 @@ internal class OpForLoop(
     private val condition: (ScriptRuntime) -> Boolean = if (comparison == null) {
         { true }
     } else {
-        { !isFalse(comparison.invoke(it)) }
+        { !it.isFalse(comparison.invoke(it)) }
     }
 
     override fun invokeRaw(context: ScriptRuntime): Any {
@@ -46,8 +45,7 @@ internal class OpForLoop(
 
 internal fun  OpDoWhileLoop(
     condition : Expression,
-    body : OpBlock,
-    isFalse : (Any?) -> Boolean
+    body : OpBlock
 ) = Expression {
     do {
         try {
@@ -57,16 +55,15 @@ internal fun  OpDoWhileLoop(
         } catch (_: BlockBreak) {
             break
         }
-    } while (!isFalse(condition.invoke(it)))
+    } while (!it.isFalse(condition.invoke(it)))
 }
 
 
-internal fun  OpWhileLoop(
+internal fun OpWhileLoop(
     condition : Expression,
     body : Expression,
-    isFalse : (Any?) -> Boolean
 ) = Expression {
-    while (!isFalse(condition.invoke(it))) {
+    while (!it.isFalse(condition.invoke(it))) {
         try {
             body.invoke(it)
         } catch (_: BlockContinue) {

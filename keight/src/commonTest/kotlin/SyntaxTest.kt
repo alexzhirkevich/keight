@@ -1,6 +1,6 @@
-import io.github.alexzhirkevich.keight.expressions.Function
-import io.github.alexzhirkevich.keight.es.ESObject
-import io.github.alexzhirkevich.keight.es.SyntaxError
+import io.github.alexzhirkevich.keight.js.JSFunction
+import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.SyntaxError
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -82,7 +82,7 @@ class SyntaxTest {
                 error = x.message
             }
             error
-        """.trimIndent().eval().assertEqualsTo("Cannot set properties of null (setting 'test')")
+        """.trimIndent().eval().assertEqualsTo("Cannot set properties of null")
 
         """
             let error = undefined
@@ -171,7 +171,7 @@ class SyntaxTest {
 
         "'str' + /* commment */ 'ing'".eval().assertEqualsTo("string")
 
-        val func = "/**/function /**/name/**/(/**/arg1,/**/arg2/**/){/**/}".eval() as Function
+        val func = "/**/function /**/name/**/(/**/arg1,/**/arg2/**/){/**/}".eval() as JSFunction
         func.name.assertEqualsTo("name")
         func.parameters.let {
             it[0].name.assertEqualsTo("arg1")
@@ -193,7 +193,7 @@ class SyntaxTest {
         """
             let /**/ obj = /**/{ /**/name/**/ : /**/'test'/**/}
         """.trimIndent().eval().let {
-            it as ESObject
+            it as JSObject
             it["name"].toString().assertEqualsTo("test")
         }
     }

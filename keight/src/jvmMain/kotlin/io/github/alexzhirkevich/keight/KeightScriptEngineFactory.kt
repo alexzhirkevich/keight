@@ -1,7 +1,5 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.js.JSEngine
-import io.github.alexzhirkevich.keight.js.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptEngine as KeightScriptEngine
 import javax.script.ScriptEngine
 import javax.script.ScriptEngineFactory
@@ -53,7 +51,7 @@ public class KeightScriptEngineFactory : ScriptEngineFactory  {
     }
 
     override fun getScriptEngine(): ScriptEngine {
-        return getScriptEngine(JSEngine())
+        return getScriptEngine(JavaScriptEngine())
     }
 
     public fun getScriptEngine(engine: KeightScriptEngine) : ScriptEngine {

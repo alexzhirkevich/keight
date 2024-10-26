@@ -4,17 +4,15 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.argAtOrNull
-import io.github.alexzhirkevich.keight.expressions.Callable
 import io.github.alexzhirkevich.keight.checkNotEmpty
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit
-import io.github.alexzhirkevich.keight.es.ESAny
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 
 @JvmInline
-internal value class JsString(
+internal value class JsStringWrapper(
     override val value : String
-) : ESAny, JsWrapper<String>, Comparable<JsString>, CharSequence by value {
+) : JsAny, JsWrapper<String>, Comparable<JsStringWrapper>, CharSequence by value {
 
     override val type: String
         get() = "string"
@@ -52,7 +50,7 @@ internal value class JsString(
         }
     }
 
-    override fun compareTo(other: JsString): Int {
+    override fun compareTo(other: JsStringWrapper): Int {
         return value.compareTo(other.value)
     }
 

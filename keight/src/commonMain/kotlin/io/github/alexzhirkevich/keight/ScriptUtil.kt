@@ -1,6 +1,6 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.es.ESAny
+import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
@@ -8,11 +8,11 @@ import kotlin.contracts.contract
 internal fun  Delegate(
     a : Expression,
     b : Expression,
-    op : (Any?, Any?) -> Any?
-) = Expression { op(a(it), b(it)) }
+    op : ScriptRuntime.(Any?, Any?) -> Any?
+) = Expression { op(it, a(it), b(it)) }
 
-internal fun Delegate(a : Expression, op : (Any?) -> Any?) = Expression {
-    op(a(it))
+internal fun Delegate(a : Expression, op :ScriptRuntime.(Any?) -> Any?) = Expression {
+    op(it, a(it))
 }
 
 internal fun <T : Any?> checkNotEmpty(value : T?) : T {
@@ -74,7 +74,7 @@ internal fun Any.valueAtIndexOrUnit(index : Any?, numberIndex : Int) : Any {
         is List<*> -> getOrElse(numberIndex) { Unit }
         is Array<*> -> getOrElse(numberIndex) { Unit }
         is CharSequence -> getOrNull(numberIndex) ?: Unit
-        is ESAny -> get(indexNorm)
+        is JsAny -> get(indexNorm)
         else -> Unit
     }!!
 }

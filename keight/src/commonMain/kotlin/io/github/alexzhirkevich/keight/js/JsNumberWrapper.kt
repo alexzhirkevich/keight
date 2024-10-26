@@ -3,25 +3,17 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.argAtOrNull
-import io.github.alexzhirkevich.keight.expressions.Callable
-import io.github.alexzhirkevich.keight.expressions.Function
-import io.github.alexzhirkevich.keight.es.ESAny
-import io.github.alexzhirkevich.keight.es.ESClass
-import io.github.alexzhirkevich.keight.es.ESObjectBase
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
-internal class JsNumberClass(
-    val number: JsNumber
-) : ESObjectBase("Number"),
-    ESClass,
+internal class JsNumberObject(
+    val number: JsNumberWrapper
+) : JSObjectImpl("Number"),
     JsWrapper<Number> by number,
     Comparable<JsWrapper<Number>> by number {
-
-    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? = Unit
 
     override fun toString(): String {
         return number.toString()
@@ -31,24 +23,14 @@ internal class JsNumberClass(
         get() = "Number"
 
     override fun get(variable: Any?): Any? {
-        return number[variable] ?: super<ESObjectBase>.get(variable)
+        return number[variable] ?: super.get(variable)
     }
-
-    override val functions: List<Function> get() = emptyList()
-
-    override val construct: Function? get() = null
-
-    override val extends: Expression = Expression {
-        it["Number"]
-    }
-
-    override val constructorClass: Expression? get() = extends
 }
 
 @JvmInline
-internal value class JsNumber(
+internal value class JsNumberWrapper(
     override val value : Number
-) : ESAny, JsWrapper<Number>, Comparable<JsWrapper<Number>> {
+) : JsAny, JsWrapper<Number>, Comparable<JsWrapper<Number>> {
 
     override val type: String get() = "number"
 

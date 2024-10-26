@@ -1,8 +1,8 @@
-import io.github.alexzhirkevich.keight.es.ESClass
-import io.github.alexzhirkevich.keight.es.ESObject
-import io.github.alexzhirkevich.keight.es.ReferenceError
-import io.github.alexzhirkevich.keight.es.SyntaxError
-import io.github.alexzhirkevich.keight.js.JSRuntime
+import io.github.alexzhirkevich.keight.js.JSClass
+import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.ReferenceError
+import io.github.alexzhirkevich.keight.js.SyntaxError
+import io.github.alexzhirkevich.keight.JSRuntime
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -18,7 +18,7 @@ class ClassesTest {
 
            new Test()
         """.trimIndent().eval().let {
-            assertTrue { it is ESClass }
+            assertTrue { it is JSClass }
         }
 
         """
@@ -100,7 +100,7 @@ class ClassesTest {
                    a(){ return 'a'}
                }
                let a = new A()
-            """.trimIndent().eval() is ESObject
+            """.trimIndent().eval() is JSObject
         }
     }
 

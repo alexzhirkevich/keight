@@ -1,8 +1,6 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.expressions.FunctionParam
-import io.github.alexzhirkevich.keight.es.Object
 
 internal fun JsConsole() = Object("console") {
     "log".func(FunctionParam("data", isVararg = true)) { out(it, io::out) }

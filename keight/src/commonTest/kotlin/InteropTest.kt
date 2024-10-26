@@ -1,4 +1,4 @@
-import io.github.alexzhirkevich.keight.js.JSRuntime
+import io.github.alexzhirkevich.keight.JSRuntime
 import kotlin.test.Test
 
 class InteropTest {

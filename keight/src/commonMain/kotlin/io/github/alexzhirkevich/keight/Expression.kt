@@ -5,8 +5,8 @@ import io.github.alexzhirkevich.keight.expressions.OpIndex
 
 
 public fun interface Expression {
-    public fun invokeRaw(context: ScriptRuntime): Any?
 
+    public fun invokeRaw(context: ScriptRuntime): Any?
 }
 
 public operator fun Expression.invoke(context: ScriptRuntime): Any? =

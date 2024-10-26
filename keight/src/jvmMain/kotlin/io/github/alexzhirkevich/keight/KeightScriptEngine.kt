@@ -1,6 +1,5 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.js.JSRuntime
 import java.io.Reader
 import javax.script.Bindings
 import javax.script.ScriptContext

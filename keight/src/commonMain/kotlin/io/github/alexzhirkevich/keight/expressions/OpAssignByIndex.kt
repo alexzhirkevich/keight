@@ -3,16 +3,16 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.es.ESObject
+import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.invoke
-import io.github.alexzhirkevich.keight.js.JsArray
+import io.github.alexzhirkevich.keight.js.JsArrayWrapper
 
 internal class OpAssignByIndex(
     private val variableName : String,
     private val scope : VariableType?,
     private val index : Expression,
     private val assignableValue : Expression,
-    private val merge : ((Any?, Any?) -> Any?)?
+    private val merge : (ScriptRuntime.(Any?, Any?) -> Any?)?
 ) : Expression {
 
     override tailrec fun invokeRaw(context: ScriptRuntime): Any? {
@@ -33,7 +33,7 @@ internal class OpAssignByIndex(
 
             return when (current) {
 
-                is JsArray-> {
+                is JsArrayWrapper-> {
                     val i = context.toNumber(idx)
 
                     check(!i.toDouble().isNaN()) {
@@ -48,16 +48,16 @@ internal class OpAssignByIndex(
                     val c = current.value[index]
 
                     current.value[index] = if (current.value[index] !is Unit && merge != null){
-                        merge.invoke(c,v)
+                        merge.invoke(context, c,v)
                     } else {
                         v
                     }
                     current.value[index]
                 }
-                is ESObject -> {
+                is JSObject -> {
                     
                     if (idx in current && merge != null){
-                        current[idx] = merge.invoke(current[idx], v)
+                        current[idx] = merge.invoke(context, current[idx], v)
                     } else {
                         current[idx] = v
                     }

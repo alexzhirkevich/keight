@@ -3,9 +3,10 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.es.ESAny
-import io.github.alexzhirkevich.keight.es.unresolvedReference
+import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.invoke
+import io.github.alexzhirkevich.keight.js.TypeError
+import io.github.alexzhirkevich.keight.js.unresolvedReference
 import kotlin.jvm.JvmInline
 
 @JvmInline
@@ -50,13 +51,14 @@ internal class OpGetVariable(
     private tailrec fun getImpl(res: Any?, context: ScriptRuntime): Any? {
         return when (res) {
             is Expression -> getImpl(res.invoke(context), context)
-            is ESAny -> res[name]
-            else ->
-                if (name in context) {
-                    context[name]
-                } else {
-                    unresolvedReference(name)
-                }
+            is JsAny -> res[name]
+            null -> if (name in context) {
+                context[name]
+            } else {
+                unresolvedReference(name)
+            }
+
+            else -> throw TypeError("Cannot get properties of $res")
         }
     }
 }

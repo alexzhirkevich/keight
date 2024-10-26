@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.expressions
+package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Named
@@ -6,10 +6,8 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.argForNameOrIndex
-import io.github.alexzhirkevich.keight.es.ESObject
-import io.github.alexzhirkevich.keight.es.ESObjectBase
-import io.github.alexzhirkevich.keight.es.SyntaxError
-import io.github.alexzhirkevich.keight.es.TypeError
+import io.github.alexzhirkevich.keight.Constructor
+import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.invoke
@@ -89,7 +87,7 @@ public fun <T1,T2,T3,T4, T5> callable(
     )
 }
 
-internal class Function(
+internal open class JSFunction(
     override val name : String,
     val parameters : List<FunctionParam>,
     val body : Expression,
@@ -97,15 +95,24 @@ internal class Function(
     val isClassMember : Boolean = false,
     var isStatic : Boolean = false,
     val extraVariables: Map<String, Pair<VariableType, Any?>> = emptyMap(),
-) : ESObject by ESObjectBase(name), Callable, Named {
+) : JSObjectImpl(name), Callable, Named, Constructor {
+
     override val type: String
         get() = "function"
+
+    init {
+        val varargs = parameters.count { it.isVararg }
+
+        if (varargs > 1 || varargs == 1 && !parameters.last().isVararg) {
+            throw SyntaxError("Rest parameter must be last formal parameter")
+        }
+    }
 
     fun copy(
         body: Expression = this.body,
         extraVariables: Map<String, Pair<VariableType, Any?>> = emptyMap(),
-    ): Function {
-        return Function(
+    ): JSFunction {
+        return JSFunction(
             name = name,
             parameters = parameters,
             body = body,
@@ -115,11 +122,11 @@ internal class Function(
         )
     }
 
-    init {
-        val varargs = parameters.count { it.isVararg }
-
-        if (varargs > 1 || varargs == 1 && !parameters.last().isVararg) {
-            throw SyntaxError("Rest parameter must be last formal parameter")
+    override fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
+        return copy().apply {
+            thisRef = this
+            setPrototype(this@JSFunction)
+            invoke(args, runtime)
         }
     }
 
@@ -150,64 +157,4 @@ internal class Function(
     }
 }
 
-internal fun OpExec(
-    callable : Expression,
-    arguments : List<Expression>
-) = Expression { r->
-    OpExecImpl(r, callable, arguments)
-}
-
-private fun OpExecImpl(
-    runtime: ScriptRuntime,
-    callable: Any?,
-    arguments: List<Expression>
-) : Any? {
-    return when (callable) {
-        is Expression -> OpExecImpl(runtime, callable(runtime), arguments)
-        is Callable -> callable.invoke(arguments, runtime)
-        is kotlin.Function<*> -> execKotlinFunction(callable, arguments.fastMap { runtime.toKotlin(it(runtime)) })
-        else -> throw TypeError("$callable is not a function")
-    }
-}
-
-
-@Suppress("unchecked_cast")
-private fun execKotlinFunction(
-    function: kotlin.Function<*>,
-    args: List<Any?>,
-) : Any? {
-    return when (function) {
-        is Function0<*> -> (function as Function0<Any?>)
-            .invoke()
-
-        is Function1<*, *> -> (function as Function1<Any?, Any?>)
-            .invoke(args[0])
-
-        is Function2<*, *, *> -> (function as Function2<Any?, Any?, Any?>)
-            .invoke(args[0], args[1])
-
-        is Function3<*, *, *, *> -> (function as Function3<Any?, Any?, Any?, Any?>)
-            .invoke(args[0], args[1], args[2])
-
-        is Function4<*, *, *, *, *> -> (function as Function4<Any?, Any?, Any?, Any?, Any?>)
-            .invoke(args[0], args[1], args[2], args[3])
-
-        is Function5<*, *, *, *, *, *> -> (function as Function5<Any?, Any?, Any?, Any?, Any?, Any?>)
-            .invoke(args[0], args[1], args[2], args[3], args[4])
-
-        is Function6<*, *, *, *, *, *, *> -> (function as Function6<Any?, Any?, Any?, Any?, Any?, Any?, Any?>)
-            .invoke(args[0], args[1], args[2], args[3], args[4], args[5])
-
-        is Function7<*, *, *, *, *, *, *, *> -> (function as Function7<Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?>)
-            .invoke(args[0], args[1], args[2], args[3], args[4], args[5], args[6])
-
-        is Function8<*, *, *, *, *, *, *, *, *> -> (function as Function8<Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?>)
-            .invoke(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7])
-
-        is Function9<*, *, *, *, *, *, *, *, *, *> -> (function as Function9<Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?>)
-            .invoke(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
-
-        else -> error("${function::class.simpleName} has too many arguments to be called from JS")
-    }
-}
 

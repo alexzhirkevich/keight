@@ -1,11 +1,10 @@
-package io.github.alexzhirkevich.keight.es
+package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.expressions.Callable
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import kotlin.jvm.JvmInline
 
-public interface ESAny {
+public interface JsAny {
 
     public val type : String get() = "object"
 
@@ -18,16 +17,6 @@ public interface ESAny {
 
     public operator fun contains(variable: Any?): Boolean =
         get(variable) != Unit
-
-    public operator fun invoke(
-        function: String,
-        context: ScriptRuntime,
-        arguments: List<Expression>
-    ): Any? {
-        return when {
-            else -> throw TypeError("${type}.$function is not a function")
-        }
-    }
 }
 
 @JvmInline

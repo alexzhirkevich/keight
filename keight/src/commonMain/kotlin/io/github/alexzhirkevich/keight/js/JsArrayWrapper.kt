@@ -3,21 +3,18 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.argAt
-import io.github.alexzhirkevich.keight.expressions.Callable
 import io.github.alexzhirkevich.keight.expressions.OpConstant
-import io.github.alexzhirkevich.keight.es.TypeError
 import io.github.alexzhirkevich.keight.checkNotEmpty
 import io.github.alexzhirkevich.keight.fastFilter
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit
-import io.github.alexzhirkevich.keight.es.ESAny
 import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 
 @JvmInline
-internal value class JsArray(
+internal value class JsArrayWrapper(
     override val value : MutableList<Any?>
-) : ESAny, JsWrapper<MutableList<Any?>>, MutableList<Any?> by value {
+) : JsAny, JsWrapper<MutableList<Any?>>, MutableList<Any?> by value {
 
     override fun get(variable: Any?): Any? {
         return when (variable) {

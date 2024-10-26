@@ -1,8 +1,6 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.es.ESObject
-import io.github.alexzhirkevich.keight.es.Object
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -13,7 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
-internal fun JsJSON() : ESObject {
+internal fun JsJSON() : JSObject {
 
     return Object("JSON") {
         "parse".func("text") {
@@ -31,7 +29,7 @@ private fun stringify(value : Any?, runtime: ScriptRuntime) : String {
         is Number -> Json.encodeToString<Number>(value)
         is List<*> -> Json.encodeToString<List<*>>(value)
         is JsWrapper<*> -> stringify(value.value, runtime)
-        is ESObject -> Json.encodeToString<JsonElement>(value.toJsonObject(runtime))
+        is JSObject -> Json.encodeToString<JsonElement>(value.toJsonObject(runtime))
         else -> ""
     }
 }
@@ -43,7 +41,7 @@ private fun Any?.toJsonObject(runtime: ScriptRuntime) : JsonElement {
         is String -> JsonPrimitive(this)
         is Number -> JsonPrimitive(this)
         is List<*> -> JsonArray(map { it.toJsonObject(runtime) })
-        is ESObject -> JsonObject(keys.associateWith {
+        is JSObject -> JsonObject(keys.associateWith {
             runtime.toKotlin(get(it)).toJsonObject(runtime)
         })
 

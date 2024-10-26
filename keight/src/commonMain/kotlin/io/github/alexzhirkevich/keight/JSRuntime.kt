@@ -1,24 +1,27 @@
-package io.github.alexzhirkevich.keight.es
+package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.DefaultRuntime
-import io.github.alexzhirkevich.keight.DefaultScriptIO
-import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.ScriptIO
-import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.set
+import io.github.alexzhirkevich.keight.js.JSLangContext
+import io.github.alexzhirkevich.keight.js.JSMath
+import io.github.alexzhirkevich.keight.js.JSNumberFunction
+import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.JSObjectFunction
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.JsConsole
 import kotlin.jvm.JvmInline
 
-public abstract class ESRuntime(
+public open class JSRuntime(
     override var io: ScriptIO = DefaultScriptIO,
-) : DefaultRuntime(), ESObject {
+) : DefaultRuntime(), JSObject, ScriptContext by JSLangContext {
 
     override val comparator: Comparator<Any?> by lazy {
-        ESComparator(this)
+        JSComparator(this)
     }
 
     override val keys: Set<String> get() = emptySet()
+
     override val entries: List<List<Any?>> get() = emptyList()
+
+    override val values: List<Any?> get() = emptyList()
 
     init { init() }
 
@@ -32,15 +35,16 @@ public abstract class ESRuntime(
     }
 
     private fun init() {
-        set("Math", ESMath(), VariableType.Global)
-        set("Object", ESObjectAccessor(), VariableType.Global)
+        set("console", JsConsole(), VariableType.Global)
+        set("Math", JSMath(), VariableType.Global)
+        set("Object", JSObjectFunction(), VariableType.Global)
         set("globalThis", this, VariableType.Global)
         set("this", this, VariableType.Const)
         set("Infinity", Double.POSITIVE_INFINITY, VariableType.Const)
         set("NaN", Double.NaN, VariableType.Const)
         set("undefined", Unit, VariableType.Const)
 
-        val number = ESNumber()
+        val number = JSNumberFunction()
         set("Number", number, VariableType.Global)
 
         set("parseInt", number.parseInt, VariableType.Global)
@@ -49,6 +53,7 @@ public abstract class ESRuntime(
         set("isNan", number.isNan, VariableType.Global)
         set("isInteger", number.isInteger, VariableType.Global)
         set("isSafeInteger", number.isSafeInteger, VariableType.Global)
+
     }
 
     final override fun get(variable: Any?): Any? {
@@ -61,7 +66,7 @@ public abstract class ESRuntime(
             return super<DefaultRuntime>.get(variable)
         }
 
-        val globalThis = get("globalThis") as? ESAny?
+        val globalThis = get("globalThis") as? JsAny?
             ?: return super<DefaultRuntime>.get(variable)
 
         if (variable in globalThis){
@@ -75,17 +80,10 @@ public abstract class ESRuntime(
         set(variable, fromKotlin(value), null)
     }
 
-    override fun invoke(
-        function: String,
-        context: ScriptRuntime,
-        arguments: List<Expression>
-    ): Any? {
-        throw TypeError("ScriptRuntime is not a function")
-    }
 }
 
 @JvmInline
-internal value class ESComparator(
+internal value class JSComparator(
     private val runtime: ScriptRuntime
 ) : Comparator<Any?> {
 

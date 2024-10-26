@@ -1,4 +1,4 @@
-package io.github.alexzhirkevich.keight.es.interpreter
+package io.github.alexzhirkevich.keight.js.interpreter
 
 import kotlin.jvm.JvmInline
 
@@ -7,16 +7,27 @@ internal enum class NumberFormat(
     val alphabet : Set<Char>,
     val prefix : Char?
 ) {
-    Dec(10, ".0123456789".toSet(), null),
-    Hex(16, "0123456789abcdef".toSet(), 'x'),
-    Oct(8, "01234567".toSet(), 'o'),
-    Bin(2, "01".toSet(), 'b')
+    Dec(10, "eE.0123456789".toHashSet(), null),
+    Hex(16, "0123456789abcdef".toHashSet(), 'x'),
+    Oct(8, "01234567".toHashSet(), 'o'),
+    Bin(2, "01".toHashSet(), 'b')
+}
+
+internal sealed interface TemplateStringToken {
+    @JvmInline
+    value class Str(val value: String) : TemplateStringToken
+
+    @JvmInline
+    value class Template(val value : List<Token>) : TemplateStringToken
 }
 
 internal sealed interface Token {
 
     @JvmInline
     value class Str(val value : String) : Token
+
+    @JvmInline
+    value class TemplateString(val tokens : List<TemplateStringToken>) : Token
 
     class Num(
         val value : Number,
@@ -47,6 +58,7 @@ internal sealed interface Token {
         object Instanceof : Operator
         object Typeof : Operator
         object New : Operator
+        object Spread : Operator
 
         sealed interface Bracket : Token {
             object RoundOpen : Operator

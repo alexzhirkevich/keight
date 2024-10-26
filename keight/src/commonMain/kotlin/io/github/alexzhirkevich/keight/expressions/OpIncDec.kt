@@ -1,15 +1,18 @@
 package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.invoke
 
-internal fun  OpIncDecAssign(
+internal fun OpIncDecAssign(
     variable: Expression,
-    isPrefix : Boolean,
-    op: (Any?) -> Any?
+    isPrefix: Boolean,
+    isInc: Boolean
 ) : Expression {
 
-    val value = Expression { op(variable(it)) }
+    val op = if (isInc) ScriptRuntime::inc else ScriptRuntime::dec
+    val value = Expression { op(it, variable(it)) }
+
     val assignment = when {
         variable is OpGetVariable && variable.assignmentType == null ->
             OpAssign(
