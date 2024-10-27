@@ -1,10 +1,11 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 
 class ModTest {
 
     @Test
-    fun numbers() {
+    fun numbers()= runTest  {
         "13 % 7".eval().assertEqualsTo(6L)
         "13 % -7".eval().assertEqualsTo(6L)
         "-13 % 7".eval().assertEqualsTo(-6L)
@@ -16,14 +17,14 @@ class ModTest {
     }
 
     @Test
-    fun string() {
+    fun string() = runTest {
         "'13' % '7'".eval().assertEqualsTo(6L)
         "'13' % 7".eval().assertEqualsTo(6L)
         "13 % '7'".eval().assertEqualsTo(6L)
     }
 
     @Test
-    fun null_undefined() {
+    fun null_undefined() = runTest {
         "null % 5".eval().assertEqualsTo(0L)
         "5 % null".eval().assertEqualsTo(Double.NaN)
         "0 % null".eval().assertEqualsTo(Double.NaN)

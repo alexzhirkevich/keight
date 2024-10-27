@@ -11,7 +11,7 @@ import kotlin.jvm.JvmInline
 
 @JvmInline
 internal value class OpConstant(val value: Any?) : Expression {
-    override fun invokeRaw(context: ScriptRuntime): Any? {
+    override suspend fun invokeRaw(context: ScriptRuntime): Any? {
         return value
     }
 }
@@ -19,12 +19,12 @@ internal value class OpConstant(val value: Any?) : Expression {
 private object UNINITIALIZED
 
 internal class OpLazy(
-    private val init : (ScriptRuntime) -> Any?
+    private val init : suspend (ScriptRuntime) -> Any?
 ) : Expression {
 
     private var value : Any? = UNINITIALIZED
 
-    override fun invokeRaw(context: ScriptRuntime): Any? {
+    override suspend fun invokeRaw(context: ScriptRuntime): Any? {
 
         if (value is UNINITIALIZED){
             value = init(context)
@@ -40,7 +40,7 @@ internal class OpGetVariable(
     val assignmentType : VariableType? = null
 ) : Expression {
 
-    override fun invokeRaw(context: ScriptRuntime, ): Any? {
+    override suspend fun invokeRaw(context: ScriptRuntime, ): Any? {
         return if (assignmentType != null) {
             context.set(name, OpConstant(Unit), assignmentType)
         } else {
@@ -48,12 +48,12 @@ internal class OpGetVariable(
         }
     }
 
-    private tailrec fun getImpl(res: Any?, context: ScriptRuntime): Any? {
+    private tailrec suspend fun getImpl(res: Any?, runtime: ScriptRuntime): Any? {
         return when (res) {
-            is Expression -> getImpl(res.invoke(context), context)
-            is JsAny -> res[name]
-            null -> if (name in context) {
-                context[name]
+            is Expression -> getImpl(res.invoke(runtime), runtime)
+            is JsAny -> res.get(name, runtime)
+            null -> if (name in runtime) {
+                runtime.get(name)
             } else {
                 unresolvedReference(name)
             }

@@ -15,7 +15,7 @@ internal class OpAssignByIndex(
     private val merge : (ScriptRuntime.(Any?, Any?) -> Any?)?
 ) : Expression {
 
-    override tailrec fun invokeRaw(context: ScriptRuntime): Any? {
+    override tailrec suspend fun invokeRaw(context: ScriptRuntime): Any? {
         val v = assignableValue.invoke(context)
         val current = context.get(variableName)
 
@@ -56,8 +56,8 @@ internal class OpAssignByIndex(
                 }
                 is JSObject -> {
                     
-                    if (idx in current && merge != null){
-                        current[idx] = merge.invoke(context, current[idx], v)
+                    if (current.contains(idx, context) && merge != null){
+                        current[idx] = merge.invoke(context, current.get(idx, context), v)
                     } else {
                         current[idx] = v
                     }

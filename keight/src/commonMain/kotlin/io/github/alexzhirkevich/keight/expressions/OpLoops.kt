@@ -13,13 +13,13 @@ internal class OpForLoop(
 ) : Expression {
 
 
-    private val condition: (ScriptRuntime) -> Boolean = if (comparison == null) {
+    private val condition: suspend (ScriptRuntime) -> Boolean = if (comparison == null) {
         { true }
     } else {
         { !it.isFalse(comparison.invoke(it)) }
     }
 
-    override fun invokeRaw(context: ScriptRuntime): Any {
+    override suspend fun invokeRaw(context: ScriptRuntime): Any {
         context.withScope {
             assignment?.invoke(it)
             block(it)
@@ -27,7 +27,7 @@ internal class OpForLoop(
         return Unit
     }
 
-    private fun block(ctx: ScriptRuntime) {
+    private suspend fun block(ctx: ScriptRuntime) {
         while (condition(ctx)) {
             try {
                 body(ctx)

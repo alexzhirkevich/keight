@@ -17,15 +17,15 @@ internal class OpAssign(
     private val merge : (ScriptRuntime.(Any?, Any?) -> Any?)?
 ) : Expression {
 
-    override fun invokeRaw(context: ScriptRuntime): Any? {
-        val v = assignableValue.invoke(context)
-        val r = receiver?.invoke(context)
+    override suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
+        val v = assignableValue.invoke(runtime)
+        val r = receiver?.invoke(runtime)
 
         val current = if (receiver == null) {
-            context[variableName]
+            runtime.get(variableName)
         } else {
             when (r){
-                is JsAny -> r[variableName]
+                is JsAny -> r.get(variableName, runtime)
                 else -> null
             }
         }
@@ -35,11 +35,11 @@ internal class OpAssign(
         }
 
         val value = if (current != null && merge != null) {
-            merge.invoke(context, current, v)
+            merge.invoke(runtime, current, v)
         } else v
 
         if (receiver == null) {
-            context.set(
+            runtime.set(
                 variable = variableName,
                 value = value,
                 type = type

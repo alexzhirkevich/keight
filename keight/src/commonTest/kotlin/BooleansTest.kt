@@ -1,9 +1,10 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 class BooleansTest {
 
     @Test
-    fun and() {
+    fun and() = runTest {
         "true && true".eval().assertEqualsTo(true)
         "true && true && true".eval().assertEqualsTo(true)
 
@@ -16,7 +17,7 @@ class BooleansTest {
     }
 
     @Test
-    fun or() {
+    fun or() = runTest {
         "true || true".eval().assertEqualsTo(true)
         "true || true || true".eval().assertEqualsTo(true)
 
@@ -31,7 +32,7 @@ class BooleansTest {
     }
 
     @Test
-    fun and_or_order() {
+    fun and_or_order() = runTest {
         "true && true || false".eval().assertEqualsTo(true)
         "false || true && true".eval().assertEqualsTo(true)
 
@@ -44,7 +45,7 @@ class BooleansTest {
     }
 
     @Test
-    fun with_different_source() {
+    fun with_different_source() = runTest {
         "false || 1 == 1".eval().assertEqualsTo(true)
         "true && 1 == 2".eval().assertEqualsTo(false)
 
@@ -56,7 +57,7 @@ class BooleansTest {
     }
 
     @Test
-    fun assignment() {
+    fun assignment() = runTest {
 
         "let x = 50; x ||= 10; x".eval().assertEqualsTo(50L)
         "let x = ''; x ||= 'empty'; x".eval().assertEqualsTo("empty")

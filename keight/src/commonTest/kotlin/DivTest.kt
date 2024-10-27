@@ -1,10 +1,11 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 
 class DivTest {
 
     @Test
-    fun numbers() {
+    fun numbers() = runTest {
         "26 / 2.0".eval().assertEqualsTo(13.0)
         "26 / 2".eval().assertEqualsTo(13L)
         "-26 / 2.0".eval().assertEqualsTo(-13.0)
@@ -20,7 +21,7 @@ class DivTest {
     }
 
     @Test
-    fun string() {
+    fun string() = runTest {
         "'30' / '3'".eval().assertEqualsTo(10L)
         "30.0 / '3'".eval().assertEqualsTo(10.0)
         "'30' / 3.0".eval().assertEqualsTo(10.0)
@@ -30,7 +31,7 @@ class DivTest {
     }
 
     @Test
-    fun null_undefined() {
+    fun null_undefined() = runTest  {
         "null / 5".eval().assertEqualsTo(0L)
         "5 / null".eval().assertEqualsTo(Double.POSITIVE_INFINITY)
         "0 / null".eval().assertEqualsTo(Double.NaN)

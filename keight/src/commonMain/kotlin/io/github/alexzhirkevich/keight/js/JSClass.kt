@@ -27,14 +27,14 @@ internal interface JSClass : JSObject, Named, Constructor {
         get() = "object"
 }
 
-internal fun JSClass.superFunctions(runtime: ScriptRuntime) : List<JSFunction> {
+internal suspend fun JSClass.superFunctions(runtime: ScriptRuntime) : List<JSFunction> {
     val extendsClass = extends?.invoke(runtime) as? JSClass
         ?: return emptyList()
 
     return (extendsClass.superFunctions(runtime) + extendsClass.functions).associateBy { it.name }.values.toList()
 }
 
-internal tailrec fun JSClass.instanceOf(
+internal tailrec suspend fun JSClass.instanceOf(
     any: Any?,
     runtime: ScriptRuntime,
     extends: Expression? = this.extends
@@ -55,16 +55,16 @@ internal tailrec fun JSClass.instanceOf(
 
 internal sealed interface StaticClassMember {
 
-    fun assignTo(clazz : JSClass, runtime: ScriptRuntime)
+    suspend fun assignTo(clazz : JSClass, runtime: ScriptRuntime)
 
     class Variable(val name : String, val init : Expression) : StaticClassMember {
-        override fun assignTo(clazz: JSClass, runtime: ScriptRuntime) {
+        override suspend fun assignTo(clazz: JSClass, runtime: ScriptRuntime) {
             clazz[name] = init(runtime)
         }
     }
 
     class Method(val function: JSFunction) : StaticClassMember {
-        override fun assignTo(clazz: JSClass, runtime: ScriptRuntime) {
+        override suspend fun assignTo(clazz: JSClass, runtime: ScriptRuntime) {
             clazz[function.name] = function
         }
     }
@@ -89,7 +89,7 @@ internal open class ESClassBase(
 
     final override var constructorClass: Expression = OpConstant(this)
 
-    override fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
+    override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
 
         val parent = (extends?.invoke(runtime) as? JSClass)?.construct
 
@@ -123,14 +123,4 @@ internal open class ESClassBase(
     override val type: String
         get() = "object"
 
-    override fun toString(): String {
-        val properties = keys.joinToString(
-            prefix = " ",
-            postfix = " ",
-            separator = ", "
-        ) {
-            "$it: ${get(it)}"
-        }
-        return "$name {$properties}"
-    }
 }

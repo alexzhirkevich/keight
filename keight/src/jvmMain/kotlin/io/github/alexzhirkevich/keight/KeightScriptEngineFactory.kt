@@ -1,12 +1,13 @@
 package io.github.alexzhirkevich.keight
 
+import kotlinx.coroutines.Job
 import io.github.alexzhirkevich.keight.ScriptEngine as KeightScriptEngine
 import javax.script.ScriptEngine
 import javax.script.ScriptEngineFactory
 
 public class KeightScriptEngineFactory : ScriptEngineFactory  {
 
-    internal val globalRuntime : ScriptRuntime = JSRuntime()
+    internal val globalRuntime : ScriptRuntime = JSRuntime(Job())
 
     override fun getEngineName(): String {
         return "Keight"

@@ -1,15 +1,16 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 
 class SubTest {
 
     @Test
-    fun randomJsPizdec(){
+    fun randomJsPizdec() = runTest {
         "10 - [[[[[[[[[[5]]]]]]]]]]".eval().assertEqualsTo(5L)
     }
 
     @Test
-    fun numbers() {
+    fun numbers()= runTest  {
         "13-17".eval().assertEqualsTo(-4L)
         "13 - 17".eval().assertEqualsTo(-4L)
         "-13-17".eval().assertEqualsTo(-30L)
@@ -19,7 +20,7 @@ class SubTest {
     }
 
     @Test
-    fun string(){
+    fun string() = runTest {
         "'10' - '3'".eval().assertEqualsTo(7L)
         "10 - '3'".eval().assertEqualsTo(7L)
         "'10' - 3".eval().assertEqualsTo(7L)
@@ -31,7 +32,7 @@ class SubTest {
     }
 
     @Test
-    fun null_undefined(){
+    fun null_undefined() = runTest {
         "null - 5".eval().assertEqualsTo(-5L)
         "5 - null".eval().assertEqualsTo(5L)
         "null - null".eval().assertEqualsTo(0L)

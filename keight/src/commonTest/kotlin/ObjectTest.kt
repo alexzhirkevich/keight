@@ -1,5 +1,7 @@
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.JSRuntime
+import io.github.alexzhirkevich.keight.js.JSLangContext
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -7,11 +9,21 @@ import kotlin.test.assertTrue
 class ObjectTest {
 
     @Test
-    fun context(){
+    fun context() = runTest {
 
-        val obj = "{ name : 'test'}".eval() as JSObject
+        val runtime = JSRuntime(coroutineContext)
+        assertTrue {
+            "const person = {}; person".eval(runtime) is JSObject
+        }
 
-        obj["name"].toString().assertEqualsTo("test")
+        assertTrue {
+            "function x(obj) { return obj }; x({})".eval(runtime) is JSObject
+        }
+
+        val obj = "{ name : 'test', x : 1 }".eval(runtime) as JSObject
+
+        runtime.toKotlin(obj.get("name", runtime)).assertEqualsTo("test")
+        runtime.toKotlin(obj.get("x",runtime)).assertEqualsTo(1L)
 
 
         "typeof {}".eval().assertEqualsTo("object")
@@ -28,9 +40,9 @@ class ObjectTest {
     }
 
     @Test
-    fun syntax(){
+    fun syntax() = runTest {
 
-        val runtime = JSRuntime()
+        val runtime = JSRuntime(coroutineContext)
 
         """
             let obj = {
@@ -49,24 +61,24 @@ class ObjectTest {
     }
 
     @Test
-    fun getters(){
+    fun getters() = runTest {
         "let obj = { name : 'string' }; obj['name']".eval().assertEqualsTo("string")
         "let obj = { name : 'string' }; obj.name".eval().assertEqualsTo("string")
     }
 
     @Test
-    fun setters(){
+    fun setters() = runTest {
         "let obj = {}; obj['name'] = 213; obj.name".eval().assertEqualsTo(213L)
         "let obj = {}; obj.name = 213; obj.name".eval().assertEqualsTo(213L)
     }
 
     @Test
-    fun global_object(){
+    fun object_entries_keys() = runTest {
         "typeof Object".eval().assertEqualsTo("function")
 
-        "Object.keys({ name : 'test' })".eval().assertEqualsTo(listOf("name"))
-        "Object.keys({ name : 'test', x : 1 })".eval().assertEqualsTo(listOf("name","x"))
-        ("Object.keys(1)".eval() as List<*>).size.assertEqualsTo(0)
+        "Object.keys({ name : 'test' })".eval().assertEqualsTo(setOf("name"))
+        "Object.keys({ name : 'test', x : 1 })".eval().assertEqualsTo(setOf("name", "x"))
+        ("Object.keys(1)".eval() as Set<*>).size.assertEqualsTo(0)
 
         "Object.entries({ name : 'test' })".eval()
             .assertEqualsTo(listOf(listOf("name", "test")))
@@ -76,10 +88,47 @@ class ObjectTest {
     }
 
     @Test
-    fun contains(){
-        val runtime = JSRuntime()
+    fun object_prototype() {
+        """
+            function Person(name) {
+                this.name = name
+            }
+            
+            let person = new Person('John')
+            
+            Object.getPrototypeOf(person) == person.prototype
+        """.trimIndent()
+    }
+
+    @Test
+    fun contains() = runTest {
+        val runtime = JSRuntime(coroutineContext)
         "let obj = { name : 'test'}".eval(runtime)
         assertTrue { "'name' in obj".eval(runtime) as Boolean }
         assertFalse { "'something' in obj".eval(runtime) as Boolean }
+    }
+
+    @Test
+    fun assign() = runTest {
+        val runtime = JSRuntime(coroutineContext)
+        """
+            // Create Target Object
+            const person1 = {
+                firstName: "John",
+                lastName: "Doe",
+                age: 50,
+                eyeColor: "blue"
+              };
+              
+           // Create Source Object
+            const person2 = {firstName: "Anne",lastName: "Smith"};
+
+            // Assign Source to Target
+            Object.assign(person1, person2);
+        """.eval(runtime)
+
+        "person1.firstName".eval(runtime).assertEqualsTo("Anne")
+        "person1.lastName".eval(runtime).assertEqualsTo("Smith")
+        "person1.age".eval(runtime).assertEqualsTo(50L)
     }
 }

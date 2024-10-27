@@ -1,9 +1,10 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 class ComparisonTest {
 
     @Test
-    fun number_string(){
+    fun number_string() = runTest {
         "'1' > 2".eval().assertEqualsTo(false)
         "'1' == 1".eval().assertEqualsTo(true)
         "'1' === 1".eval().assertEqualsTo(false)

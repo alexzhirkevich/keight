@@ -10,83 +10,95 @@ internal class JSObjectFunction : JSFunction(
     body = OpConstant(Unit)
 ) {
 
-    private val assign by func("target", "source") {
-        TODO()
+    init {
+        func("assign", "target", "source") {
+            val target = it[0] as JSObject
+            val source = it[1] as JSObject
+
+            source.keys.forEach { k ->
+                target[k] = source.get(k, this)
+            }
+        }
+        func("create","object", "source") {
+            TODO()
+        }
+
+        func("entries","object") {
+            (it.firstOrNull() as? JSObject)?.entries ?: emptyList<String>()
+        }
+
+        noArgsFunc("fromEntries") {
+            TODO()
+        }
+
+        func("keys","object") {
+            (it.firstOrNull() as? JSObject)?.keys ?: emptySet<String>()
+        }
+
+        func("values","object") {
+            (it.firstOrNull() as? JSObject)?.values ?: emptyList<String>()
+        }
+
+        func("groupBy","object", "callback") {
+            TODO()
+        }
+
+        func("defineProperty","object", "property", "descriptor") {
+            TODO()
+        }
+
+        func("defineProperties","object", "descriptors") {
+            TODO()
+        }
+
+        func("getOwnPropertyDescriptor","object", "property") {
+            TODO()
+        }
+
+        func("getOwnPropertyDescriptors","object") {
+            TODO()
+        }
+
+        func("getOwnPropertyNames","object") {
+            TODO()
+        }
+
+        func("getPrototypeOf","object") {
+            val obj = it.getOrElse(0) {
+                throw TypeError("Cannot convert undefined or null to object")
+            }
+
+            (obj as? JsAny)?.get(PROTO, this) ?: Unit
+        }
+
+        func("preventExtensions","object") {
+            TODO()
+        }
+
+        func("isExtensible","object") {
+            TODO()
+        }
+
+        func("seal","object") {
+            TODO()
+        }
+
+        func("isSealed","object") {
+            TODO()
+        }
+
+        func("freeze","object") {
+            TODO()
+        }
+
+        func("isFrozen", "object") {
+            TODO()
+        }
     }
 
-    private val create by func("object", "source") {
-        TODO()
-    }
 
-    private val _entries by func("object") {
-        (it.firstOrNull() as? JSObject)?.entries ?: emptyList<String>()
-    }
 
-    private val fromEntries by func {
-        TODO()
-    }
-
-    private val _keys by func("object") {
-        (it.firstOrNull() as? JSObject)?.keys ?: emptyList<String>()
-    }
-
-    private val _values by func("object") {
-        (it.firstOrNull() as? JSObject)?.values ?: emptyList<String>()
-    }
-
-    private val groupBy by func("object", "callback") {
-        TODO()
-    }
-
-    private val defineProperty by func("object", "property", "descriptor") {
-        TODO()
-    }
-
-    private val defineProperties by func("object", "descriptors") {
-        TODO()
-    }
-
-    private val getOwnPropertyDescriptor by func("object", "property") {
-        TODO()
-    }
-
-    private val getOwnPropertyDescriptors by func("object") {
-        TODO()
-    }
-
-    private val getOwnPropertyNames by func("object") {
-        TODO()
-    }
-
-    private val getPrototypeOf by func("object") {
-        TODO()
-    }
-
-    private val preventExtensions by func("object") {
-        TODO()
-    }
-
-    private val isExtensible by func("object") {
-        TODO()
-    }
-
-    private val seal by func("object") {
-        TODO()
-    }
-
-    private val isSealed by func("object") {
-        TODO()
-    }
-
-    private val freeze by func("object") {
-        TODO()
-    }
-
-    private val isFrozen by func("object") {
-        TODO()
-    }
-
-    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any {
+    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any {
         return if (args.isEmpty()){
             JSObjectImpl()
         } else {
@@ -95,7 +107,7 @@ internal class JSObjectFunction : JSFunction(
     }
 
 
-    override fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
+    override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
         return invoke(args, runtime)
     }
 }

@@ -11,16 +11,16 @@ internal class OpIndex(
     val index : Expression,
 ) : Expression {
 
-    override fun invokeRaw(context: ScriptRuntime): Any? {
+    override suspend fun invokeRaw(context: ScriptRuntime): Any? {
         return invoke(context, variable, index)
     }
 
     companion object {
-        fun invoke(context: ScriptRuntime, variable : Expression, index : Expression) : Any? {
-            val v = checkNotEmpty(variable(context))
-            val idx = index(context)
+        suspend fun invoke(runtime: ScriptRuntime, variable : Expression, index : Expression) : Any? {
+            val v = checkNotEmpty(variable(runtime))
+            val idx = index(runtime)
 
-            return v.valueAtIndexOrUnit(idx, context.toNumber(idx).toInt())
+            return v.valueAtIndexOrUnit(idx, runtime.toNumber(idx).toInt(), runtime)
         }
     }
 }

@@ -9,11 +9,11 @@ public interface ScriptEngine : ScriptInterpreter {
     }
 }
 
-public fun ScriptEngine.evaluate(script: String) : Any? {
+public suspend fun ScriptEngine.evaluate(script: String) : Any? {
     return invoke(interpret(script)) 
 }
 
-public fun ScriptEngine.invoke(script: Script) : Any? {
+public suspend fun ScriptEngine.invoke(script: Script) : Any? {
     return script.invoke(runtime)
 }
 

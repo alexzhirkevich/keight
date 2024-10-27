@@ -1,13 +1,14 @@
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 class VariablesTest {
 
     @Test
-    fun multiple_declaration() {
+    fun multiple_declaration() = runTest {
         "var a=1,b=2; a+b".eval().assertEqualsTo(3L)
         assertFailsWith<TypeError> {
             "const a=1,b=2; b++".eval().assertEqualsTo(3L)
@@ -15,7 +16,7 @@ class VariablesTest {
     }
 
     @Test
-    fun variable_scopes() {
+    fun variable_scopes()= runTest  {
         """
             var x;
             if(true) {
@@ -59,12 +60,12 @@ class VariablesTest {
     }
 
     @Test
-    fun constMutating() {
+    fun constMutating() = runTest {
         assertFailsWith<TypeError> { "const x = 1; x++".eval() }
     }
 
     @Test
-    fun variable_redeclaration() {
+    fun variable_redeclaration() = runTest {
         assertFailsWith<SyntaxError> { "const x = 1; const x = 2".eval() }
         assertFailsWith<SyntaxError> { "const x = 1; let x = 2".eval() }
         assertFailsWith<SyntaxError> { "const x = 1; var x = 2".eval() }

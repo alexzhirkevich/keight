@@ -1,9 +1,10 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 class MathTest {
 
     @Test
-    fun math() {
+    fun math() = runTest {
         "Math.sin(Math.PI/2)".eval().assertEqualsTo(1.0)
         "Math.sin(Math.PI)".eval().assertEqualsTo(0.0)
         "Math.sin(0)".eval().assertEqualsTo(0.0)

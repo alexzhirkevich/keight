@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight
 
+import kotlinx.coroutines.runBlocking
 import javax.script.Bindings
 
 internal class KeightBindings(
@@ -20,7 +21,7 @@ internal class KeightBindings(
     }
 
     override fun remove(k: String?): Any? {
-        return runtime.remove(k)
+        return runtime.delete(k)
     }
 
     override fun containsKey(k: String?): Boolean {
@@ -32,7 +33,7 @@ internal class KeightBindings(
     }
 
     override fun get(p0: String?): Any? {
-        return runtime[p0]
+        return runBlocking { runtime.get(p0) }
     }
 
     override fun isEmpty(): Boolean {

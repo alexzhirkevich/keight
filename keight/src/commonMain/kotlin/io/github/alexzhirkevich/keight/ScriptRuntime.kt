@@ -2,13 +2,14 @@ package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
+import kotlinx.coroutines.CoroutineScope
 
 
 public enum class VariableType {
     Global, Local, Const
 }
 
-public interface ScriptRuntime : ScriptContext {
+public interface ScriptRuntime : ScriptContext, CoroutineScope {
 
     public var io : ScriptIO
 
@@ -16,17 +17,17 @@ public interface ScriptRuntime : ScriptContext {
 
     public fun isEmpty() : Boolean
 
-    public fun remove(variable: Any?) : Any?
+    public fun delete(property: Any?)
 
     public operator fun contains(variable: Any?): Boolean
 
-    public operator fun get(variable: Any?): Any?
+    public suspend fun get(variable: Any?): Any?
 
     public fun set(variable: Any?, value: Any?, type: VariableType?)
 
-    public fun withScope(
+    public suspend fun withScope(
         extraVariables: Map<String, Pair<VariableType, Any?>> = emptyMap(),
-        block: (ScriptRuntime) -> Any?
+        block: suspend (ScriptRuntime) -> Any?
     ): Any?
 
     public fun reset()
@@ -36,24 +37,34 @@ public operator fun ScriptRuntime.set(variable: Any?, value: Any?): Unit =
     set(variable, fromKotlin(value), null)
 
 private class ScopedRuntime(
-    private val parent : ScriptRuntime
-) : DefaultRuntime(), ScriptContext by parent {
+    val parent : ScriptRuntime,
+) : DefaultRuntime(),
+    ScriptContext by parent ,
+    CoroutineScope by parent {
 
     override var io: ScriptIO by parent::io
 
     override val comparator: Comparator<Any?>
         get() = parent.comparator
 
-    override fun get(variable: Any?): Any? {
-        return if (variable in variables) {
-            super.get(variable)
+    override fun fromKotlin(a: Any?): Any? {
+        return parent.fromKotlin(a)
+    }
+
+    override fun toKotlin(a: Any?): Any? {
+       return parent.toKotlin(a)
+    }
+
+    override suspend fun get(property: Any?): Any? {
+        return if (property in variables) {
+            super.get(property)
         } else {
-            parent.get(variable)
+            parent.get(property)
         }
     }
 
-    override fun contains(variable: Any?): Boolean {
-        return super.contains(variable) || parent.contains(variable)
+    override fun contains(property: Any?): Boolean {
+        return super.contains(property) || parent.contains(property)
     }
 
     override fun set(variable: Any?, value: Any?, type: VariableType?) {
@@ -77,12 +88,12 @@ public abstract class DefaultRuntime : ScriptRuntime {
         ScopedRuntime(this)
     }
 
-    override fun contains(variable: Any?): Boolean {
-        return variable in variables
+    override fun contains(property: Any?): Boolean {
+        return property in variables
     }
 
-    override fun remove(variable: Any?) : Any?  {
-        return variables.remove(variable)
+    override fun delete(property: Any?) {
+        variables.remove(property)
     }
 
     override fun set(variable: Any?, value: Any?, type: VariableType?) {
@@ -95,15 +106,15 @@ public abstract class DefaultRuntime : ScriptRuntime {
         variables[variable] = (type ?: variables[variable]?.first ?: VariableType.Global) to value
     }
 
-    override fun get(variable: Any?): Any? {
-        return if (contains(variable))
-            variables[variable]?.second
+    override suspend fun get(property: Any?): Any? {
+        return if (contains(property))
+            variables[property]?.second
         else Unit
     }
 
-    final override fun withScope(
+    final override suspend fun withScope(
         extraVariables: Map<String, Pair<VariableType, Any?>>,
-        block: (ScriptRuntime) -> Any?
+        block: suspend (ScriptRuntime) -> Any?
     ): Any? {
         child.reset()
         extraVariables.forEach { (n, v) ->
@@ -121,4 +132,9 @@ public abstract class DefaultRuntime : ScriptRuntime {
     }
 }
 
+internal tailrec fun ScriptRuntime.findRoot() : ScriptRuntime {
+    return if (this is ScopedRuntime) {
+        parent.findRoot()
+    } else this
+}
 

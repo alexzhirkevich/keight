@@ -1,5 +1,7 @@
 package io.github.alexzhirkevich.keight
 
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.runBlocking
 import java.io.Reader
 import javax.script.Bindings
 import javax.script.ScriptContext
@@ -20,7 +22,7 @@ internal class KeightScriptEngine(
     }
 
     override fun eval(script: String): Any? {
-        val v =  engine.evaluate(script)
+        val v = runBlocking { engine.evaluate(script) }
         return v
     }
 
@@ -41,7 +43,9 @@ internal class KeightScriptEngine(
     }
 
     override fun get(name: String?): Any? {
-        return engine.runtime[name]
+        return runBlocking {
+            engine.runtime.get(name)
+        }
     }
 
     override fun getBindings(scope: Int): Bindings {
@@ -67,7 +71,7 @@ internal class KeightScriptEngine(
     }
 
     override fun createBindings(): Bindings {
-        return KeightBindings(JSRuntime())
+        return KeightBindings(JSRuntime(Job()))
     }
 
     override fun getContext(): ScriptContext {

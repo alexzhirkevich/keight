@@ -1,11 +1,12 @@
 import io.github.alexzhirkevich.keight.js.ReferenceError
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 class LoopsTest {
 
     @Test
-    fun whileLoop() {
+    fun whileLoop() = runTest {
         """
             var x = 0
             while(x != 3) {
@@ -23,7 +24,7 @@ class LoopsTest {
     }
 
     @Test
-    fun doWhileLoop() {
+    fun doWhileLoop()= runTest  {
         """
             var x = 0
             do {
@@ -34,7 +35,7 @@ class LoopsTest {
     }
 
     @Test
-    fun forLoop(){
+    fun forLoop()= runTest {
         """
             var x = 0
             for(let i = 0; i<3;i++){
@@ -80,7 +81,7 @@ class LoopsTest {
     }
 
     @Test
-    fun multiple_expressions(){
+    fun multiple_expressions()= runTest {
         """
             let a;
             let b
@@ -100,7 +101,7 @@ class LoopsTest {
     }
 
     @Test
-    fun early_return(){
+    fun early_return()= runTest {
         """
             var x = 0
             for(let i = 0; i<3;i++){
@@ -170,7 +171,7 @@ class LoopsTest {
     }
 
     @Test
-    fun scopes() {
+    fun scopes() = runTest {
         assertFailsWith<ReferenceError> {
             """
             let i = 1

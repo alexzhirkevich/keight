@@ -1,24 +1,25 @@
 package io.github.alexzhirkevich.keight.js
 
-public open class JSError(message : String?, cause : Throwable?) : Exception(message, cause),
-    JsAny {
-    override fun get(variable: Any?): Any? {
-        return when(variable){
+import io.github.alexzhirkevich.keight.ScriptRuntime
+
+public open class JSError(message : String?, cause : Throwable?)
+    : Exception(message, cause), JsAny {
+
+    override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
+        return when(property){
             "message" -> message
             "stack" -> stackTraceToString()
             "name" -> this::class.simpleName
-            else -> Unit
+            else -> super.get(property, runtime)
         }
-    }
-
-    override fun contains(variable: Any?): Boolean {
-        return variable == "message" || variable == "stack" || variable == "name"
     }
 }
 
 public class SyntaxError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
 
 public class TypeError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
+
+public class RangeError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
 
 public class ReferenceError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
 

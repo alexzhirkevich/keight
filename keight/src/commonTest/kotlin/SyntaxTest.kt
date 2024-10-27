@@ -1,13 +1,15 @@
+import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.SyntaxError
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 class SyntaxTest {
 
     @Test
-    fun newline_property_chaining() {
+    fun newline_property_chaining() = runTest {
         """
             Math.imul(3,4).toString()
         """.trimIndent().eval().assertEqualsTo("12")
@@ -47,7 +49,7 @@ class SyntaxTest {
 
 
     @Test
-    fun typeOf() {
+    fun typeOf() = runTest {
         "typeof(1)".eval().assertEqualsTo("number")
         "typeof(null)".eval().assertEqualsTo("object")
         "typeof(undefined)".eval().assertEqualsTo("undefined")
@@ -72,7 +74,7 @@ class SyntaxTest {
     }
 
     @Test
-    fun tryCatch() {
+    fun tryCatch()= runTest  {
         """
             let error = undefined
             try {
@@ -120,7 +122,7 @@ class SyntaxTest {
     }
 
     @Test
-    fun operator_precedence_and_associativity() {
+    fun operator_precedence_and_associativity() = runTest {
         "1 + 2 ** 3 * 4 / 5 >> 6".eval().assertEqualsTo(0L)
 
         "2 ** 3 / 3 ** 2".eval().assertEqualsTo(0.8888888888888888)
@@ -130,7 +132,7 @@ class SyntaxTest {
     }
 
     @Test
-    fun comments() {
+    fun comments() = runTest {
         """
             // comment
             "string"
@@ -190,22 +192,31 @@ class SyntaxTest {
             i
         """.trimIndent().eval().assertEqualsTo(2L)
 
+        val runtime = JSRuntime(coroutineContext)
         """
             let /**/ obj = /**/{ /**/name/**/ : /**/'test'/**/}
-        """.trimIndent().eval().let {
+        """.trimIndent().eval(runtime).let {
             it as JSObject
-            it["name"].toString().assertEqualsTo("test")
+            it.get("name",runtime).toString().assertEqualsTo("test")
         }
     }
 
     @Test
-    fun ternary_operator() {
+    fun ternary_operator() = runTest {
         "false ? 1 : 2".eval().assertEqualsTo(2L)
         "true ? 1 : 2".eval().assertEqualsTo(1L)
     }
 
     @Test
-    fun recursion_with_ternary_return(){
+    fun spread_operator() = runTest {
+        """
+            let a = [3,4];
+            [1,2, ...a, 5,6]
+        """.eval().assertEqualsTo(listOf(1L,2L,3L,4L,5L,6L))
+    }
+
+    @Test
+    fun recursion_with_ternary_return()= runTest {
 
         """
            function fib(n) {

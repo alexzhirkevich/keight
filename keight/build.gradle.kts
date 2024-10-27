@@ -5,10 +5,13 @@ plugins {
 }
 
 kotlin {
-
     sourceSets {
+        commonMain.dependencies {
+            implementation(libs.coroutines.core)
+        }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation(libs.coroutines.test)
         }
     }
 }

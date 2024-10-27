@@ -3,6 +3,8 @@ import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.JSRuntime
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -12,7 +14,7 @@ import kotlin.test.assertTrue
 class ClassesTest {
 
     @Test
-    fun declaration() {
+    fun declaration() = runTest {
         """
            class Test {}
 
@@ -34,7 +36,7 @@ class ClassesTest {
     }
 
     @Test
-    fun singleConstructor() {
+    fun singleConstructor() = runTest {
         assertFailsWith<SyntaxError> {
             """
                class Test {
@@ -48,7 +50,7 @@ class ClassesTest {
     }
 
     @Test
-    fun methods() {
+    fun methods() = runTest {
         """
            class Test {
                method(x){
@@ -71,7 +73,7 @@ class ClassesTest {
     }
 
     @Test
-    fun inlineMethodInvoke() {
+    fun inlineMethodInvoke() = runTest {
         """
            class Test {
                method(x){
@@ -84,7 +86,7 @@ class ClassesTest {
     }
 
     @Test
-    fun inheritance() {
+    fun inheritance() = runTest {
         """
            class A {
                a(){ return 'a'}
@@ -105,7 +107,7 @@ class ClassesTest {
     }
 
     @Test
-    fun instanceof() {
+    fun instanceof() = runTest {
 
         assertTrue {
             """
@@ -135,9 +137,9 @@ class ClassesTest {
     }
 
     @Test
-    fun superConstructorAndMethod() {
+    fun superConstructorAndMethod() = runTest {
 
-        val runtime = JSRuntime()
+        val runtime = JSRuntime(coroutineContext)
 
         """
             class Person {
@@ -165,7 +167,7 @@ class ClassesTest {
     }
 
     @Test
-    fun override() {
+    fun override() = runTest {
 
         """
             class A {
@@ -185,9 +187,9 @@ class ClassesTest {
     }
 
     @Test
-    fun static() {
+    fun static() = runTest {
 
-        val runtime = JSRuntime()
+        val runtime = JSRuntime(coroutineContext)
         """
             class A {
                 static test = 'static'
@@ -204,9 +206,9 @@ class ClassesTest {
 
     @Test
     @Ignore
-    fun staticInheritance() {
+    fun staticInheritance()= runTest  {
 
-        val runtime = JSRuntime()
+        val runtime = JSRuntime(coroutineContext)
 
         """
             class A {
@@ -226,7 +228,7 @@ class ClassesTest {
 
 
     @Test
-    fun doubleSuperCall() {
+    fun doubleSuperCall() = runTest {
 
         assertFailsWith<ReferenceError> {
             """
@@ -251,7 +253,7 @@ class ClassesTest {
 
     @Test
     @Ignore
-    fun missedSuperCall(){
+    fun missedSuperCall() = runTest {
         assertFailsWith<ReferenceError> {
             """
                 class A {
@@ -269,7 +271,7 @@ class ClassesTest {
         }
     }
     @Test
-    fun notMatchingArgConstructor(){
+    fun notMatchingArgConstructor()= runTest {
         """
             class Test {
                 constructor(x){
@@ -285,7 +287,7 @@ class ClassesTest {
     }
 
     @Test
-    fun number(){
+    fun number() = runTest {
         "1 instanceof Number".eval().assertEqualsTo(false)
         "new Number(1)".eval().assertEqualsTo(1L)
         "new Number('1')".eval().assertEqualsTo(1L)

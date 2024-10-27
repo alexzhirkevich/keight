@@ -1,10 +1,11 @@
 import io.github.alexzhirkevich.keight.ScriptIO
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 class JsConsoleTest {
 
     @Test
-    fun out(){
+    fun out()= runTest {
 
         var out : Any? = null
         var err : Any? = null
@@ -33,7 +34,7 @@ class JsConsoleTest {
     }
 
     @Test
-    fun empty(){
+    fun empty()= runTest {
         var out : Any? = null
         var err : Any? = null
 
@@ -48,7 +49,7 @@ class JsConsoleTest {
     }
 
     @Test
-    fun multiple(){
+    fun multiple()= runTest {
         var out : Any? = null
         var err : Any? = null
 

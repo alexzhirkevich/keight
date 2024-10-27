@@ -1,13 +1,16 @@
 import io.github.alexzhirkevich.keight.JSRuntime
+import io.github.alexzhirkevich.keight.set
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 class InteropTest {
 
     @Test
-    fun lambda(){
+    fun lambda()= runTest {
 
         var x = 0L
-        val runtime  = JSRuntime()
+        val runtime  = JSRuntime(coroutineContext)
 
         runtime["test"] = { x = 2 }
         "test()".eval(runtime)

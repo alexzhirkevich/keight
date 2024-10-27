@@ -1,9 +1,10 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 class SwitchTest {
 
     @Test
-    fun test(){
+    fun test()= runTest {
         """
             var x
             switch(3){
@@ -22,7 +23,7 @@ class SwitchTest {
     }
 
     @Test
-    fun multi_choice(){
+    fun multi_choice()= runTest {
         """
             var x
             switch(3){
@@ -40,7 +41,7 @@ class SwitchTest {
     }
 
     @Test
-    fun default_missplacement(){
+    fun default_missplacement()= runTest {
         """
             var x = ''
             switch(4){

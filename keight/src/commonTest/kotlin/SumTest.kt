@@ -1,17 +1,18 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 
 class SumTest {
 
     @Test
-    fun randomJsPizdec(){
+    fun randomJsPizdec() = runTest {
         "'b' + 'a' + + 'a' + 'a'".eval().assertEqualsTo("baNaNa")
         "[5] + 1".eval().assertEqualsTo("51")
         "[1,2] + [3,3]".eval().assertEqualsTo("1,23,3")
     }
 
     @Test
-    fun numbers() {
+    fun numbers() = runTest {
         "13+17".eval().assertEqualsTo(30L)
         "-13+ 17".eval().assertEqualsTo(4L)
         "-13+ -17".eval().assertEqualsTo(-30L)
@@ -19,14 +20,14 @@ class SumTest {
     }
 
     @Test
-    fun string(){
+    fun string()= runTest {
         "'10' + '5'".eval().assertEqualsTo("105")
         "'10' + 5".eval().assertEqualsTo("105")
         "10 + '5'".eval().assertEqualsTo("105")
     }
 
     @Test
-    fun null_undefined(){
+    fun null_undefined()= runTest {
         "null + 5".eval().assertEqualsTo(5L)
         "5 + null".eval().assertEqualsTo(5L)
         "null + null".eval().assertEqualsTo(0L)

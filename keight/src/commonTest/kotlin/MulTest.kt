@@ -1,17 +1,18 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 
 class MulTest {
 
     @Test
-    fun numbers() {
+    fun numbers() = runTest {
         "13 * 17.0".eval().assertEqualsTo(221.0)
         "-13 * -17".eval().assertEqualsTo(221L)
         "-13.0 * 17 * 2".eval().assertEqualsTo(-442.0)
     }
 
     @Test
-    fun string(){
+    fun string()= runTest {
         "'10' * '3'".eval().assertEqualsTo(30L)
         "10 * '3'".eval().assertEqualsTo(30L)
         "'10' * 3".eval().assertEqualsTo(30L)
@@ -23,7 +24,7 @@ class MulTest {
     }
 
     @Test
-    fun null_undefined(){
+    fun null_undefined()= runTest {
         "null * 5".eval().assertEqualsTo(0L)
         "5 * null".eval().assertEqualsTo(0L)
         "null * null".eval().assertEqualsTo(0L)

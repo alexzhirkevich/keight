@@ -1,13 +1,10 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.argAtOrNull
-import io.github.alexzhirkevich.keight.invoke
+import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 import kotlin.math.pow
-import kotlin.math.roundToInt
-import kotlin.math.roundToLong
 
 internal class JsNumberObject(
     val number: JsNumberWrapper
@@ -22,8 +19,8 @@ internal class JsNumberObject(
     override val name: String
         get() = "Number"
 
-    override fun get(variable: Any?): Any? {
-        return number[variable] ?: super.get(variable)
+    override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
+        return number.get(property, runtime) ?: super.get(property, runtime)
     }
 }
 
@@ -34,12 +31,8 @@ internal value class JsNumberWrapper(
 
     override val type: String get() = "number"
 
-    override fun get(variable: Any?): Any? {
-        return when(variable){
-            "toFixed" -> ToFixed(value)
-            "toPrecision" -> ToPrecision(value)
-            else -> super.get(variable)
-        }
+    override suspend fun proto(runtime: ScriptRuntime): Any? {
+        return (runtime.findRoot() as JSRuntime).Number.get(PROTOTYPE, runtime)
     }
 
     override fun toString(): String {
@@ -49,46 +42,4 @@ internal value class JsNumberWrapper(
     override fun compareTo(other: JsWrapper<Number>): Int {
         return value.toDouble().compareTo(other.value.toDouble())
     }
-}
-
-@JvmInline
-private value class ToPrecision(val value: Number) : Callable {
-    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): Double {
-        val digits = args.argAtOrNull(0)?.invoke(runtime) ?: return value.toDouble()
-        return value.toDouble().roundTo(runtime.toNumber(digits).toInt() - 1)
-    }
-}
-
-@JvmInline
-private value class ToFixed(val value: Number) : Callable {
-    override fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
-        val digits = args.argAtOrNull(0)?.invoke(runtime)?.let(runtime::toNumber)?.toInt() ?: 0
-
-        if (digits == 0) {
-            return value.toDouble().roundToLong().toString()
-        }
-
-        val stringNumber = value.toDouble().roundTo(digits).toString()
-
-        val intPart = stringNumber.substringBefore(".")
-        val floatPart = stringNumber.substringAfter(".", "").take(digits)
-
-        if (floatPart.isBlank()) {
-            return intPart
-        }
-
-        return (intPart + "." + floatPart.padEnd(digits, '0'))
-    }
-}
-
-private val pow10 by lazy {
-    (1..10).mapIndexed { i, it -> i to 10.0.pow(it) }.toMap()
-}
-
-private fun Double.roundTo(digit : Int) : Double {
-    if(digit <= 0)
-        return roundToLong().toDouble()
-
-    val pow = pow10[digit-1] ?: return this
-    return ((this * pow).roundToInt() / pow)
 }

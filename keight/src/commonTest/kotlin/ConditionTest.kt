@@ -1,9 +1,10 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 class ConditionTest {
 
     @Test
-    fun if_with_else() {
+    fun if_with_else() = runTest {
         "var x = 1; if (true) { x = x + 1 }; x;".eval().assertEqualsTo(2L)
         "var x = 1; if (true) x+=1; x".eval().assertEqualsTo(2L)
         "var x = 1; if (1==1) { x = x+1 }; x".eval().assertEqualsTo(2L)
@@ -34,7 +35,7 @@ class ConditionTest {
     }
 
     @Test
-    fun multiple_expressions(){
+    fun multiple_expressions() = runTest {
         """
             var x;
             if (false,true){

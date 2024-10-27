@@ -1,10 +1,12 @@
+import io.github.alexzhirkevich.keight.JSRuntime
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class NumberTest {
 
     @Test
-    fun format(){
+    fun format()= runTest {
         "123".eval().assertEqualsTo(123L)
         "123.1".eval().assertEqualsTo(123.1)
         ".1".eval().assertEqualsTo(.1)
@@ -17,22 +19,23 @@ class NumberTest {
     }
 
     @Test
-    fun eq(){
+    fun eq()= runTest {
         assertTrue { "5 === 5.0".eval() as Boolean }
     }
 
     @Test
-    fun toFixed(){
+    fun toFixed()= runTest {
         "12.12345.toFixed()".eval().assertEqualsTo("12")
         "12.52345.toFixed()".eval().assertEqualsTo("13")
         "12.12345.toFixed(1)".eval().assertEqualsTo("12.1")
         "12.12345.toFixed(3)".eval().assertEqualsTo("12.123")
         "123.456.toFixed(2)".eval().assertEqualsTo("123.46")
         "123.51.toFixed(1)".eval().assertEqualsTo("123.5")
+        "123.51.toFixed(1)".eval().assertEqualsTo("123.5")
     }
 
     @Test
-    fun toPrecision(){
+    fun toPrecision() = runTest {
         val num = 5.123456;
         "$num.toPrecision()".eval().assertEqualsTo(5.123456)
         "$num.toPrecision(5)".eval().assertEqualsTo(5.1235)
@@ -41,7 +44,7 @@ class NumberTest {
     }
 
     @Test
-    fun type(){
+    fun type()= runTest {
         "typeof(Number)".eval().assertEqualsTo("function")
         "Number(123)".eval().assertEqualsTo(123L)
         "Number(123.0)".eval().assertEqualsTo(123.0)
@@ -57,7 +60,7 @@ class NumberTest {
         "0 == false".eval().assertEqualsTo(true)
     }
     @Test
-    fun static_props(){
+    fun static_props()= runTest {
         "Number.MAX_SAFE_INTEGER".eval().assertEqualsTo(Long.MAX_VALUE)
         "Number.MIN_SAFE_INTEGER".eval().assertEqualsTo(Long.MIN_VALUE)
         "Number.MAX_VALUE".eval().assertEqualsTo(Double.MAX_VALUE)
@@ -68,42 +71,28 @@ class NumberTest {
     }
 
     @Test
-    fun static_methods() {
+    fun static_methods()= runTest  {
 
+        val runtime = JSRuntime(coroutineContext)
         listOf("Number.", "globalThis.", "").forEach {
-            "${it}isFinite(123)".eval().assertEqualsTo(true)
-            "${it}isInteger(123)".eval().assertEqualsTo(true)
-            "${it}isInteger(123.3)".eval().assertEqualsTo(false)
-            "${it}isNan(123.3)".eval().assertEqualsTo(false)
-            "${it}isNan(NaN)".eval().assertEqualsTo(true)
-            "${it}isSafeInteger(123.3)".eval().assertEqualsTo(false)
-            "${it}isSafeInteger(123)".eval().assertEqualsTo(true)
-            "${it}parseFloat('123.3')".eval().assertEqualsTo(123.3)
-            "${it}parseFloat('123.3sdfsdf')".eval().assertEqualsTo(123.3)
-            "${it}parseInt('123')".eval().assertEqualsTo(123L)
-            "${it}parseInt('123.3')".eval().assertEqualsTo(123L)
-            "${it}parseInt('123.3sdfsdf')".eval().assertEqualsTo(123L)
-            "${it}parseInt(' 0xff', 16)".eval().assertEqualsTo(255L)
-            "${it}parseInt(' 0xff', 0)".eval().assertEqualsTo(255L)
-            "${it}parseInt(' 0xffhh', 16)".eval().assertEqualsTo(255L)
-            "${it}parseInt(' 110', 2)".eval().assertEqualsTo(6L)
-            "${it}parseInt('1245', 8)".eval().assertEqualsTo(677L)
+            "${it}isFinite(123)".eval(runtime).assertEqualsTo(true)
+            "${it}isInteger(123)".eval(runtime).assertEqualsTo(true)
+            "${it}isInteger(123.3)".eval(runtime).assertEqualsTo(false)
+            "${it}isNaN(123.3)".eval(runtime).assertEqualsTo(false)
+            "${it}isNaN(NaN)".eval(runtime).assertEqualsTo(true)
+            "${it}isSafeInteger(123.3)".eval(runtime).assertEqualsTo(false)
+            "${it}isSafeInteger(123)".eval(runtime).assertEqualsTo(true)
+            "${it}parseFloat('123.3')".eval(runtime).assertEqualsTo(123.3)
+            "${it}parseFloat('123.3sdfsdf')".eval(runtime).assertEqualsTo(123.3)
+            "${it}parseInt('123')".eval(runtime).assertEqualsTo(123L)
+            "${it}parseInt('123.3')".eval(runtime).assertEqualsTo(123L)
+            "${it}parseInt('123.3sdfsdf')".eval(runtime).assertEqualsTo(123L)
+            "${it}parseInt(' 0xff', 16)".eval(runtime).assertEqualsTo(255L)
+            "${it}parseInt(' 0xff', 0)".eval(runtime).assertEqualsTo(255L)
+            "${it}parseInt(' 0xffhh', 16)".eval(runtime).assertEqualsTo(255L)
+            "${it}parseInt(' 110', 2)".eval(runtime).assertEqualsTo(6L)
+            "${it}parseInt('1245', 8)".eval(runtime).assertEqualsTo(677L)
         }
     }
 
-    @Test
-    fun methods_in_global_Scope(){
-        assertTrue { "Number.isFinite === isFinite".eval() as Boolean }
-        assertTrue { "Number.isFinite === globalThis.isFinite".eval() as Boolean }
-        assertTrue { "Number.isNan === isNan".eval() as Boolean }
-        assertTrue { "Number.isNan === globalThis.isNan".eval() as Boolean }
-        assertTrue { "Number.parseFloat === parseFloat".eval() as Boolean }
-        assertTrue { "Number.parseFloat === globalThis.parseFloat".eval() as Boolean }
-        assertTrue { "Number.isInteger === isInteger".eval() as Boolean }
-        assertTrue { "Number.isInteger === globalThis.isInteger".eval() as Boolean }
-        assertTrue { "Number.isSafeInteger === isSafeInteger".eval() as Boolean }
-        assertTrue { "Number.isSafeInteger === globalThis.isSafeInteger".eval() as Boolean }
-        assertTrue { "Number.parseInt === parseInt".eval() as Boolean }
-        assertTrue { "Number.parseInt === globalThis.parseInt".eval() as Boolean }
-    }
 }

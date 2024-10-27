@@ -1,9 +1,10 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
 class BitwiseTest {
 
     @Test
-    fun bitwise(){
+    fun bitwise() = runTest{
         "8 >> 2".eval().assertEqualsTo(2L)
         "4 << 2".eval().assertEqualsTo(16L)
         "36 >>> 4".eval().assertEqualsTo(2L)
@@ -15,7 +16,7 @@ class BitwiseTest {
     }
 
     @Test
-    fun bitwiseAssign(){
+    fun bitwiseAssign() = runTest{
         "let x = 8; x >>= 2; x".eval().assertEqualsTo(2L);
         "let x = 4; x <<= 2;".eval().assertEqualsTo(16L)
         "let x = 36; x >>>= 2; x".eval().assertEqualsTo(9L)

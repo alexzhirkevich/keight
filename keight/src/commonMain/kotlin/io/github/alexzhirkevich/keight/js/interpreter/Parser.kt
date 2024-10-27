@@ -5,7 +5,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Script
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.js.Callable
+import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Delegate
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.FunctionParam
@@ -48,9 +48,11 @@ import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.expressions.OpCall
 import io.github.alexzhirkevich.keight.expressions.OpLazy
+import io.github.alexzhirkevich.keight.expressions.OpSpread
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.isAssignable
+import io.github.alexzhirkevich.keight.js.TypeError
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 import kotlin.math.pow
@@ -64,7 +66,7 @@ internal fun List<Token>.parse() : Script {
         )
 
     return object : Script {
-        override fun invoke(runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(runtime: ScriptRuntime): Any? {
             return try {
                 runtime.toKotlin(block(runtime))
             } catch (t: Throwable) {
@@ -233,8 +235,8 @@ private fun ListIterator<Token>.parseStatement(
 
             }
             6 ->  when (nextSignificant()) {
-                Token.Operator.In -> parseInKeyword(x)
-                Token.Operator.Instanceof -> TODO()
+                Token.Operator.In -> parseInOperator(x, precedence)
+                Token.Operator.Instanceof -> parseInstanceOfOperator(x, precedence)
                 else -> return x.also { prevSignificant() }
             }
             7 ->  when (nextSignificant()) {
@@ -372,7 +374,7 @@ private fun ListIterator<Token>.parseFactor(
                 }
             }
             OpLazy { r ->
-                expressions.joinToString("") { it(r).toString() }
+                expressions.fastMap { it(r) }.joinToString("")
             }
         }
         is Token.Operator.Period, is Token.Num -> {
@@ -392,6 +394,7 @@ private fun ListIterator<Token>.parseFactor(
             OpConstant(num)
         }
 
+        Token.Operator.Spread -> OpSpread(parseFactor(blockContext))
         Token.Operator.Arithmetic.Inc,
         Token.Operator.Arithmetic.Dec -> {
             val isInc = next is Token.Operator.Arithmetic.Inc
@@ -408,9 +411,7 @@ private fun ListIterator<Token>.parseFactor(
 
         Token.Operator.Arithmetic.Plus,
         Token.Operator.Arithmetic.Minus -> Delegate(
-            a = parseFactor(
-                blockContext = blockContext
-            ),
+            a = parseFactor(blockContext = blockContext),
             op = if (next is Token.Operator.Arithmetic.Plus)
                 ScriptRuntime::pos else ScriptRuntime::neg
         )
@@ -620,7 +621,7 @@ private fun ListIterator<Token>.parseNew() : Expression {
     val args = parseExpressionGrouping().expressions
 
     return Expression { runtime ->
-        val constructor = runtime[next.name]
+        val constructor = runtime.get(next.name)
         syntaxCheck(constructor is Constructor) {
             "'${next.name}' is not a constructor"
         }
@@ -642,7 +643,7 @@ private fun ListIterator<Token>.parseTypeof() : Expression {
             true, false -> "boolean"
             is CharSequence -> "string"
             is JsAny -> v.type
-            is Callable -> "function"
+            is Callable, is Function<*> -> "function"
             else -> v::class.simpleName
         }
     }
@@ -708,14 +709,25 @@ private fun ListIterator<Token>.parseMemberOf(receiver: Expression): Expression 
     }
 }
 
-private fun ListIterator<Token>.parseInKeyword(subject : Expression) : Expression {
-    val obj = parseStatement()
+private fun ListIterator<Token>.parseInOperator(subject : Expression, precedence: Int) : Expression {
+    val obj = parseStatement(precedence = precedence)
     return Expression {
         val o = obj(it)
         syntaxCheck(o is JsAny) {
             "Illegal usage of 'in' operator"
         }
-        o.contains(subject(it))
+        o.contains(subject(it), it)
+    }
+}
+
+private fun ListIterator<Token>.parseInstanceOfOperator(subject : Expression, precedence: Int) : Expression {
+    val obj = parseStatement(precedence = precedence)
+    return Expression {
+        val o = obj(it)
+        syntaxCheck(o is Constructor) {
+            "Illegal usage of 'instanceof' operator"
+        }
+        o.isInstance(subject(it), it)
     }
 }
 
@@ -853,9 +865,10 @@ private fun ListIterator<Token>.parseArrowFunction(blockContext: List<BlockConte
     val lambda = parseBlock(blockContext = blockContext + BlockContext.Function)
 
     return JSFunction(
-        "",
-        fArgs.map { FunctionParam(it.name) },
-        body = lambda
+        name = "",
+        parameters = fArgs.map { FunctionParam(it.name) },
+        body = lambda,
+        isArrow = true
     )
 }
 
@@ -873,20 +886,8 @@ private fun ListIterator<Token>.parseFunction(
         }
     }
 
-    val nArgs = (args ?: (parseStatement() as OpTouple).expressions).let { a ->
-        a.map {
-            when (it) {
-                is OpGetVariable -> FunctionParam(name = it.name, default = null)
-                is OpAssign -> FunctionParam(
-                    name = it.variableName,
-                    default = it.assignableValue
-                )
-
-                else -> throw SyntaxError("Invalid function declaration ($name)")
-            }
-        }
-    }
-
+    val nArgs = (args ?: (parseStatement() as OpTouple).expressions)
+        .map(Expression::toFunctionParam)
 
     val block = parseBlock(
         scoped = false,
@@ -899,6 +900,25 @@ private fun ListIterator<Token>.parseFunction(
         body = block,
         isClassMember =  args != null
     )
+}
+
+private fun Expression.toFunctionParam() : FunctionParam {
+    return when (this) {
+        is OpGetVariable -> FunctionParam(name = name, default = null)
+        is OpSpread -> value.toFunctionParam().let {
+            FunctionParam(
+                name = it.name,
+                isVararg = true,
+                default = it.default
+            )
+        }
+        is OpAssign -> FunctionParam(
+            name = variableName,
+            default = assignableValue
+        )
+
+        else -> throw SyntaxError("Invalid function declaration")
+    }
 }
 
 private fun ListIterator<Token>.parseObject(
@@ -930,8 +950,8 @@ private fun ListIterator<Token>.parseObject(
 
     return Expression { r ->
         Object("") {
-            props.forEach {
-                it.key eq it.value.invoke(r)
+            props.forEach { (k,v) ->
+                k eq v.invoke(r)
             }
         }
     }
@@ -951,9 +971,9 @@ private fun ListIterator<Token>.parseBlock(
                 val expr = parseStatement(blockContext, isExpressionStart = true)
 
                 if (isEmpty() && expr is OpGetVariable && eat(Token.Operator.Colon)) {
-                    return parseObject(
-                        mapOf(expr.name to parseStatement())
-                    )
+                    val fields = mapOf(expr.name to parseStatement())
+                    eat(Token.Operator.Comma)
+                    return parseObject(fields)
                 }
 
                 when {
@@ -1071,6 +1091,18 @@ public inline fun syntaxCheck(value: Boolean, lazyMessage: () -> Any) {
     if (!value) {
         val message = lazyMessage()
         throw SyntaxError(message.toString())
+    }
+}
+
+@OptIn(ExperimentalContracts::class)
+public inline fun typeCheck(value: Boolean, lazyMessage: () -> Any) {
+    contract {
+        returns() implies value
+    }
+
+    if (!value) {
+        val message = lazyMessage()
+        throw TypeError(message.toString())
     }
 }
 

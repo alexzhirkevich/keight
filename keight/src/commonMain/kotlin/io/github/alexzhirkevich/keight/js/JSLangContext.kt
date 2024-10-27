@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptContext
+import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.fastMap
 import kotlin.math.absoluteValue
 
@@ -71,7 +72,11 @@ internal object JSLangContext : ScriptContext {
                 }
                 JsNumberWrapper(a.toLong())
             }
-            is Collection<*> -> JsArrayWrapper(a.map(::fromKotlin).toMutableList())
+            is Map<*,*> -> JsMapWrapper(
+                a.map { fromKotlin(it.key) to fromKotlin(it.value) }.toMap().toMutableMap()
+            )
+            is Set<*> -> JsSetWrapper(a.map(::fromKotlin).toMutableSet())
+            is List<*> -> JsArrayWrapper(a.map(::fromKotlin).toMutableList())
             is CharSequence -> JsStringWrapper(a.toString())
             else -> a
         }
@@ -79,6 +84,8 @@ internal object JSLangContext : ScriptContext {
 
     override fun toKotlin(a: Any?): Any? {
         return when (a) {
+            is JsMapWrapper -> a.value.map { fromKotlin(it.key) to fromKotlin(it.value) }.toMap()
+            is JsSetWrapper -> a.value.map(::toKotlin).toSet()
             is JsArrayWrapper -> a.value.fastMap(::toKotlin)
             is JsWrapper<*> -> toKotlin(a.value)
             else -> a

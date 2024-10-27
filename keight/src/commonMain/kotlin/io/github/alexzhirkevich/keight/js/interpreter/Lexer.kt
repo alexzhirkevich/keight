@@ -402,7 +402,6 @@ private fun ListIterator<Char>.number(start : Char) : Token.Num {
     val number: Number = try {
         if (value.endsWith('.')) {
             previous()
-            value.deleteAt(0)
             isFloat = false
         }
         if (isFloat) {

@@ -2,10 +2,11 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.js.Callable
+import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.invoke
+import kotlin.jvm.JvmInline
 
 internal fun OpCall(
     callable : Expression,
@@ -14,7 +15,7 @@ internal fun OpCall(
     OpCallImpl(it, callable, arguments)
 }
 
-private tailrec fun OpCallImpl(
+private tailrec suspend fun OpCallImpl(
     runtime: ScriptRuntime,
     callable: Any?,
     arguments: List<Expression>
@@ -24,6 +25,17 @@ private tailrec fun OpCallImpl(
         is Callable -> callable.invoke(arguments, runtime)
         is Function<*> -> execKotlinFunction(callable, arguments.fastMap { runtime.toKotlin(it(runtime)) })
         else -> throw TypeError("$callable is not a function")
+    }
+}
+
+internal fun Function<*>.asCallable() : Callable = KotlinCallable(this)
+
+@JvmInline
+private value class KotlinCallable(
+    val function: Function<*>
+) : Callable {
+    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        return execKotlinFunction(function, args.fastMap { it(runtime) })
     }
 }
 

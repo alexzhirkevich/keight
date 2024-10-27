@@ -1,3 +1,4 @@
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 
@@ -5,7 +6,7 @@ import kotlin.test.assertContentEquals
 class AssignTest {
 
     @Test
-    fun add_sub_mull_div_assign() {
+    fun add_sub_mull_div_assign() = runTest{
 //
         "var x = 13; x += 17".eval().assertEqualsTo(30L)
         "var x = 56; x -=17".eval().assertEqualsTo(39L)
@@ -21,7 +22,7 @@ class AssignTest {
     }
 
     @Test
-    fun increment_decrement() {
+    fun increment_decrement() = runTest {
         "let x = 5; x++".eval().assertEqualsTo(5L)
         "let x = 5; ++x".eval().assertEqualsTo(6L)
 

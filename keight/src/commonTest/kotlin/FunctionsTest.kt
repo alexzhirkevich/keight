@@ -1,6 +1,8 @@
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.JSRuntime
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -8,7 +10,7 @@ import kotlin.test.assertTrue
 class FunctionsTest {
 
     @Test
-    fun creation() {
+    fun creation() = runTest {
         """
             var x;
             function test(a,b) { return a + b }
@@ -33,7 +35,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun defaultArgs() {
+    fun defaultArgs() = runTest {
         """
             function test(a, b = 2)
             {
@@ -61,7 +63,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun scope() {
+    fun scope() = runTest {
         """
             let x = 1
             
@@ -90,7 +92,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun variable_func() {
+    fun variable_func() = runTest {
         """
             const test = function(a,b) { return a + b }
             test(1,2)
@@ -114,7 +116,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun arrow() {
+    fun arrow() = runTest {
         """
             const test = (a,b) => a + b
             test(1,2)
@@ -140,7 +142,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun recursion() {
+    fun recursion() = runTest {
 
         """
            function fib(n) {
@@ -155,22 +157,70 @@ class FunctionsTest {
     }
 
     @Test
-    fun constructor_function() {
+    fun vararg() = runTest {
+        """
+            function test(x, ...rest) {
+                return x.toString() + "_"  + rest.join('')
+            }
+            
+            test(1, 2, 3, 4)
+        """.eval().assertEqualsTo("1_234")
+    }
 
-        val runtime = JSRuntime()
+    @Test
+    fun constructor_function() = runTest {
+
+        val runtime = JSRuntime(Job())
 
         """
             function Person(name,age){
                 this.name = name
                 this.age = age
             }
+            const p = new Person('John', 25)
         """.eval(runtime)
 
-        "new Person('John', 25).name".eval(runtime).assertEqualsTo("John")
-        "new Person('John', 25).age".eval(runtime).assertEqualsTo(25L)
+        "p.name".eval(runtime).assertEqualsTo("John")
+        "p.age".eval(runtime).assertEqualsTo(25L)
+        "p.prototype".eval(runtime).assertEqualsTo(Unit)
+        "p.__proto__".eval(runtime).assertEqualsTo("Person.prototype".eval(runtime))
+    }
 
-        assertTrue {
-            "new Person('John', 25).prototype === Person".eval(runtime) as Boolean
-        }
+    @Test
+    fun add_field_to_prototype_constructor() = runTest {
+        val runtime = JSRuntime(coroutineContext)
+
+        """
+            function Person(name,age){
+                this.name = name
+                this.age = age
+            }
+            Person.prototype.nationality = 'English'
+        """.eval(runtime)
+
+        "new Person('John', 25).nationality".eval(runtime).assertEqualsTo("English")
+    }
+
+    @Test
+    fun changed_prototype() = runTest {
+        """
+            Number.prototype.toFixed = function() { return this * this }
+            5.toFixed()
+        """.eval().assertEqualsTo(25L)
+
+        // arrow function should not receive binding
+        """
+            Number.prototype.toFixed = () => this * this
+            5.toFixed()
+        """.eval().assertEqualsTo(Double.NaN)
+    }
+
+    @Test
+    fun apply() = runTest {
+        "Number.prototype.toFixed.apply(12.12345)".eval()
+            .assertEqualsTo("12")
+
+        "Number.prototype.toFixed.apply(12.12345, [1])".eval()
+            .assertEqualsTo("12.1")
     }
 }

@@ -57,7 +57,7 @@ internal fun Any.valueAtIndexOrUnit(index : Int) : Any {
     }!!
 }
 
-internal fun Any.valueAtIndexOrUnit(index : Any?, numberIndex : Int) : Any {
+internal suspend fun Any.valueAtIndexOrUnit(index : Any?, numberIndex : Int, runtime: ScriptRuntime) : Any {
     val indexNorm = when (index){
         is CharSequence -> index.toString()
         else -> index
@@ -74,7 +74,7 @@ internal fun Any.valueAtIndexOrUnit(index : Any?, numberIndex : Int) : Any {
         is List<*> -> getOrElse(numberIndex) { Unit }
         is Array<*> -> getOrElse(numberIndex) { Unit }
         is CharSequence -> getOrNull(numberIndex) ?: Unit
-        is JsAny -> get(indexNorm)
+        is JsAny -> get(indexNorm, runtime)
         else -> Unit
     }!!
 }

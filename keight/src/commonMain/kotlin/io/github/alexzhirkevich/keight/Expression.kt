@@ -6,10 +6,10 @@ import io.github.alexzhirkevich.keight.expressions.OpIndex
 
 public fun interface Expression {
 
-    public fun invokeRaw(context: ScriptRuntime): Any?
+    public suspend fun invokeRaw(context: ScriptRuntime): Any?
 }
 
-public operator fun Expression.invoke(context: ScriptRuntime): Any? =
+public suspend operator fun Expression.invoke(context: ScriptRuntime): Any? =
     context.fromKotlin(invokeRaw(context))
 
 

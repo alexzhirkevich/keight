@@ -1,8 +1,6 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import kotlin.properties.PropertyDelegateProvider
-import kotlin.properties.ReadOnlyProperty
 
 public interface JSObject : JsAny {
 
@@ -12,15 +10,20 @@ public interface JSObject : JsAny {
 
     public val entries: List<List<Any?>>
 
-    public operator fun set(variable: Any?, value: Any?)
+    public operator fun set(property: Any?, value: Any?)
+
+    public fun delete(property: Any?)
 }
 
-private const val PROTOTYPE = "prototype"
-
-internal val JSObject.prototype : Any? get() = get(PROTOTYPE)
+internal const val PROTOTYPE = "prototype"
+internal const val PROTO = "__proto__"
 
 internal fun JSObject.setPrototype(prototype : Any?) {
     this[PROTOTYPE] = prototype
+}
+
+internal fun JSObject.setProto(proto : Any?) {
+    this[PROTO] = proto
 }
 
 private class ObjectMap(
@@ -62,17 +65,27 @@ internal open class JSObjectImpl(
     override val entries: List<List<Any?>>
         get() = map.entries.map { listOf(it.key, it.value) }
 
-    override fun get(variable: Any?): Any? {
-        return if (contains(variable))
-            map[variable]
-        else
-            super.get(variable)
-    }
-    override fun set(variable: Any?, value: Any?) {
-        map[variable] = value
+    override suspend fun proto(runtime: ScriptRuntime): Any? {
+        return map[PROTO]
     }
 
-    override fun contains(variable: Any?): Boolean = variable in map
+    override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
+        if (property in map) {
+            return map[property]
+        }
+        return super.get(property, runtime)
+    }
+
+    override fun delete(property: Any?) {
+        map.remove(property)
+    }
+
+    override fun set(property: Any?, value: Any?) {
+        map[property] = value
+    }
+
+    override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
+        property in map
 
     override fun toString(): String {
         return if (name.isNotBlank()){
@@ -105,7 +118,8 @@ public sealed interface ObjectScope {
     }
 }
 
-private class ObjectScopeImpl(
+@PublishedApi
+internal class ObjectScopeImpl(
     name: String,
     val o : JSObject = JSObjectImpl(name)
 ) : ObjectScope {
@@ -119,7 +133,7 @@ private class ObjectScopeImpl(
             parameters = args.toList(),
             body = { ctx ->
                 with(ctx) {
-                    body(args.map { ctx[it.name] })
+                    body(args.map { ctx.get(it.name) })
                 }
             }
         )
@@ -134,7 +148,7 @@ public fun Object(name: String, contents : Map<Any?, Any?>) : JSObject {
     return JSObjectImpl(name, contents.toMutableMap())
 }
 
-public fun  Object(name: String, builder : ObjectScope.() -> Unit) : JSObject {
+public inline fun Object(name: String, builder : ObjectScope.() -> Unit) : JSObject {
     return ObjectScopeImpl(name).also(builder).o
 }
 
@@ -143,21 +157,38 @@ internal fun JSObject.init(scope: ObjectScope.() -> Unit) {
     ObjectScopeImpl("", this).apply(scope)
 }
 
-internal fun func(
+internal interface SuspendReadOnlyProperty<out V> {
+    suspend fun getValue(): V
+}
+
+
+internal fun JSObject.noArgsFunc(
+    name: String,
+    body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
+) : JSFunction = func(
+    name = name,
+    args = emptyArray<FunctionParam>(),
+    body = body
+)
+
+internal fun JSObject.func(
+    name: String,
     vararg args: String,
     params: (String) -> FunctionParam = { FunctionParam(it) },
-    body: ScriptRuntime.(args: List<Any?>) -> Any?
-) : PropertyDelegateProvider<JSObject, ReadOnlyProperty<JSObject, JSFunction>> =  func(
+    body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
+) : JSFunction = func(
+    name = name,
     args = args.map(params).toTypedArray(),
     body = body
 )
 
-internal fun func(
+
+internal fun JSObject.func(
+    name: String,
     vararg args: FunctionParam,
-    body: ScriptRuntime.(args: List<Any?>) -> Any?
-): PropertyDelegateProvider<JSObject, ReadOnlyProperty<JSObject, JSFunction>> =  PropertyDelegateProvider { obj, prop ->
-    val name = prop.name.trimStart('_')
-    obj[name] = JSFunction(
+    body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
+): JSFunction {
+    return JSFunction(
         name = name,
         parameters = args.toList(),
         body = {
@@ -165,10 +196,8 @@ internal fun func(
                 body(args.map { get(it.name) })
             }
         }
-    )
-
-    ReadOnlyProperty { thisRef, property ->
-        thisRef[property.name] as JSFunction
+    ).also {
+        this[name] = it
     }
 }
 
@@ -186,8 +215,21 @@ internal fun String.func(
     }
 )
 
+internal fun JSObject.func(
+    name: String,
+    params: (String) -> FunctionParam = { FunctionParam(it) },
+    body: ScriptRuntime.(args: List<Any?>) -> Any?
+) : JSFunction {
 
-internal fun  String.func(
+    return name.func(
+        params = params,
+        body = body
+    ).also {
+        this[name] = it
+    }
+}
+
+internal fun String.func(
     vararg args: String,
     params: (String) -> FunctionParam = { FunctionParam(it) },
     body: ScriptRuntime.(args: List<Any?>) -> Any?

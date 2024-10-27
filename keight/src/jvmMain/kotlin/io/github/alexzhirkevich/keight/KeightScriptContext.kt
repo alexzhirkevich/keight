@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight;
 
+import kotlinx.coroutines.runBlocking
 import java.io.Reader
 import java.io.Writer
 import javax.script.Bindings
@@ -38,22 +39,26 @@ internal class KeightScriptContext(
     }
 
     override fun getAttribute(name: String?, scope: Int): Any? {
-        return if (scope == ScriptContext.GLOBAL_SCOPE){
-            factory.globalRuntime[name]
-        } else {
-            runtime[name]
+        return runBlocking {
+            if (scope == ScriptContext.GLOBAL_SCOPE) {
+                factory.globalRuntime.get(name)
+            } else {
+                runtime.get(name)
+            }
         }
     }
 
     override fun getAttribute(name: String?): Any? {
-        return runtime[name]
+        return runBlocking {
+            runtime.get(name)
+        }
     }
 
     override fun removeAttribute(name: String?, scope: Int): Any? {
         return if (scope == ScriptContext.GLOBAL_SCOPE){
-            factory.globalRuntime.remove(name)
+            factory.globalRuntime.delete(name)
         } else {
-            runtime.remove(name)
+            runtime.delete(name)
         }
     }
 

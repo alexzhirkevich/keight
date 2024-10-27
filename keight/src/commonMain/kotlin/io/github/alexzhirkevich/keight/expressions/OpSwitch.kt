@@ -38,7 +38,7 @@ internal fun OpSwitch(
 internal class OpCase(
     val value : Expression,
 ) : Expression {
-    override fun invokeRaw(context: ScriptRuntime): Any = Unit
+    override suspend fun invokeRaw(context: ScriptRuntime): Any = Unit
 
     companion object {
         val Default = Expression {  }

@@ -1,85 +1,113 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.js.JSArrayFunction
 import io.github.alexzhirkevich.keight.js.JSLangContext
+import io.github.alexzhirkevich.keight.js.JSMapFunction
 import io.github.alexzhirkevich.keight.js.JSMath
 import io.github.alexzhirkevich.keight.js.JSNumberFunction
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JSObjectFunction
+import io.github.alexzhirkevich.keight.js.JSObjectImpl
+import io.github.alexzhirkevich.keight.js.JSSetFunction
+import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsConsole
+import io.github.alexzhirkevich.keight.js.JsMapWrapper
+import io.github.alexzhirkevich.keight.js.setupNumberMethods
+import kotlin.coroutines.CoroutineContext
 import kotlin.jvm.JvmInline
 
 public open class JSRuntime(
-    override var io: ScriptIO = DefaultScriptIO,
-) : DefaultRuntime(), JSObject, ScriptContext by JSLangContext {
+    override val coroutineContext: CoroutineContext,
+    override var io: ScriptIO = DefaultScriptIO
+) : DefaultRuntime(), ScriptContext by JSLangContext {
 
     override val comparator: Comparator<Any?> by lazy {
         JSComparator(this)
     }
 
-    override val keys: Set<String> get() = emptySet()
-
-    override val entries: List<List<Any?>> get() = emptyList()
-
-    override val values: List<Any?> get() = emptyList()
+    internal lateinit var Number : JSNumberFunction
+    internal lateinit var Object : JSObjectFunction
+    internal lateinit var Array : JSArrayFunction
+    internal lateinit var Map : JSMapFunction
+    internal lateinit var Set : JSSetFunction
+    internal lateinit var String : JSStringFunction
 
     init { init() }
-
-    override fun contains(variable: Any?): Boolean {
-        return super<DefaultRuntime>.contains(variable)
-    }
 
     override fun reset() {
         super.reset()
         init()
     }
 
+
     private fun init() {
+        Number = JSNumberFunction()
+        Object = JSObjectFunction()
+        Array = JSArrayFunction()
+        Map = JSMapFunction()
+        Set = JSSetFunction()
+        String = JSStringFunction()
+
+        val globalThis = RuntimeGlobalThis(this)
+
         set("console", JsConsole(), VariableType.Global)
         set("Math", JSMath(), VariableType.Global)
-        set("Object", JSObjectFunction(), VariableType.Global)
-        set("globalThis", this, VariableType.Global)
+        set("globalThis", globalThis, VariableType.Global)
         set("this", this, VariableType.Const)
         set("Infinity", Double.POSITIVE_INFINITY, VariableType.Const)
         set("NaN", Double.NaN, VariableType.Const)
         set("undefined", Unit, VariableType.Const)
 
-        val number = JSNumberFunction()
-        set("Number", number, VariableType.Global)
+        set("Object", Object, VariableType.Global)
+        set("Array", Array, VariableType.Global)
+        set("Map", Map, VariableType.Global)
+        set("Set", Set, VariableType.Global)
+        set("Number", Number, VariableType.Global)
+        set("String", String, VariableType.Global)
 
-        set("parseInt", number.parseInt, VariableType.Global)
-        set("parseFloat", number.parseFloat, VariableType.Global)
-        set("isFinite", number.isFinite, VariableType.Global)
-        set("isNan", number.isNan, VariableType.Global)
-        set("isInteger", number.isInteger, VariableType.Global)
-        set("isSafeInteger", number.isSafeInteger, VariableType.Global)
-
+        globalThis.setupNumberMethods()
     }
 
-    final override fun get(variable: Any?): Any? {
-        val v = getInternal(variable)
-        return v
-    }
-
-    private fun getInternal(variable: Any?) : Any? {
-        if (variable in this){
-            return super<DefaultRuntime>.get(variable)
+    final override suspend fun get(property: Any?): Any? {
+        if (contains(property)) {
+            return super.get(property)
         }
+        return (super.get("globalThis") as JsAny?)?.get(property, this)
+    }
+}
 
-        val globalThis = get("globalThis") as? JsAny?
-            ?: return super<DefaultRuntime>.get(variable)
+private class RuntimeGlobalThis(
+    private val runtime: ScriptRuntime
+) : JSObject {
 
-        if (variable in globalThis){
-            return globalThis[variable]
+    override val keys: Set<String>
+        get() = emptySet()
+    override val values: List<Any?>
+        get() = emptyList()
+    override val entries: List<List<Any?>>
+        get() = emptyList()
+
+
+    override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
+        return if (runtime.contains(property)){
+            runtime.get(property)
+        } else {
+            super.get(property, runtime)
         }
-
-        return super<DefaultRuntime>.get(variable)
     }
 
-    final override fun set(variable: Any?, value: Any?) {
-        set(variable, fromKotlin(value), null)
+    override fun set(property: Any?, value: Any?) {
+        runtime.set(property, value, null)
     }
 
+    override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean {
+        return runtime.contains(property)
+    }
+
+    override fun delete(property: Any?) {
+        runtime.delete(property)
+    }
 }
 
 @JvmInline

@@ -8,7 +8,7 @@ import io.github.alexzhirkevich.keight.invoke
 internal class OpTouple(
     val expressions: List<Expression>
 ) : Expression {
-    override fun invokeRaw(context: ScriptRuntime): Any? {
+    override suspend fun invokeRaw(context: ScriptRuntime): Any? {
         var res: Any? = Unit
         expressions.fastForEach { res = it.invoke(context) }
         return res

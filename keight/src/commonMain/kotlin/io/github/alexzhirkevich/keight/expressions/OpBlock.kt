@@ -12,7 +12,7 @@ internal class OpBlock(
     private val isExpressible : Boolean = true
 ) : Expression {
 
-    override fun invokeRaw(context: ScriptRuntime): Any? {
+    override suspend fun invokeRaw(context: ScriptRuntime): Any? {
         return if (isScoped) {
             context.withScope(block = ::invokeInternal)
         } else {
@@ -20,7 +20,7 @@ internal class OpBlock(
         }
     }
 
-    private fun invokeInternal(context: ScriptRuntime): Any? {
+    private suspend fun invokeInternal(context: ScriptRuntime): Any? {
         if (expressions.isEmpty()) {
             return Unit
         }
@@ -36,7 +36,7 @@ internal class OpBlock(
         }
     }
 
-    private fun invoke(expression: Expression, context: ScriptRuntime) : Any? {
+    private suspend fun invoke(expression: Expression, context: ScriptRuntime) : Any? {
         return expression.invoke(context)
     }
 }
@@ -51,18 +51,18 @@ internal class BlockReturn(val value: Any?) : ScopeException()
 internal value class OpReturn(
     val value : Expression
 ) : Expression {
-    override fun invokeRaw(context: ScriptRuntime): Any? {
+    override suspend fun invokeRaw(context: ScriptRuntime): Any? {
         throw BlockReturn(value(context))
     }
 }
 
 internal object OpContinue : Expression {
-    override fun invokeRaw(context: ScriptRuntime): Any? {
+    override suspend fun invokeRaw(context: ScriptRuntime): Any? {
         throw BlockContinue
     }
 }
 internal object OpBreak : Expression {
-    override fun invokeRaw(context: ScriptRuntime): Any? {
+    override suspend fun invokeRaw(context: ScriptRuntime): Any? {
         throw BlockBreak
     }
 }
