@@ -9,6 +9,7 @@ import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.argForNameOrIndex
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
+import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.expressions.asCallable
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMap
@@ -26,8 +27,8 @@ internal infix fun String.defaults(default: Expression?) : FunctionParam {
 
 internal open class JSFunction(
     override val name : String,
-    val parameters : List<FunctionParam>,
-    val body : Expression,
+    val parameters : List<FunctionParam> = emptyList(),
+    val body : Expression = OpConstant(Unit),
     var thisRef : Any? = null,
     val isClassMember : Boolean = false,
     var isStatic : Boolean = false,

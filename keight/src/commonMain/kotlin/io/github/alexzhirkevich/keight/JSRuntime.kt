@@ -81,8 +81,8 @@ private class RuntimeGlobalThis(
     private val runtime: ScriptRuntime
 ) : JSObject {
 
-    override val keys: Set<String>
-        get() = emptySet()
+    override val keys: List<String>
+        get() = emptyList()
     override val values: List<Any?>
         get() = emptyList()
     override val entries: List<List<Any?>>

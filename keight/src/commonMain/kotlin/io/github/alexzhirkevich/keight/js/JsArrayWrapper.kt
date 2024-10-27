@@ -10,6 +10,9 @@ internal value class JsArrayWrapper(
     override val value : MutableList<Any?>
 ) : JsAny, JsWrapper<MutableList<Any?>>, MutableList<Any?> by value {
 
+    override val keys: List<String>
+        get() = value.indices.map(Int::toString)
+
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return (runtime.findRoot() as JSRuntime).Array.get(PROTOTYPE,runtime)
     }

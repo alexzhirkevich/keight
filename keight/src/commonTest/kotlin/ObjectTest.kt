@@ -76,9 +76,10 @@ class ObjectTest {
     fun object_entries_keys() = runTest {
         "typeof Object".eval().assertEqualsTo("function")
 
-        "Object.keys({ name : 'test' })".eval().assertEqualsTo(setOf("name"))
-        "Object.keys({ name : 'test', x : 1 })".eval().assertEqualsTo(setOf("name", "x"))
-        ("Object.keys(1)".eval() as Set<*>).size.assertEqualsTo(0)
+        "Object.keys({ name : 'test' })".eval().assertEqualsTo(listOf("name"))
+        "Object.keys({ name : 'test', x : 1 })".eval().assertEqualsTo(listOf("name", "x"))
+        "Object.keys([1,2,3])".eval().assertEqualsTo(listOf("0","1","2"))
+        ("Object.keys(1)".eval() as List<*>).size.assertEqualsTo(0)
 
         "Object.entries({ name : 'test' })".eval()
             .assertEqualsTo(listOf(listOf("name", "test")))

@@ -12,11 +12,7 @@ import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit
 import kotlin.jvm.JvmInline
 
-internal class JSStringFunction : JSFunction(
-    name = "String",
-    parameters = emptyList(),
-    body = OpConstant(Unit)
-) {
+internal class JSStringFunction : JSFunction(name = "String") {
 
     init {
         val proto = JSObjectImpl().apply {

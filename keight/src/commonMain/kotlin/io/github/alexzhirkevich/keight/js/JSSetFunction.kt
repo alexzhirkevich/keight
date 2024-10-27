@@ -7,21 +7,22 @@ import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.invoke
 
-internal class JSSetFunction : JSFunction(
-    name = "Set",
-    parameters = emptyList(),
-    body = OpConstant(Unit)
-) {
+internal class JSSetFunction : JSFunction(name = "Set",) {
 
     override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any {
-        return if (args.isEmpty()) {
-            mutableSetOf<Any?>()
-        } else {
-            TODO()
-        }
+        throw TypeError("Constructor Set requires 'new'")
     }
 
     override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
-        return invoke(args, runtime)
+        if (args.isEmpty()){
+            return mutableSetOf<Any>()
+        }
+        val x = args[0](runtime)
+
+        return when {
+            x is Iterable<*> -> x.toSet()
+//            x is JsWrapper<*> && x.value is Iterable<*> -> (x.value as Iterable<*>).toSet()
+            else -> throw TypeError( "$x is not iterable")
+        }
     }
 }

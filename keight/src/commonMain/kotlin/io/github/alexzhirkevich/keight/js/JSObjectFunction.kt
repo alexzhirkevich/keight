@@ -4,11 +4,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 
-internal class JSObjectFunction : JSFunction(
-    name = "Object",
-    parameters = emptyList(),
-    body = OpConstant(Unit)
-) {
+internal class JSObjectFunction : JSFunction(name = "Object") {
 
     init {
         func("assign", "target", "source") {
@@ -32,7 +28,7 @@ internal class JSObjectFunction : JSFunction(
         }
 
         func("keys","object") {
-            (it.firstOrNull() as? JSObject)?.keys ?: emptySet<String>()
+            (it.firstOrNull() as? JsAny)?.keys ?: emptySet<String>()
         }
 
         func("values","object") {

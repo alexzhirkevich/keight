@@ -13,4 +13,5 @@ internal value class JsSetWrapper(
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return (runtime.findRoot() as JSRuntime).Set.get(PROTOTYPE, runtime)
     }
+
 }

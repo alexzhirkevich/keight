@@ -23,7 +23,6 @@ internal class JSArrayFunction : JSFunction(
     parameters = emptyList(),
     body = OpConstant(Unit)
 ) {
-
     init {
         func("isArray", "object") {
             isInstance(it.getOrNull(0), this)

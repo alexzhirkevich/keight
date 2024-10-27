@@ -75,11 +75,7 @@ internal fun JSObject.setupNumberMethods() {
     }
 }
 
-internal class JSNumberFunction : JSFunction(
-    name = "Number",
-    parameters = listOf(FunctionParam("number", default = OpConstant(0L))),
-    body = OpConstant(Unit)
-) {
+internal class JSNumberFunction : JSFunction(name = "Number") {
 
     init {
         val proto = JSObjectImpl().apply {

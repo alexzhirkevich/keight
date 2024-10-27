@@ -7,11 +7,7 @@ import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.invoke
 
-internal class JSMapFunction : JSFunction(
-    name = "Map",
-    parameters = emptyList(),
-    body = OpConstant(Unit)
-) {
+internal class JSMapFunction : JSFunction(name = "Map",) {
 
     override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any {
         return if (args.isEmpty()) {

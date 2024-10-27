@@ -10,6 +10,8 @@ public interface JsAny {
 
     public val type : String get() = "object"
 
+    public val keys: List<String> get() = emptyList()
+
     public suspend fun proto(runtime: ScriptRuntime) : Any? = Unit
 
     public suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {

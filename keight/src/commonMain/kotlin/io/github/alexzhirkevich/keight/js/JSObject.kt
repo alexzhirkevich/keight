@@ -4,8 +4,6 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 
 public interface JSObject : JsAny {
 
-    public val keys: Set<String>
-
     public val values: List<Any?>
 
     public val entries: List<List<Any?>>
@@ -57,8 +55,8 @@ internal open class JSObjectImpl(
 
     private val map = ObjectMap(map)
 
-    override val keys: Set<String>
-        get() = map.keys.map { it.toString() }.toSet()
+    override val keys: List<String>
+        get() = map.keys.map { it.toString() }
 
     override val values: List<Any?> get() = map.values.toList()
 
