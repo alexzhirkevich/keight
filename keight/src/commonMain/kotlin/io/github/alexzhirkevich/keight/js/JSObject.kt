@@ -101,13 +101,13 @@ public sealed interface ObjectScope {
 
     public fun String.func(
         vararg args: FunctionParam,
-        body: ScriptRuntime.(args: List<Any?>) -> Any?
+        body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
     )
 
     public fun String.func(
         vararg args: String,
         params: (String) -> FunctionParam = { FunctionParam(it) },
-        body: ScriptRuntime.(args: List<Any?>) -> Any?
+        body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
     ) {
         func(
             args = args.map(params).toTypedArray(),
@@ -124,7 +124,7 @@ internal class ObjectScopeImpl(
 
     override fun String.func(
         vararg args: FunctionParam,
-        body: ScriptRuntime.(args: List<Any?>) -> Any?
+        body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
     ) {
         this eq JSFunction(
             this,
@@ -146,7 +146,7 @@ public fun Object(name: String, contents : Map<Any?, Any?>) : JSObject {
     return JSObjectImpl(name, contents.toMutableMap())
 }
 
-public inline fun Object(name: String, builder : ObjectScope.() -> Unit) : JSObject {
+public inline fun Object(name: String = "", builder : ObjectScope.() -> Unit) : JSObject {
     return ObjectScopeImpl(name).also(builder).o
 }
 

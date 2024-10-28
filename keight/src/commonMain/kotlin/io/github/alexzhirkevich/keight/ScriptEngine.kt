@@ -4,17 +4,18 @@ public interface ScriptEngine : ScriptInterpreter {
 
     public val runtime : ScriptRuntime
 
+    /**
+     * Restore engine runtime to its initial state
+     *
+     * @see [ScriptRuntime.reset]
+     * */
     public fun reset() {
         runtime.reset()
     }
 }
 
 public suspend fun ScriptEngine.evaluate(script: String) : Any? {
-    return invoke(interpret(script)) 
-}
-
-public suspend fun ScriptEngine.invoke(script: Script) : Any? {
-    return script.invoke(runtime)
+    return interpret(script).asScript(runtime).invoke()
 }
 
 public fun ScriptEngine(

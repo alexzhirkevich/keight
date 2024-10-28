@@ -15,6 +15,8 @@ public interface ScriptRuntime : ScriptContext, CoroutineScope {
 
     public val comparator : Comparator<Any?>
 
+    public val isSuspendAllowed : Boolean
+
     public fun isEmpty() : Boolean
 
     public fun delete(property: Any?)
@@ -27,9 +29,13 @@ public interface ScriptRuntime : ScriptContext, CoroutineScope {
 
     public suspend fun withScope(
         extraVariables: Map<String, Pair<VariableType, Any?>> = emptyMap(),
+        isSuspendAllowed: Boolean = this.isSuspendAllowed,
         block: suspend (ScriptRuntime) -> Any?
     ): Any?
 
+    /**
+     * Restore runtime to its initial state
+     * */
     public fun reset()
 }
 
@@ -38,6 +44,7 @@ public operator fun ScriptRuntime.set(variable: Any?, value: Any?): Unit =
 
 private class ScopedRuntime(
     val parent : ScriptRuntime,
+    override var isSuspendAllowed: Boolean
 ) : DefaultRuntime(),
     ScriptContext by parent ,
     CoroutineScope by parent {
@@ -85,8 +92,11 @@ public abstract class DefaultRuntime : ScriptRuntime {
     protected val variables: MutableMap<Any?, Pair<VariableType, Any?>> = mutableMapOf()
 
     private val child by lazy {
-        ScopedRuntime(this)
+        ScopedRuntime(this, isSuspendAllowed)
     }
+
+    override val isSuspendAllowed: Boolean
+        get() = true
 
     override fun contains(property: Any?): Boolean {
         return property in variables
@@ -114,9 +124,11 @@ public abstract class DefaultRuntime : ScriptRuntime {
 
     final override suspend fun withScope(
         extraVariables: Map<String, Pair<VariableType, Any?>>,
+        isSuspendAllowed: Boolean,
         block: suspend (ScriptRuntime) -> Any?
     ): Any? {
         child.reset()
+        child.isSuspendAllowed = isSuspendAllowed
         extraVariables.forEach { (n, v) ->
             child.set(n, v.second, v.first)
         }

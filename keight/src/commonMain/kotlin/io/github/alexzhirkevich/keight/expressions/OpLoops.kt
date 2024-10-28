@@ -19,8 +19,8 @@ internal class OpForLoop(
         { !it.isFalse(comparison.invoke(it)) }
     }
 
-    override suspend fun invokeRaw(context: ScriptRuntime): Any {
-        context.withScope {
+    override suspend fun invokeRaw(runtime: ScriptRuntime): Any {
+        runtime.withScope {
             assignment?.invoke(it)
             block(it)
         }

@@ -36,9 +36,6 @@ internal sealed interface Token {
     ) : Token
 
     @JvmInline
-    value class Identifier(val name : String) : Token
-
-    @JvmInline
     value class Comment(val value : String) : Token
 
     @JvmInline
@@ -53,7 +50,9 @@ internal sealed interface Token {
         object Colon  : Operator
         object SemiColon : Operator
         object Arrow : Operator
+        object OptionalChaining : Operator
         object QuestionMark : Operator
+        object NullishCoalescing : Operator
         object In : Operator
         object Instanceof : Operator
         object Typeof : Operator
@@ -126,29 +125,41 @@ internal sealed interface Token {
         }
     }
 
-    sealed interface Keyword : Token {
-        object Var : Keyword
-        object Let : Keyword
-        object Const : Keyword
-        object Null : Keyword
-        object True : Keyword
-        object False : Keyword
-        object If : Keyword
-        object Else : Keyword
-        object For : Keyword
-        object While : Keyword
-        object Do : Keyword
-        object Break : Keyword
-        object Continue : Keyword
-        object Function : Keyword
-        object Return : Keyword
-        object Class : Keyword
-        object Switch : Keyword
-        object Case : Keyword
-        object Default : Keyword
-        object Throw : Keyword
-        object Try : Keyword
-        object Catch : Keyword
-        object Finally : Keyword
+    sealed interface Identifier : Token {
+        val name: String
+
+        @JvmInline
+        value class Property(override val name: String) : Identifier
+
+
+        sealed class Keyword(override val name: String) : Identifier {
+            object Var : Keyword("var")
+            object Let : Keyword("let")
+            object Const : Keyword("const")
+            object Null : Keyword("null")
+            object True : Keyword("true")
+            object False : Keyword("false")
+            object If : Keyword("if")
+            object Else : Keyword("else")
+            object For : Keyword("for")
+            object While : Keyword("while")
+            object Do : Keyword("do")
+            object Break : Keyword("break")
+            object Continue : Keyword("continue")
+            object Function : Keyword("function")
+            object Return : Keyword("return")
+            object Class : Keyword("class")
+            object Switch : Keyword("switch")
+            object Case : Keyword("case")
+            object Default : Keyword("default")
+            object Throw : Keyword("throw")
+            object Try : Keyword("try")
+            object Catch : Keyword("catch")
+            object Finally : Keyword("finally")
+
+            object Async : Keyword("async")
+
+            object Await : Keyword("await")
+        }
     }
 }

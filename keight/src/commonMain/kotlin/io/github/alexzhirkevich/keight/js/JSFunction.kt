@@ -5,15 +5,14 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.argForNameOrIndex
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.OpConstant
-import io.github.alexzhirkevich.keight.expressions.asCallable
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.invoke
+import kotlinx.coroutines.async
 
 public class FunctionParam(
     public val name : String,
@@ -31,8 +30,10 @@ internal open class JSFunction(
     val body : Expression = OpConstant(Unit),
     var thisRef : Any? = null,
     val isClassMember : Boolean = false,
-    var isStatic : Boolean = false,
+    val isStaticClassMember : Boolean = false,
+    val isAsync : Boolean = false,
     val isArrow : Boolean = false,
+    val isObject : Boolean = false,
     val extraVariables: Map<String, Pair<VariableType, Any?>> = emptyMap(),
     prototype : Any? = JSObjectImpl()
 ) : JSObjectImpl(name), Callable, Named, Constructor {
@@ -46,8 +47,8 @@ internal open class JSFunction(
         }
     }
 
-    override val type: String
-        get() = "function"
+    override val type: String get() =
+        if (isObject) "object" else "function"
 
     init {
         val varargs = parameters.count { it.isVararg }
@@ -69,6 +70,8 @@ internal open class JSFunction(
     fun copy(
         body: Expression = this.body,
         extraVariables: Map<String, Pair<VariableType, Any?>> = emptyMap(),
+        isAsync: Boolean = this.isAsync,
+        isObject : Boolean = this.isObject,
         prototype: Any? = Unit
     ): JSFunction {
         return JSFunction(
@@ -78,6 +81,8 @@ internal open class JSFunction(
             thisRef = thisRef,
             isClassMember = isClassMember,
             isArrow = isArrow,
+            isAsync = isAsync,
+            isObject = isObject,
             extraVariables = this.extraVariables + extraVariables,
             prototype = prototype
         )
@@ -88,7 +93,7 @@ internal open class JSFunction(
     }
 
     override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
-        return copy().apply {
+        return copy(isObject = true).apply {
             thisRef = this
             setProto(this@JSFunction.get(PROTOTYPE, runtime))
             invoke(args, runtime)
@@ -114,8 +119,26 @@ internal open class JSFunction(
                 this["this"] = VariableType.Const to it
             }
         }
+
+        return if (isAsync){
+            runtime.async {
+                invokeImpl(runtime, arguments)
+            }
+        } else {
+            invokeImpl(runtime, arguments)
+        }
+    }
+
+    private suspend fun invokeImpl(
+        runtime: ScriptRuntime,
+        arguments: Map<String, Pair<VariableType,Any?>>
+    ) : Any? {
         return try {
-            runtime.withScope(arguments + extraVariables, body::invoke)
+            runtime.withScope(
+                extraVariables = arguments + extraVariables,
+                isSuspendAllowed = isAsync,
+                block = body::invoke
+            )
         } catch (ret: BlockReturn) {
             ret.value
         }

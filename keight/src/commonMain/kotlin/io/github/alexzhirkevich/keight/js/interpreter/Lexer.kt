@@ -34,6 +34,7 @@ private fun ListIterator<Char>.tokenize(
                 '>' -> greater() // +shr, ushr
                 '!' -> not() // + neq
                 '.' -> period() // + spread
+                '?' -> questionMark() // for ternary + nullish coalescing, optional chaining
                 '~' -> Token.Operator.Bitwise.Reverse
                 '{' -> Token.Operator.Bracket.CurlyOpen.also {
                     blockStack++
@@ -50,7 +51,6 @@ private fun ListIterator<Char>.tokenize(
                 ':' -> Token.Operator.Colon
                 ';' -> Token.Operator.SemiColon
                 ',' -> Token.Operator.Comma
-                '?' -> Token.Operator.QuestionMark
                 '\n' -> Token.NewLine
                 '`' -> templateString(ignoreWhitespaces)
                 in STRING_START -> string(c)
@@ -67,6 +67,19 @@ private fun ListIterator<Char>.tokenize(
         }
     }
 }
+
+private fun ListIterator<Char>.questionMark() : Token {
+    if (!hasNext()){
+        return Token.Operator.QuestionMark
+    }
+
+    return when(next()){
+        '?' -> Token.Operator.NullishCoalescing
+        '.' -> Token.Operator.OptionalChaining
+        else -> Token.Operator.QuestionMark.also { previous() }
+    }
+}
+
 
 private fun ListIterator<Char>.period() : Token {
     val pos = nextIndex()
@@ -433,36 +446,38 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
     }
 
     return when (val string = value.toString()) {
-        "var" -> Token.Keyword.Var
-        "let" -> Token.Keyword.Let
-        "const" -> Token.Keyword.Const
-        "null" -> Token.Keyword.Null
-        "true" -> Token.Keyword.True
-        "false" -> Token.Keyword.False
-        "if" -> Token.Keyword.If
-        "else" -> Token.Keyword.Else
-        "for" -> Token.Keyword.For
-        "while" -> Token.Keyword.While
-        "do" -> Token.Keyword.Do
-        "break" -> Token.Keyword.Break
-        "continue" -> Token.Keyword.Continue
-        "function" -> Token.Keyword.Function
-        "return" -> Token.Keyword.Return
-        "class" -> Token.Keyword.Class
-        "switch" -> Token.Keyword.Switch
-        "case" -> Token.Keyword.Case
-        "default" -> Token.Keyword.Default
-        "throw" -> Token.Keyword.Throw
-        "try" -> Token.Keyword.Try
-        "catch" -> Token.Keyword.Catch
-        "finally" -> Token.Keyword.Finally
+        "var" -> Token.Identifier.Keyword.Var
+        "let" -> Token.Identifier.Keyword.Let
+        "const" -> Token.Identifier.Keyword.Const
+        "null" -> Token.Identifier.Keyword.Null
+        "true" -> Token.Identifier.Keyword.True
+        "false" -> Token.Identifier.Keyword.False
+        "if" -> Token.Identifier.Keyword.If
+        "else" -> Token.Identifier.Keyword.Else
+        "for" -> Token.Identifier.Keyword.For
+        "while" -> Token.Identifier.Keyword.While
+        "do" -> Token.Identifier.Keyword.Do
+        "break" -> Token.Identifier.Keyword.Break
+        "continue" -> Token.Identifier.Keyword.Continue
+        "function" -> Token.Identifier.Keyword.Function
+        "return" -> Token.Identifier.Keyword.Return
+        "class" -> Token.Identifier.Keyword.Class
+        "switch" -> Token.Identifier.Keyword.Switch
+        "case" -> Token.Identifier.Keyword.Case
+        "default" -> Token.Identifier.Keyword.Default
+        "throw" -> Token.Identifier.Keyword.Throw
+        "try" -> Token.Identifier.Keyword.Try
+        "catch" -> Token.Identifier.Keyword.Catch
+        "finally" -> Token.Identifier.Keyword.Finally
+        "async" -> Token.Identifier.Keyword.Async
+        "await" -> Token.Identifier.Keyword.Await
 
         "new" -> Token.Operator.New
         "in" -> Token.Operator.In
         "instanceof" -> Token.Operator.Instanceof
         "typeof" -> Token.Operator.Typeof
 
-        else -> Token.Identifier(string)
+        else -> Token.Identifier.Property(string)
     }
 }
 

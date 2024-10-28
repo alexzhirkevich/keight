@@ -7,6 +7,7 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.expressions.OpContinue
 import io.github.alexzhirkevich.keight.fastForEach
 
 internal interface JSClass : JSObject, Named, Constructor {
@@ -34,7 +35,85 @@ internal suspend fun JSClass.superFunctions(runtime: ScriptRuntime) : List<JSFun
     return (extendsClass.superFunctions(runtime) + extendsClass.functions).associateBy { it.name }.values.toList()
 }
 
-internal tailrec suspend fun JSClass.instanceOf(
+internal sealed interface StaticClassMember {
+
+    suspend fun assignTo(clazz : JSClass, runtime: ScriptRuntime)
+
+    class Variable(val name : String, val init : Expression) : StaticClassMember {
+        override suspend fun assignTo(clazz: JSClass, runtime: ScriptRuntime) {
+            clazz[name] = init(runtime)
+        }
+    }
+
+    class Method(val function: JSFunction) : StaticClassMember {
+        override suspend fun assignTo(clazz: JSClass, runtime: ScriptRuntime) {
+            clazz[function.name] = function
+        }
+    }
+}
+
+
+internal open class JSClassImpl(
+    override val name : String,
+    final override val functions : List<JSFunction>,
+    final override val construct: JSFunction?,
+    final override val extends: Expression?,
+    final override val static: List<StaticClassMember>
+) : JSFunction(
+    name = name,
+    parameters = construct?.parameters.orEmpty(),
+    body = construct?.body ?: OpConstant(Unit)
+), JSClass {
+
+    override suspend fun isInstance(obj: Any?, runtime: ScriptRuntime): Boolean {
+        return (obj as? JSClass)?.instanceOf(this, runtime, extends) == true
+    }
+
+    private var isSuperInitialized = false
+
+    override val isInitialized: Boolean get() =
+        extends == null || isSuperInitialized
+
+    final override var constructorClass: Expression = OpConstant(this)
+
+    override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
+
+        val parent = (extends?.invoke(runtime) as? JSClass)?.construct
+
+        if (parent == null && extends != null) {
+            isSuperInitialized = true
+        }
+
+        val clazz = JSClassImpl(
+            name = name,
+            functions = (superFunctions(runtime) + functions).map(JSFunction::copy),
+            construct = construct?.copy(
+                extraVariables = if (parent != null){
+                    mapOf("super" to (VariableType.Const to parent))
+                } else emptyMap()
+            ),
+            extends = extends,
+            static = static,
+        )
+        parent?.thisRef = clazz
+
+        clazz.setProto(get(PROTOTYPE, runtime))
+        clazz.constructorClass = constructorClass
+        clazz.functions.fastForEach {
+            clazz[it.name] = it.apply { thisRef=clazz }
+        }
+        clazz.construct?.thisRef = clazz
+
+        clazz.construct?.invoke(args, runtime)
+
+        return clazz
+    }
+    override val type: String
+        get() = "object"
+
+}
+
+private tailrec suspend fun JSClass.instanceOf(
     any: Any?,
     runtime: ScriptRuntime,
     extends: Expression? = this.extends
@@ -53,74 +132,3 @@ internal tailrec suspend fun JSClass.instanceOf(
     return instanceOf(any, runtime, e.extends)
 }
 
-internal sealed interface StaticClassMember {
-
-    suspend fun assignTo(clazz : JSClass, runtime: ScriptRuntime)
-
-    class Variable(val name : String, val init : Expression) : StaticClassMember {
-        override suspend fun assignTo(clazz: JSClass, runtime: ScriptRuntime) {
-            clazz[name] = init(runtime)
-        }
-    }
-
-    class Method(val function: JSFunction) : StaticClassMember {
-        override suspend fun assignTo(clazz: JSClass, runtime: ScriptRuntime) {
-            clazz[function.name] = function
-        }
-    }
-}
-
-internal open class ESClassBase(
-    override val name : String,
-    final override val functions : List<JSFunction>,
-    final override val construct: JSFunction?,
-    final override val extends: Expression?,
-    final override val static: List<StaticClassMember>
-) : JSFunction(
-    name = name,
-    parameters = construct?.parameters.orEmpty(),
-    body = construct?.body ?: OpConstant(Unit)
-), JSClass {
-
-    private var isSuperInitialized = false
-
-    override val isInitialized: Boolean get() =
-        extends == null || isSuperInitialized
-
-    final override var constructorClass: Expression = OpConstant(this)
-
-    override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
-
-        val parent = (extends?.invoke(runtime) as? JSClass)?.construct
-
-        if (parent == null && extends != null) {
-            isSuperInitialized = true
-        }
-
-        val clazz = ESClassBase(
-            name = name,
-            functions = (superFunctions(runtime) + functions).map(JSFunction::copy),
-            construct = construct?.copy(
-                extraVariables = if (parent != null){
-                    mapOf("super" to (VariableType.Const to parent))
-                } else emptyMap()
-            ),
-            extends = extends,
-            static = static,
-        )
-        parent?.thisRef = clazz
-
-        clazz.constructorClass = constructorClass
-        clazz.functions.fastForEach {
-            clazz[it.name] = it.apply { thisRef=clazz }
-        }
-        clazz.construct?.thisRef = clazz
-
-        clazz.construct?.invoke(args, runtime)
-
-        return clazz
-    }
-    override val type: String
-        get() = "object"
-
-}

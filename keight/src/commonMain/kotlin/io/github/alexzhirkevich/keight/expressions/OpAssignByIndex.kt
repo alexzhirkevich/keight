@@ -15,26 +15,26 @@ internal class OpAssignByIndex(
     private val merge : (ScriptRuntime.(Any?, Any?) -> Any?)?
 ) : Expression {
 
-    override tailrec suspend fun invokeRaw(context: ScriptRuntime): Any? {
-        val v = assignableValue.invoke(context)
-        val current = context.get(variableName)
+    override tailrec suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
+        val v = assignableValue.invoke(runtime)
+        val current = runtime.get(variableName)
 
         check(merge == null || current != null) {
             "Cant modify $variableName as it is undefined"
         }
 
         if (current == null) {
-            context.set(variableName, mutableListOf<Any>(), scope)
-            return invoke(context)
+            runtime.set(variableName, mutableListOf<Any>(), scope)
+            return invoke(runtime)
         } else {
 
 
-            val idx = index(context)
+            val idx = index(runtime)
 
             return when (current) {
 
                 is JsArrayWrapper-> {
-                    val i = context.toNumber(idx)
+                    val i = runtime.toNumber(idx)
 
                     check(!i.toDouble().isNaN()) {
                         "Unexpected index: $i"
@@ -48,7 +48,7 @@ internal class OpAssignByIndex(
                     val c = current.value[index]
 
                     current.value[index] = if (current.value[index] !is Unit && merge != null){
-                        merge.invoke(context, c,v)
+                        merge.invoke(runtime, c,v)
                     } else {
                         v
                     }
@@ -56,8 +56,8 @@ internal class OpAssignByIndex(
                 }
                 is JSObject -> {
                     
-                    if (current.contains(idx, context) && merge != null){
-                        current[idx] = merge.invoke(context, current.get(idx, context), v)
+                    if (current.contains(idx, runtime) && merge != null){
+                        current[idx] = merge.invoke(runtime, current.get(idx, runtime), v)
                     } else {
                         current[idx] = v
                     }

@@ -1,21 +1,21 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.expressions.OpGetVariable
+import io.github.alexzhirkevich.keight.expressions.OpGetProperty
 import io.github.alexzhirkevich.keight.expressions.OpIndex
 
 
 public fun interface Expression {
 
-    public suspend fun invokeRaw(context: ScriptRuntime): Any?
+    public suspend fun invokeRaw(runtime: ScriptRuntime): Any?
 }
 
-public suspend operator fun Expression.invoke(context: ScriptRuntime): Any? =
-    context.fromKotlin(invokeRaw(context))
+public suspend operator fun Expression.invoke(runtime: ScriptRuntime): Any? =
+    runtime.fromKotlin(invokeRaw(runtime))
 
 
 internal fun Expression.isAssignable() : Boolean {
-    return this is OpGetVariable && assignmentType == null ||
-            this is OpIndex && variable is OpGetVariable
+    return this is OpGetProperty && assignmentType == null ||
+            this is OpIndex && property is OpGetProperty
 }
 
 

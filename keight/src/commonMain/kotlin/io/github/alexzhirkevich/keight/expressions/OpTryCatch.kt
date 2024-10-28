@@ -4,8 +4,12 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.invoke
+import io.github.alexzhirkevich.keight.js.JSError
 
-internal class ThrowableValue(val value : Any?) : Throwable(message = value?.toString()) {
+internal class ThrowableValue(val value : Any?) : JSError(
+    message = "Uncaught $value",
+    cause = null
+) {
     override fun toString(): String {
         return value.toString() + " (thrown)"
     }

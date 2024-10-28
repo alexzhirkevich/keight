@@ -8,38 +8,60 @@ import io.github.alexzhirkevich.keight.js.JSNumberFunction
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JSObjectFunction
 import io.github.alexzhirkevich.keight.js.JSObjectImpl
+import io.github.alexzhirkevich.keight.js.JSPromiseFunction
 import io.github.alexzhirkevich.keight.js.JSSetFunction
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsConsole
 import io.github.alexzhirkevich.keight.js.JsMapWrapper
 import io.github.alexzhirkevich.keight.js.setupNumberMethods
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.job
 import kotlin.coroutines.CoroutineContext
 import kotlin.jvm.JvmInline
 
 public open class JSRuntime(
-    override val coroutineContext: CoroutineContext,
-    override var io: ScriptIO = DefaultScriptIO
+    context: CoroutineContext,
+    override val isSuspendAllowed: Boolean = true,
+    override var io: ScriptIO = DefaultScriptIO,
 ) : DefaultRuntime(), ScriptContext by JSLangContext {
+
+    override var coroutineContext: CoroutineContext =
+        context + SupervisorJob(context[Job]).also {
+            if (!isSuspendAllowed){
+                it.cancel()
+            }
+        }
 
     override val comparator: Comparator<Any?> by lazy {
         JSComparator(this)
     }
 
-    internal lateinit var Number : JSNumberFunction
-    internal lateinit var Object : JSObjectFunction
-    internal lateinit var Array : JSArrayFunction
-    internal lateinit var Map : JSMapFunction
-    internal lateinit var Set : JSSetFunction
-    internal lateinit var String : JSStringFunction
+    internal lateinit var Number: JSNumberFunction
+    internal lateinit var Object: JSObjectFunction
+    internal lateinit var Array: JSArrayFunction
+    internal lateinit var Map: JSMapFunction
+    internal lateinit var Set: JSSetFunction
+    internal lateinit var String: JSStringFunction
+    internal lateinit var Promise: JSPromiseFunction
 
-    init { init() }
-
-    override fun reset() {
-        super.reset()
+    init {
         init()
     }
 
+    /**
+     * Restore runtime to its initial state. Cancels all pending promises.
+     * */
+    override fun reset() {
+        super.reset()
+        init()
+
+        coroutineContext.cancelChildren()
+    }
 
     private fun init() {
         Number = JSNumberFunction()
@@ -48,6 +70,7 @@ public open class JSRuntime(
         Map = JSMapFunction()
         Set = JSSetFunction()
         String = JSStringFunction()
+        Promise = JSPromiseFunction()
 
         val globalThis = RuntimeGlobalThis(this)
 
@@ -65,6 +88,7 @@ public open class JSRuntime(
         set("Set", Set, VariableType.Global)
         set("Number", Number, VariableType.Global)
         set("String", String, VariableType.Global)
+        set("Promise", Promise, VariableType.Global)
 
         globalThis.setupNumberMethods()
     }

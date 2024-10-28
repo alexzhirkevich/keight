@@ -1,16 +1,21 @@
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.set
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.coroutineContext
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 class InteropTest {
 
     @Test
-    fun lambda()= runTest {
+    fun lambda()= runtimeTest { runtime ->
 
         var x = 0L
-        val runtime  = JSRuntime(coroutineContext)
 
         runtime["test"] = { x = 2 }
         "test()".eval(runtime)
@@ -26,6 +31,24 @@ class InteropTest {
         runtime["sum"] = ::sum
 
         "sum(test(9), test(4))".eval(runtime).assertEqualsTo(15L)
+    }
+
+    @Test
+    fun suspendFunction() = runtimeTest { runtime ->
+
+        runtime["testSuspend"] = suspend { delay(1); "result" }
+        runtime["testInline"] = suspend { "result" }
+
+        assertTrue {
+            "testSuspend()".eval(runtime) is Deferred<*>
+        }
+        "await testSuspend()".eval(runtime).assertEqualsTo("result")
+
+        assertTrue {
+            "testInline()".eval(runtime) is Deferred<*>
+        }
+
+        "await testInline()".eval(runtime).assertEqualsTo("result")
     }
 
     fun sum(a : Long, b : Long) : Long {

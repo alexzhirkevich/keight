@@ -1,11 +1,13 @@
+import io.github.alexzhirkevich.keight.js.JSError
+import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.ReferenceError
+import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
-import io.github.alexzhirkevich.keight.JSRuntime
+import io.github.alexzhirkevich.keight.js.interpreter.Token
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 class FunctionsTest {
 
@@ -32,6 +34,29 @@ class FunctionsTest {
             }
             test(1,2)
         """.trimIndent().eval().assertEqualsTo(4L)
+    }
+
+    @Test
+    fun keyword_name() = runTest{
+        assertFailsWith<SyntaxError> {
+            "function throw() {}".eval()
+        }
+        assertFailsWith<SyntaxError> {
+            "function return() {}".eval()
+        }
+        assertFailsWith<SyntaxError> {
+            "function await() {}".eval()
+        }
+    }
+
+    @Test
+    fun noReturn()  = runtimeTest{
+        """
+            function test(){
+                5  
+            }
+            test()
+        """.trimIndent().eval().assertEqualsTo(Unit)
     }
 
     @Test
@@ -127,6 +152,10 @@ class FunctionsTest {
             test(1,2)
         """.trimIndent().eval().assertEqualsTo(3L)
 
+        """
+            const test = (a,b) => { a + b }
+            test(1,2)
+        """.trimIndent().eval().assertEqualsTo(Unit)
 
         """
             const test = a => a+1
@@ -168,9 +197,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun constructor_function() = runTest {
-
-        val runtime = JSRuntime(Job())
+    fun constructor_function() = runtimeTest { runtime ->
 
         """
             function Person(name,age){
@@ -180,6 +207,7 @@ class FunctionsTest {
             const p = new Person('John', 25)
         """.eval(runtime)
 
+        "typeof p".eval(runtime).assertEqualsTo("object")
         "p.name".eval(runtime).assertEqualsTo("John")
         "p.age".eval(runtime).assertEqualsTo(25L)
         "p.prototype".eval(runtime).assertEqualsTo(Unit)
@@ -187,8 +215,7 @@ class FunctionsTest {
     }
 
     @Test
-    fun add_field_to_prototype_constructor() = runTest {
-        val runtime = JSRuntime(coroutineContext)
+    fun add_field_to_prototype_constructor() = runtimeTest { runtime ->
 
         """
             function Person(name,age){
@@ -222,5 +249,33 @@ class FunctionsTest {
 
         "Number.prototype.toFixed.apply(12.12345, [1])".eval()
             .assertEqualsTo("12.1")
+    }
+
+    @Test
+    fun async_function() = runTest {
+        assertFailsWith<JSError> {
+            """
+                function notAsync() {
+                      let promise = new Promise((resolve) => resolve(123))
+                      await promise
+                }
+                notAsync()
+           """.eval()
+        }
+
+        """
+            function returnPromise() {
+                  return new Promise((resolve) => resolve(123))
+            }
+            await returnPromise()
+       """.eval().assertEqualsTo(123L)
+
+        """
+            async function asyncFunc() {
+              return 123
+            }
+            
+            await asyncFunc()
+       """.eval().assertEqualsTo(123L)
     }
 }

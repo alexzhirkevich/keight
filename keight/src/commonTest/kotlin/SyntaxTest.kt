@@ -132,7 +132,7 @@ class SyntaxTest {
     }
 
     @Test
-    fun comments() = runTest {
+    fun comments() = runtimeTest { runtime ->
         """
             // comment
             "string"
@@ -192,7 +192,6 @@ class SyntaxTest {
             i
         """.trimIndent().eval().assertEqualsTo(2L)
 
-        val runtime = JSRuntime(coroutineContext)
         """
             let /**/ obj = /**/{ /**/name/**/ : /**/'test'/**/}
         """.trimIndent().eval(runtime).let {
@@ -213,6 +212,30 @@ class SyntaxTest {
             let a = [3,4];
             [1,2, ...a, 5,6]
         """.eval().assertEqualsTo(listOf(1L,2L,3L,4L,5L,6L))
+    }
+
+    @Test
+    fun optional_chaining() = runtimeTest { runtime ->
+        "let x = undefined; x?.test".eval().assertEqualsTo(Unit)
+        "let x = undefined; x?.test?.other?.more".eval().assertEqualsTo(Unit)
+
+        "let x = undefined; x?.['test']".eval().assertEqualsTo(Unit)
+        "let x = undefined; x?.['test']?.['more']".eval().assertEqualsTo(Unit)
+
+        "let x = undefined; x?.(1)".eval().assertEqualsTo(Unit)
+        "let x = undefined; x?.(1)?.(2)".eval().assertEqualsTo(Unit)
+
+        "let x = undefined; x?.one?.['two']?.('three')".eval().assertEqualsTo(Unit)
+
+        """
+            let x = {
+                prop: 1,
+                func : () => 1
+            }
+        """.eval(runtime)
+
+        "x?.prop".eval(runtime).assertEqualsTo(1L)
+        "x.func?.()".eval(runtime).assertEqualsTo(1L)
     }
 
     @Test

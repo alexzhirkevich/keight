@@ -52,7 +52,7 @@ public class KeightScriptEngineFactory : ScriptEngineFactory  {
     }
 
     override fun getScriptEngine(): ScriptEngine {
-        return getScriptEngine(JavaScriptEngine())
+        return getScriptEngine(JavaScriptEngine(JSRuntime(Job())))
     }
 
     public fun getScriptEngine(engine: KeightScriptEngine) : ScriptEngine {

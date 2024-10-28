@@ -2,8 +2,6 @@ import io.github.alexzhirkevich.keight.js.JSClass
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
-import io.github.alexzhirkevich.keight.JSRuntime
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -137,9 +135,7 @@ class ClassesTest {
     }
 
     @Test
-    fun superConstructorAndMethod() = runTest {
-
-        val runtime = JSRuntime(coroutineContext)
+    fun superConstructorAndMethod() = runtimeTest { runtime ->
 
         """
             class Person {
@@ -187,9 +183,8 @@ class ClassesTest {
     }
 
     @Test
-    fun static() = runTest {
+    fun static() = runtimeTest { runtime ->
 
-        val runtime = JSRuntime(coroutineContext)
         """
             class A {
                 static test = 'static'
@@ -206,9 +201,8 @@ class ClassesTest {
 
     @Test
     @Ignore
-    fun staticInheritance()= runTest  {
+    fun staticInheritance()= runtimeTest { runtime ->
 
-        val runtime = JSRuntime(coroutineContext)
 
         """
             class A {

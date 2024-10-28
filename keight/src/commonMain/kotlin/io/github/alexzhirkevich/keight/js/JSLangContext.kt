@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.ScriptContext
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.fastMap
+import kotlinx.coroutines.Job
 import kotlin.math.absoluteValue
 
 internal object JSLangContext : ScriptContext {
@@ -68,7 +69,7 @@ internal object JSLangContext : ScriptContext {
             is UInt -> JsNumberWrapper(a.toLong())
             is ULong -> {
                 check(a < Long.MAX_VALUE.toULong()){
-                    "Unsigned numbers grater than Long.MAX_VALUE can't be imported to JavaScript"
+                    "Unsigned numbers greater than ${Long.MAX_VALUE} can't be used in JavaScript"
                 }
                 JsNumberWrapper(a.toLong())
             }
@@ -78,6 +79,7 @@ internal object JSLangContext : ScriptContext {
             is Set<*> -> JsSetWrapper(a.map(::fromKotlin).toMutableSet())
             is List<*> -> JsArrayWrapper(a.map(::fromKotlin).toMutableList())
             is CharSequence -> JsStringWrapper(a.toString())
+            is Job -> JSPromiseWrapper(a)
             else -> a
         }
     }

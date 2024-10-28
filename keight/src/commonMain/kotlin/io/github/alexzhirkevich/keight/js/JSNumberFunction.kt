@@ -78,12 +78,10 @@ internal fun JSObject.setupNumberMethods() {
 internal class JSNumberFunction : JSFunction(name = "Number") {
 
     init {
-        val proto = JSObjectImpl().apply {
-            this["toFixed"] = ToFixed(0)
-            this["toPrecision"] = ToPrecision(0)
-        }
-
-        setPrototype(proto)
+        setPrototype(Object {
+            "toFixed" eq ToFixed(0)
+            "toPrecision" eq ToPrecision(0)
+        })
 
         set("EPSILON", Double.MIN_VALUE)
         set("MAX_SAFE_INTEGER", Long.MAX_VALUE)

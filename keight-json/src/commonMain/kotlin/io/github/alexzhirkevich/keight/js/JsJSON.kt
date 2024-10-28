@@ -23,7 +23,7 @@ internal fun JsJSON() : JSObject {
     }
 }
 
-private fun stringify(value : Any?, runtime: ScriptRuntime) : String {
+private suspend fun stringify(value : Any?, runtime: ScriptRuntime) : String {
     return when(value){
         is String -> Json.encodeToString<String>(value)
         is Number -> Json.encodeToString<Number>(value)
@@ -34,7 +34,7 @@ private fun stringify(value : Any?, runtime: ScriptRuntime) : String {
     }
 }
 
-private fun Any?.toJsonObject(runtime: ScriptRuntime) : JsonElement {
+private suspend fun Any?.toJsonObject(runtime: ScriptRuntime) : JsonElement {
     return when (this) {
         null -> JsonNull
         is JsWrapper<*> -> value.toJsonObject(runtime)
@@ -42,7 +42,7 @@ private fun Any?.toJsonObject(runtime: ScriptRuntime) : JsonElement {
         is Number -> JsonPrimitive(this)
         is List<*> -> JsonArray(map { it.toJsonObject(runtime) })
         is JSObject -> JsonObject(keys.associateWith {
-            runtime.toKotlin(get(it)).toJsonObject(runtime)
+            runtime.toKotlin(get(it, runtime)).toJsonObject(runtime)
         })
 
         else -> JsonNull

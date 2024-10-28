@@ -1,4 +1,3 @@
-import io.github.alexzhirkevich.keight.JSRuntime
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -71,9 +70,8 @@ class NumberTest {
     }
 
     @Test
-    fun static_methods()= runTest  {
+    fun static_methods() = runtimeTest { runtime ->
 
-        val runtime = JSRuntime(coroutineContext)
         listOf("Number.", "globalThis.", "").forEach {
             "${it}isFinite(123)".eval(runtime).assertEqualsTo(true)
             "${it}isInteger(123)".eval(runtime).assertEqualsTo(true)

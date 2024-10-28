@@ -1,6 +1,5 @@
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.JSRuntime
-import io.github.alexzhirkevich.keight.js.JSLangContext
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -9,9 +8,8 @@ import kotlin.test.assertTrue
 class ObjectTest {
 
     @Test
-    fun context() = runTest {
+    fun context() = runtimeTest { runtime ->
 
-        val runtime = JSRuntime(coroutineContext)
         assertTrue {
             "const person = {}; person".eval(runtime) is JSObject
         }
@@ -40,9 +38,7 @@ class ObjectTest {
     }
 
     @Test
-    fun syntax() = runTest {
-
-        val runtime = JSRuntime(coroutineContext)
+    fun syntax() = runtimeTest { runtime ->
 
         """
             let obj = {
@@ -102,16 +98,14 @@ class ObjectTest {
     }
 
     @Test
-    fun contains() = runTest {
-        val runtime = JSRuntime(coroutineContext)
+    fun contains() = runtimeTest { runtime ->
         "let obj = { name : 'test'}".eval(runtime)
         assertTrue { "'name' in obj".eval(runtime) as Boolean }
         assertFalse { "'something' in obj".eval(runtime) as Boolean }
     }
 
     @Test
-    fun assign() = runTest {
-        val runtime = JSRuntime(coroutineContext)
+    fun assign() = runtimeTest { runtime ->
         """
             // Create Target Object
             const person1 = {

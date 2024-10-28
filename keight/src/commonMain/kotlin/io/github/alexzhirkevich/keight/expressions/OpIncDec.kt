@@ -14,16 +14,16 @@ internal fun OpIncDecAssign(
     val value = Expression { op(it, variable(it)) }
 
     val assignment = when {
-        variable is OpGetVariable && variable.assignmentType == null ->
+        variable is OpGetProperty && variable.assignmentType == null ->
             OpAssign(
                 variableName = variable.name,
                 assignableValue = value,
                 merge = null
             )
 
-        variable is OpIndex && variable.variable is OpGetVariable ->
+        variable is OpIndex && variable.property is OpGetProperty ->
             OpAssignByIndex(
-                variableName = variable.variable.name,
+                variableName = variable.property.name,
                 index = variable.index,
                 assignableValue = value,
                 scope = null,
