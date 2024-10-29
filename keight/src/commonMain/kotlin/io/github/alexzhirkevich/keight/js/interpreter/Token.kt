@@ -156,9 +156,7 @@ internal sealed interface Token {
             object Try : Keyword("try")
             object Catch : Keyword("catch")
             object Finally : Keyword("finally")
-
             object Async : Keyword("async")
-
             object Await : Keyword("await")
         }
     }

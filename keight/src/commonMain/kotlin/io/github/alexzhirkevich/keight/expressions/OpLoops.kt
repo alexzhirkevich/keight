@@ -3,6 +3,8 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.invoke
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 
 
 internal class OpForLoop(
@@ -39,6 +41,42 @@ internal class OpForLoop(
                 increment?.invoke(ctx)
             }
         }
+    }
+}
+
+internal class OpForInLoop(
+    private val prepare : Expression,
+    private val assign : suspend (ScriptRuntime, Any?) -> Unit,
+    private val inObject : Expression,
+    private val body: Expression
+) : Expression {
+
+    override suspend fun invokeRaw(runtime: ScriptRuntime): Any {
+        runtime.withScope {
+            val o = inObject(it)
+
+            syntaxCheck(o is JsAny){
+                "$o is not iterable"
+            }
+
+            val keys = o.keys
+
+            if (keys.isNotEmpty()){
+                prepare(it)
+            }
+
+            for (k in keys) {
+                try {
+                    assign(it, k)
+                    body(it)
+                } catch (_: BlockContinue) {
+                    continue
+                } catch (_: BlockBreak) {
+                    break
+                }
+            }
+        }
+        return Unit
     }
 }
 

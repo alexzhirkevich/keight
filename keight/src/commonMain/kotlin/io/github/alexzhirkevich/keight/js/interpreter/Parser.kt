@@ -1,55 +1,54 @@
 package io.github.alexzhirkevich.keight.js.interpreter
 
+import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Constructor
+import io.github.alexzhirkevich.keight.Delegate
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.Callable
-import io.github.alexzhirkevich.keight.Delegate
-import io.github.alexzhirkevich.keight.js.JSFunction
-import io.github.alexzhirkevich.keight.js.FunctionParam
-import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.expressions.OpAssign
 import io.github.alexzhirkevich.keight.expressions.OpAssignByIndex
 import io.github.alexzhirkevich.keight.expressions.OpBlock
 import io.github.alexzhirkevich.keight.expressions.OpBreak
+import io.github.alexzhirkevich.keight.expressions.OpCall
 import io.github.alexzhirkevich.keight.expressions.OpCase
-import io.github.alexzhirkevich.keight.expressions.OpCompare
+import io.github.alexzhirkevich.keight.expressions.OpCompare2
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.expressions.OpContinue
 import io.github.alexzhirkevich.keight.expressions.OpDoWhileLoop
 import io.github.alexzhirkevich.keight.expressions.OpEquals
-import io.github.alexzhirkevich.keight.expressions.OpEqualsComparator
 import io.github.alexzhirkevich.keight.expressions.OpExp
+import io.github.alexzhirkevich.keight.expressions.OpForInLoop
 import io.github.alexzhirkevich.keight.expressions.OpForLoop
 import io.github.alexzhirkevich.keight.expressions.OpGetProperty
-import io.github.alexzhirkevich.keight.expressions.OpGreaterComparator
 import io.github.alexzhirkevich.keight.expressions.OpIfCondition
+import io.github.alexzhirkevich.keight.expressions.OpIn
 import io.github.alexzhirkevich.keight.expressions.OpIncDecAssign
 import io.github.alexzhirkevich.keight.expressions.OpIndex
-import io.github.alexzhirkevich.keight.expressions.OpLessComparator
 import io.github.alexzhirkevich.keight.expressions.OpLongInt
 import io.github.alexzhirkevich.keight.expressions.OpLongLong
 import io.github.alexzhirkevich.keight.expressions.OpMakeArray
 import io.github.alexzhirkevich.keight.expressions.OpNot
 import io.github.alexzhirkevich.keight.expressions.OpNotEquals
 import io.github.alexzhirkevich.keight.expressions.OpReturn
+import io.github.alexzhirkevich.keight.expressions.OpSpread
 import io.github.alexzhirkevich.keight.expressions.OpSwitch
 import io.github.alexzhirkevich.keight.expressions.OpTouple
 import io.github.alexzhirkevich.keight.expressions.OpTryCatch
 import io.github.alexzhirkevich.keight.expressions.OpWhileLoop
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
-import io.github.alexzhirkevich.keight.js.JsAny
-import io.github.alexzhirkevich.keight.js.JSClass
-import io.github.alexzhirkevich.keight.js.JSError
-import io.github.alexzhirkevich.keight.js.Object
-import io.github.alexzhirkevich.keight.js.StaticClassMember
-import io.github.alexzhirkevich.keight.js.SyntaxError
-import io.github.alexzhirkevich.keight.expressions.OpCall
-import io.github.alexzhirkevich.keight.expressions.OpSpread
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.isAssignable
+import io.github.alexzhirkevich.keight.js.FunctionParam
+import io.github.alexzhirkevich.keight.js.JSClass
+import io.github.alexzhirkevich.keight.js.JSError
+import io.github.alexzhirkevich.keight.js.JSFunction
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.Object
+import io.github.alexzhirkevich.keight.js.StaticClassMember
+import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -171,52 +170,52 @@ private fun ListIterator<Token>.parseStatement(
             }
             3 -> when (nextSignificant()) {
                 Token.Operator.Arithmetic.Mul -> Delegate(
-                    x,
-                    parseStatement(blockContext, false, precedence-1),
-                    ScriptRuntime::mul
+                    a = x,
+                    b = parseStatement(blockContext, false, precedence-1),
+                    op = ScriptRuntime::mul
                 )
                 Token.Operator.Arithmetic.Div -> Delegate(
-                    x,
-                    parseStatement(blockContext, false, precedence-1),
-                    ScriptRuntime::div
+                    a = x,
+                    b = parseStatement(blockContext, false, precedence-1),
+                    op = ScriptRuntime::div
                 )
                 Token.Operator.Arithmetic.Mod -> Delegate(
-                    x,
-                    parseStatement(blockContext, false, precedence-1),
-                    ScriptRuntime::mod
+                    a = x,
+                    b = parseStatement(blockContext, false, precedence-1),
+                    op = ScriptRuntime::mod
                 )
                 else -> return x.also { prevSignificant() }
             }
             4 -> when (nextSignificant()) {
                 Token.Operator.Arithmetic.Plus -> Delegate(
-                    x,
-                    parseStatement(blockContext, false, precedence-1),
-                    ScriptRuntime::sum
+                    a = x,
+                    b = parseStatement(blockContext, false, precedence-1),
+                    op = ScriptRuntime::sum
                 )
                 Token.Operator.Arithmetic.Minus -> Delegate(
-                    x,
-                    parseStatement(blockContext, false, precedence-1),
-                    ScriptRuntime::sub
+                    a = x,
+                    b = parseStatement(blockContext, false, precedence-1),
+                    op = ScriptRuntime::sub
                 )
 
                 else -> return x.also { prevSignificant() }
             }
             5 ->  when (nextSignificant()) {
                 Token.Operator.Bitwise.Shl -> OpLongInt(
-                    x,
-                    parseStatement(blockContext, false, precedence-1),
-                    Long::shl
+                    a = x,
+                    b = parseStatement(blockContext, false, precedence-1),
+                    op = Long::shl
                 )
 
                 Token.Operator.Bitwise.Shr -> OpLongInt(
-                    x,
-                    parseStatement(blockContext, false, precedence-1),
-                    Long::shr
+                    a = x,
+                    b = parseStatement(blockContext, false, precedence-1),
+                    op = Long::shr
                 )
                 Token.Operator.Bitwise.Ushr -> OpLongInt(
-                    x,
-                    parseStatement(blockContext, false, precedence-1),
-                    Long::ushr
+                    a = x,
+                    b = parseStatement(blockContext, false, precedence-1),
+                    op = Long::ushr
                 )
                 else -> return x.also { prevSignificant() }
 
@@ -227,27 +226,26 @@ private fun ListIterator<Token>.parseStatement(
                 else -> return x.also { prevSignificant() }
             }
             7 ->  when (nextSignificant()) {
-                Token.Operator.Compare.Less -> OpCompare(
+                Token.Operator.Compare.Less -> OpCompare2(
                     a = x,
                     b = parseStatement(blockContext, false, precedence),
-                    comparator = OpLessComparator
+                    result = { it < 0 }
                 )
-                Token.Operator.Compare.LessOrEq -> OpCompare(
-                    a = x, b = parseStatement(blockContext, false, precedence)
-                ) { a, b, r ->
-                    OpLessComparator(a, b, r) || OpEqualsComparator(a, b, r)
-                }
-                Token.Operator.Compare.Greater ->  OpCompare(
+                Token.Operator.Compare.LessOrEq -> OpCompare2(
                     a = x,
                     b = parseStatement(blockContext, false, precedence),
-                    comparator = OpGreaterComparator
+                    result = { it <= 0 }
                 )
-                Token.Operator.Compare.GreaterOrEq -> OpCompare(
+                Token.Operator.Compare.Greater -> OpCompare2(
                     a = x,
-                    b = parseStatement(blockContext, false, precedence)
-                ) { a, b,r  ->
-                    OpGreaterComparator(a, b, r) || OpEqualsComparator(a, b,r)
-                }
+                    b = parseStatement(blockContext, false, precedence),
+                    result = { it > 0 }
+                )
+                Token.Operator.Compare.GreaterOrEq -> OpCompare2(
+                    a = x,
+                    b = parseStatement(blockContext, false, precedence),
+                    result = { it >= 0 }
+                )
 
                 else -> return x.also { prevSignificant() }
             }
@@ -303,9 +301,7 @@ private fun ListIterator<Token>.parseStatement(
                 Token.Operator.Logical.And -> {
                     val a = x
                     val b = parseStatement(blockContext, false, precedence)
-                    Expression {
-                        !it.isFalse(a(it)) && !it.isFalse(b(it))
-                    }
+                    Expression { !it.isFalse(a(it)) && !it.isFalse(b(it)) }
                 }
                 else -> return x.also { prevSignificant() }
             }
@@ -314,9 +310,12 @@ private fun ListIterator<Token>.parseStatement(
                 Token.Operator.Logical.Or -> {
                     val a = x
                     val b = parseStatement(blockContext, false, precedence)
-                    Expression {
-                        !it.isFalse(a(it)) || !it.isFalse(b(it))
-                    }
+                    Expression { !it.isFalse(a(it)) || !it.isFalse(b(it)) }
+                }
+                Token.Operator.NullishCoalescing -> {
+                    val replacement = parseStatement(blockContext, false, precedence)
+                    val subject = x
+                    Expression { subject(it)?.takeUnless { it is Unit } ?: replacement(it) }
                 }
                 else -> return x.also { prevSignificant() }
             }
@@ -455,7 +454,6 @@ private fun ListIterator<Token>.parseAssignmentValue(
     return when {
         x is OpIndex && x.property is OpGetProperty -> OpAssignByIndex(
             variableName = x.property.name,
-            scope = x.property.assignmentType,
             index = x.index,
             assignableValue = parseStatement(),
             merge = merge
@@ -465,7 +463,6 @@ private fun ListIterator<Token>.parseAssignmentValue(
             variableName = x.name,
             receiver = x.receiver,
             assignableValue = parseStatement(),
-            type = x.assignmentType,
             merge = merge
         )
 
@@ -739,13 +736,10 @@ private fun ListIterator<Token>.parseFunctionCall(function : Expression, optiona
 
 private fun ListIterator<Token>.parseInOperator(subject : Expression, precedence: Int) : Expression {
     val obj = parseStatement(precedence = precedence)
-    return Expression {
-        val o = obj(it)
-        syntaxCheck(o is JsAny) {
-            "Illegal usage of 'in' operator"
-        }
-        o.contains(subject(it), it)
-    }
+    return OpIn(
+        property = subject,
+        inObject = obj
+    )
 }
 
 private fun ListIterator<Token>.parseInstanceOfOperator(subject : Expression, precedence: Int) : Expression {
@@ -800,11 +794,20 @@ private fun ListIterator<Token>.parseForLoop(parentBlockContext: List<BlockConte
         null
     else parseBlock(scoped = false, blockContext = emptyList())
 
+    // for (x in y)
+    if (assign is OpBlock) {
+        val opIn = assign.expressions.singleOrNull() as? OpIn
+        if (opIn != null) {
+            return parseForInLoop(opIn, parentBlockContext)
+        }
+    }
+
     if (assign != null) {
         syntaxCheck(nextSignificant() is Token.Operator.SemiColon) {
             "Invalid for loop"
         }
     }
+
     val comparison = if (eat(Token.Operator.SemiColon))
         null else parseStatement()
 
@@ -825,11 +828,36 @@ private fun ListIterator<Token>.parseForLoop(parentBlockContext: List<BlockConte
 
     val body = parseBlock(blockContext = parentBlockContext + BlockContext.Loop)
 
+
     return OpForLoop(
         assignment = assign,
         increment = increment,
         comparison = comparison,
         body = body
+    )
+}
+
+private fun ListIterator<Token>.parseForInLoop(opIn: OpIn, parentBlockContext : List<BlockContext>) : Expression {
+    syntaxCheck(nextSignificant() is Token.Operator.Bracket.RoundClose) {
+        "Invalid for loop"
+    }
+
+    val prepare = OpAssign(
+        type = opIn.variableType,
+        variableName = when (opIn.property){
+            is OpAssign -> opIn.property.variableName
+            is OpGetProperty -> opIn.property.name
+            else -> throw SyntaxError("Invalid for..of loop syntax")
+        },
+        assignableValue = OpConstant(Unit),
+        merge = null
+    )
+
+    return OpForInLoop(
+        prepare = prepare,
+        assign = { r, v -> r.set(prepare.variableName, v, null) },
+        inObject = opIn.inObject,
+        body = parseBlock(blockContext = parentBlockContext + BlockContext.Loop)
     )
 }
 
@@ -1133,6 +1161,9 @@ private fun ListIterator<Token>.parseVariable(type: VariableType) : Expression {
                     assignableValue = OpConstant(Unit),
                     merge = null
                 )
+
+                // for (let x in y) ...
+                is OpIn -> expr.also { it.variableType = type }
 
                 else -> throw SyntaxError(unexpected(expr::class.simpleName.orEmpty()))
             }

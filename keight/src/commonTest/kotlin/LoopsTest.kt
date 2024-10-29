@@ -78,6 +78,55 @@ class LoopsTest {
             i
         """.trimIndent().eval().assertEqualsTo(3L)
 
+        """
+            for(i = 0; i<3;i++){
+            }
+            i
+        """.trimIndent().eval().assertEqualsTo(3L)
+
+        """
+            var x = 0
+            for(let i = 0; i<3;i++){
+                let y = 1 // redeclare
+                x+=1
+            }
+            x
+        """.trimIndent().eval().assertEqualsTo(3L)
+    }
+
+    @Test
+    fun for_in_loop() = runTest {
+        """
+            var x = [2, 4, 8]
+            var sum = 0
+            for(let i in x){
+               sum += x[i]
+            }
+            sum
+        """.trimIndent().eval().assertEqualsTo(14L)
+
+        """
+            var x = { a: 1, b: 2, c : 3}
+            var sum = 0
+            for(let i in x){
+               sum += x[i]
+            }
+            sum
+        """.eval().assertEqualsTo(6L)
+
+
+        """
+            for(i in [2, 4, 8]){
+            }
+            i
+        """.trimIndent().eval().assertEqualsTo("2")
+
+        assertFailsWith<ReferenceError> {
+            """
+                for(let i in [2, 4, 8]) {   }
+                console.log(i)
+            """.eval()
+        }
     }
 
     @Test
@@ -94,7 +143,7 @@ class LoopsTest {
         """
             var i = 0;
             while(false, i<3){
-                console.log(i++)
+                i++
             }
             i
         """.trimIndent().eval().assertEqualsTo(3L)

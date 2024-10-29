@@ -14,7 +14,7 @@ internal fun OpIncDecAssign(
     val value = Expression { op(it, variable(it)) }
 
     val assignment = when {
-        variable is OpGetProperty && variable.assignmentType == null ->
+        variable is OpGetProperty  ->
             OpAssign(
                 variableName = variable.name,
                 assignableValue = value,
@@ -26,7 +26,6 @@ internal fun OpIncDecAssign(
                 variableName = variable.property.name,
                 index = variable.index,
                 assignableValue = value,
-                scope = null,
                 merge = null
             )
 

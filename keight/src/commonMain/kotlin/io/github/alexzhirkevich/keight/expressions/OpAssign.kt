@@ -8,6 +8,7 @@ import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.invoke
 
+
 internal class OpAssign(
     val type : VariableType? = null,
     val variableName : String,

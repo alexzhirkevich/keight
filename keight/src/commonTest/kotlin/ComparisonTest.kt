@@ -17,5 +17,14 @@ class ComparisonTest {
 
         " +'2' > +'10'".eval().assertEqualsTo(false)
         "'2' > '10'".eval().assertEqualsTo(true)
+
+        "2 < 12".eval().assertEqualsTo(true)
+        "2 < '12'".eval().assertEqualsTo(true)
+        "2 < 'John'".eval().assertEqualsTo(false)
+        "2 > 'John'".eval().assertEqualsTo(false)
+        "2 == 'John'".eval().assertEqualsTo(false)
+        "'2' < '12'".eval().assertEqualsTo(false)
+        "'2' > '12'".eval().assertEqualsTo(true)
+        "'2' == '12'".eval().assertEqualsTo(false)
     }
 }

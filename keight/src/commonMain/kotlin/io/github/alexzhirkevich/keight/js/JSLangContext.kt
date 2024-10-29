@@ -1,7 +1,6 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptContext
-import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.fastMap
 import kotlinx.coroutines.Job
 import kotlin.math.absoluteValue
@@ -15,6 +14,36 @@ internal object JSLangContext : ScriptContext {
                 || a is Number && a.toDouble().let { it == 0.0 || it.isNaN() }
                 || a is CharSequence && a.isEmpty()
                 || (a as? JsWrapper<*>)?.value?.let(::isFalse) == true
+    }
+
+    override tailrec fun isComparable(a: Any?, b: Any?): Boolean {
+
+        val ka = toKotlin(a)
+        val kb = toKotlin(b)
+
+        if (ka is Number && kb is CharSequence || kb is Number && ka is CharSequence){
+            return isComparable(toNumber(ka), toNumber(kb))
+        }
+
+        if (ka is Double && ka.isNaN() || kb is Double && kb.isNaN()){
+            return false
+        }
+        if (ka is Number && kb is Number || ka is CharSequence && kb is CharSequence){
+            return true
+        }
+        return false
+    }
+
+    override fun compare(a: Any?, b: Any?): Int {
+
+        val ka = toKotlin(a)
+        val kb = toKotlin(b)
+
+        return if (ka is Number || kb is Number) {
+            toNumber(ka).toDouble().compareTo(toNumber(kb).toDouble())
+        } else {
+            ka.toString().compareTo(kb.toString())
+        }
     }
 
     override fun sum(a: Any?, b: Any?): Any? {

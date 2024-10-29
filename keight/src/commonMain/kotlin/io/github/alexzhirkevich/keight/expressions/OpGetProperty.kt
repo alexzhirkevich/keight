@@ -2,9 +2,9 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.invoke
+import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.unresolvedReference
 import kotlin.jvm.JvmInline
@@ -37,16 +37,11 @@ internal class OpLazy(
 internal class OpGetProperty(
     val name : String,
     val receiver : Expression?,
-    val assignmentType : VariableType? = null,
     val isOptional : Boolean = false
 ) : Expression {
 
     override suspend fun invokeRaw(runtime: ScriptRuntime, ): Any? {
-        return if (assignmentType != null) {
-            runtime.set(name, OpConstant(Unit), assignmentType)
-        } else {
-            getImpl(receiver, runtime)
-        }
+        return getImpl(receiver, runtime)
     }
 
     private tailrec suspend fun getImpl(res: Any?, runtime: ScriptRuntime): Any? {
@@ -54,7 +49,7 @@ internal class OpGetProperty(
             receiver == null -> if (name in runtime) {
                 runtime.get(name)
             } else {
-                unresolvedReference(name)
+                throw ReferenceError("$name is not defined")
             }
             res is Expression -> getImpl(res.invoke(runtime), runtime)
             res is JsAny -> res.get(name, runtime)

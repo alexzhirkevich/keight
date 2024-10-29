@@ -9,7 +9,6 @@ import io.github.alexzhirkevich.keight.js.JsArrayWrapper
 
 internal class OpAssignByIndex(
     private val variableName : String,
-    private val scope : VariableType?,
     private val index : Expression,
     private val assignableValue : Expression,
     private val merge : (ScriptRuntime.(Any?, Any?) -> Any?)?
@@ -24,7 +23,7 @@ internal class OpAssignByIndex(
         }
 
         if (current == null) {
-            runtime.set(variableName, mutableListOf<Any>(), scope)
+            runtime.set(variableName, mutableListOf<Any>(), null)
             return invoke(runtime)
         } else {
 

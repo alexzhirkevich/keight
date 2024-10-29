@@ -14,7 +14,7 @@ public suspend operator fun Expression.invoke(runtime: ScriptRuntime): Any? =
 
 
 internal fun Expression.isAssignable() : Boolean {
-    return this is OpGetProperty && assignmentType == null ||
+    return this is OpGetProperty ||
             this is OpIndex && property is OpGetProperty
 }
 

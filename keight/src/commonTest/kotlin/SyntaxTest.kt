@@ -239,6 +239,15 @@ class SyntaxTest {
     }
 
     @Test
+    fun nullish_coalescing() = runTest {
+        "null ?? 1".eval().assertEqualsTo(1L)
+        "undefined ?? 1".eval().assertEqualsTo(1L)
+        "let x = null; x ?? 1".eval().assertEqualsTo(1L)
+        "undefined ?? null ?? 1".eval().assertEqualsTo(1L)
+        "let x = () => null; let y = () => {}; x() ?? y() ?? 1".eval().assertEqualsTo(1L)
+    }
+
+    @Test
     fun recursion_with_ternary_return()= runTest {
 
         """

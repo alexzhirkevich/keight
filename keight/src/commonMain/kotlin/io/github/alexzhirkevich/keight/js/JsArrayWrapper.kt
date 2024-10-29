@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
+import kotlin.math.abs
 
 @JvmInline
 internal value class JsArrayWrapper(
@@ -18,10 +19,20 @@ internal value class JsArrayWrapper(
     }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
-        return when (property) {
-            "length" -> value.size
-            else -> super.get(property, runtime)
+        if (property == "length") {
+            return value.size
         }
+
+        val n = runtime.toNumber(property)
+
+        if (!n.toDouble().isNaN()
+            && (abs(n.toLong().toDouble() - n.toDouble()) < Float.MIN_VALUE)
+            && n.toInt() in value.indices
+        ) {
+            return value[n.toInt()]
+        }
+
+        return super.get(property, runtime)
     }
 
     override fun toString(): String {

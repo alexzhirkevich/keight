@@ -16,40 +16,24 @@ internal fun  OpCompare(
     )
 }
 
+internal fun OpCompare2(
+    a : Expression,
+    b : Expression,
+    result : (Int) -> Boolean
+) = Expression {
+
+    val ta = a(it)
+    val tb = b(it)
+
+    if (it.isComparable(ta, tb)) {
+        result(it.compare(ta, tb))
+    } else {
+        false
+    }
+}
+
 internal fun OpNot(
     condition : Expression,
 ) = Expression {
     it.isFalse(condition(it))
 }
-
-internal val OpGreaterComparator : (Comparable<*>, Comparable<*>, ScriptRuntime) -> Boolean = { a, b, r ->
-
-    val ka = r.toKotlin(a)
-    val kb = r.toKotlin(b)
-
-    if (ka is Number || kb is Number) {
-        r.toNumber(a).toDouble() > r.toNumber(b).toDouble()
-    } else {
-        a.toString() > b.toString()
-    }
-}
-
-internal val OpLessComparator : (Comparable<*>, Comparable<*>, ScriptRuntime) -> Boolean = { a, b, r ->
-    val ka = r.toKotlin(a)
-    val kb = r.toKotlin(b)
-
-    if (ka is Number || kb is Number) {
-        r.toNumber(a).toDouble() < r.toNumber(b).toDouble()
-    } else {
-        a.toString() < b.toString()
-    }
-}
-
-internal val OpTypedEqualsComparator : (Comparable<*>, Comparable<*>, ScriptRuntime) -> Boolean = { a, b, r ->
-    OpEqualsImpl(a, b, true, r)
-}
-
-internal val OpEqualsComparator : (Comparable<*>, Comparable<*>,ScriptRuntime) -> Boolean =
-    { a, b, r ->
-        OpEqualsImpl(a, b, false, r)
-    }

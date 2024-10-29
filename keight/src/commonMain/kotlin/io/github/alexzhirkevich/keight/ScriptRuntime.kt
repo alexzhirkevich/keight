@@ -13,8 +13,6 @@ public interface ScriptRuntime : ScriptContext, CoroutineScope {
 
     public var io : ScriptIO
 
-    public val comparator : Comparator<Any?>
-
     public val isSuspendAllowed : Boolean
 
     public fun isEmpty() : Boolean
@@ -50,9 +48,6 @@ private class ScopedRuntime(
     CoroutineScope by parent {
 
     override var io: ScriptIO by parent::io
-
-    override val comparator: Comparator<Any?>
-        get() = parent.comparator
 
     override fun fromKotlin(a: Any?): Any? {
         return parent.fromKotlin(a)

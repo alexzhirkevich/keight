@@ -37,10 +37,6 @@ public open class JSRuntime(
             }
         }
 
-    override val comparator: Comparator<Any?> by lazy {
-        JSComparator(this)
-    }
-
     internal lateinit var Number: JSNumberFunction
     internal lateinit var Object: JSObjectFunction
     internal lateinit var Array: JSArrayFunction
@@ -131,21 +127,5 @@ private class RuntimeGlobalThis(
 
     override fun delete(property: Any?) {
         runtime.delete(property)
-    }
-}
-
-@JvmInline
-internal value class JSComparator(
-    private val runtime: ScriptRuntime
-) : Comparator<Any?> {
-
-    override fun compare(a: Any?, b: Any?): Int {
-        val ra = runtime.toKotlin(a)
-        val rb = runtime.toKotlin(b)
-        return if (ra is Number && rb is Number) {
-            ra.toDouble().compareTo(rb.toDouble())
-        } else {
-            ra.toString().compareTo(rb.toString())
-        }
     }
 }
