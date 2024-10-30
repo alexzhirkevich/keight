@@ -43,10 +43,13 @@ import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.isAssignable
 import io.github.alexzhirkevich.keight.js.FunctionParam
 import io.github.alexzhirkevich.keight.js.JSClass
+import io.github.alexzhirkevich.keight.js.JSClassDeclaration
+import io.github.alexzhirkevich.keight.js.JSClassImpl
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.Object
+import io.github.alexzhirkevich.keight.js.OpClassRegistration
 import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
@@ -421,7 +424,7 @@ private fun ListIterator<Token>.parseFactor(
         Token.Operator.Bracket.CurlyOpen -> {
             if (isExpressionStart) {
                 prevSignificant()
-                parseBlock(blockContext = blockContext, requireBlock = true)
+                parseBlock(requireBlock = true, blockContext = blockContext)
             } else {
                 parseObject()
             }
@@ -438,7 +441,7 @@ private fun ListIterator<Token>.parseFactor(
         is Token.Operator.New -> parseNew()
         is Token.Operator.Typeof -> parseTypeof()
         is Token.Identifier.Keyword -> parseKeyword(next, blockContext)
-        is Token.Identifier.Property -> OpGetProperty(next.name, receiver = null)
+        is Token.Identifier.Property -> OpGetProperty(next.identifier, receiver = null)
 
         else -> throw SyntaxError(unexpected(next::class.simpleName.orEmpty()))
     }
@@ -540,7 +543,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
             syntaxCheck(blockContext.last() == BlockContext.Switch) {
                 "Unexpected token 'case'"
             }
-            val case = if (keyword is Token.Identifier.Keyword.Case)
+            val case = if (keyword == Token.Identifier.Keyword.Case)
                 parseFactor(emptyList())
             else OpCase.Default
 
@@ -572,8 +575,6 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
                 parseBlock(blockContext = blockContext)
             } else null
         )
-        Token.Identifier.Keyword.Else -> throw SyntaxError(unexpected("else"))
-
         Token.Identifier.Keyword.Function -> OpConstant(parseFunction(blockContext = blockContext))
         Token.Identifier.Keyword.Return -> {
             syntaxCheck(BlockContext.Function in blockContext){
@@ -582,8 +583,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
             OpReturn(parseStatement())
         }
 
-        Token.Identifier.Keyword.Class -> TODO()
-
+        Token.Identifier.Keyword.Class -> OpConstant(parseClass())
         Token.Identifier.Keyword.Throw -> {
             val throwable = parseStatement()
             Expression {
@@ -591,11 +591,13 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
                 throw if (t is Throwable) t else ThrowableValue(t)
             }
         }
-        Token.Identifier.Keyword.Try -> parseTryCatch(blockContext)
-        Token.Identifier.Keyword.Finally -> throw SyntaxError(unexpected("finally"))
-        Token.Identifier.Keyword.Catch -> throw SyntaxError(unexpected("catch"))
         Token.Identifier.Keyword.Async -> parseAsync()
         Token.Identifier.Keyword.Await -> parseAwait()
+        Token.Identifier.Keyword.Try -> parseTryCatch(blockContext)
+        Token.Identifier.Keyword.Else,
+        Token.Identifier.Keyword.Extends,
+        Token.Identifier.Keyword.Finally,
+        Token.Identifier.Keyword.Catch -> throw SyntaxError(unexpected(keyword.identifier))
     }
 }
 
@@ -608,9 +610,9 @@ private fun ListIterator<Token>.parseNew() : Expression {
     val args = parseExpressionGrouping().expressions
 
     return Expression { runtime ->
-        val constructor = runtime.get(next.name)
+        val constructor = runtime.get(next.identifier)
         syntaxCheck(constructor is Constructor) {
-            "'${next.name}' is not a constructor"
+            "'${next.identifier}' is not a constructor"
         }
         constructor.construct(args, runtime)
     }
@@ -681,7 +683,7 @@ private fun ListIterator<Token>.parseMemberOf(receiver: Expression, ): Expressio
             syntaxCheck(next is Token.Identifier) {
                 "Illegal symbol after '.'"
             }
-            OpGetProperty(name = next.name, receiver = receiver)
+            OpGetProperty(name = next.identifier, receiver = receiver)
         }
         is Token.Operator.Bracket.SquareOpen -> {
             OpIndex(
@@ -716,7 +718,7 @@ private fun ListIterator<Token>.parseOptionalChaining(receiver: Expression): Exp
         }
         is Token.Identifier -> {
             OpGetProperty(
-                name = next.name,
+                name = next.identifier,
                 receiver = receiver,
                 isOptional = true
             )
@@ -771,6 +773,94 @@ private fun ListIterator<Token>.parseTernary(
         expressible = true
     )
 }
+
+private fun ListIterator<Token>.parseClass() : JSClassDeclaration {
+    val name = nextSignificant()
+
+    syntaxCheck(name is Token.Identifier) {
+        "Invalid class declaration"
+    }
+
+    val extends = if (eat(Token.Identifier.Keyword.Extends)) {
+        parseStatement()
+    } else null
+
+    syntaxCheck(nextIsInstance<Token.Operator.Bracket.CurlyOpen>()) {
+        "Invalid class declaration"
+    }
+
+    val staticMembers = mutableListOf<StaticClassMember>()
+    val methods = mutableListOf<JSFunction>()
+    val properties = mutableMapOf<String, Expression>()
+
+    while (!eat(Token.Operator.Bracket.CurlyClose)) {
+        val token = nextSignificant()
+
+        when {
+            token is Token.Identifier && nextIsInstance<Token.Operator.Bracket.RoundOpen>() -> {
+                methods.add(
+                    parseFunction(
+                        name = token.identifier,
+                        blockContext = listOf(BlockContext.Class)
+                    )
+                )
+            }
+
+            token is Token.Identifier.Property && token.identifier == "static" -> {
+                staticMembers.add(parseStaticClassMember())
+            }
+
+            token is Token.Identifier -> {
+                prevSignificant()
+                when (val statement = parseStatement()) {
+                    is OpAssign -> properties[statement.variableName] = statement.assignableValue
+                    is OpGetProperty -> properties[statement.name] = OpConstant(Unit)
+                    else -> throw SyntaxError("Invalid class member")
+                }
+            }
+        }
+    }
+
+    return JSClassDeclaration(
+        name = name.identifier,
+        extends = extends,
+        properties = properties,
+        static = staticMembers/*.reversed()*/.associateBy { it.name },
+        construct = methods.firstOrNull { it.name == "constructor" } ?: JSFunction("")
+    )
+}
+
+private fun ListIterator<Token>.parseStaticClassMember() : StaticClassMember {
+
+    val name = nextSignificant()
+
+    syntaxCheck(name is Token.Identifier) {
+        "Invalid static class member"
+    }
+
+    return when(nextSignificant()) {
+        is Token.Operator.Compare.Eq -> {
+            prevSignificant()
+            prevSignificant()
+            val assign = parseStatement()
+            syntaxCheck(assign is OpAssign) {
+                "Invalid static class member"
+            }
+
+            StaticClassMember.Variable(assign.variableName, assign.assignableValue)
+        }
+
+        is Token.Operator.Bracket.RoundOpen -> {
+            prevSignificant()
+            val func = parseFunction(name = name.identifier, blockContext = emptyList())
+
+            StaticClassMember.Method(func)
+        }
+
+        else -> throw SyntaxError("Invalid static class member")
+    }
+}
+
 
 private fun ListIterator<Token>.parseSwitch(blockContext: List<BlockContext>) : Expression {
     val value = parseStatement() as OpTouple
@@ -921,7 +1011,7 @@ private fun ListIterator<Token>.parseTryCatch(blockContext: List<BlockContext>):
             syntaxCheck(next is Token.Identifier && eat(Token.Operator.Bracket.RoundClose)){
                 "Invalid syntax after 'catch'"
             }
-            next.name to parseBlock(
+            next.identifier to parseBlock(
                 scoped = false,
                 requireBlock = true,
                 blockContext = blockContext
@@ -965,27 +1055,22 @@ private fun ListIterator<Token>.parseArrowFunction(blockContext: List<BlockConte
 
 private fun ListIterator<Token>.parseFunction(
     name: String? = null,
-    args: List<Expression>? = null,
     blockContext: List<BlockContext>
 ) : JSFunction {
 
     val actualName = name ?: run {
         if (nextIsInstance<Token.Identifier.Property>()) {
-            (nextSignificant() as Token.Identifier.Property).name
+            (nextSignificant() as Token.Identifier.Property).identifier
         } else {
             ""
         }
     }
+    val touple = parseStatement()
 
-    val nArgs = if (args != null) {
-        args
-    } else {
-        val touple = parseStatement()
-        syntaxCheck (touple is OpTouple) {
-            "Invalid function declaration"
-        }
-        touple.expressions
-    }.map(Expression::toFunctionParam)
+    syntaxCheck (touple is OpTouple) {
+        "Invalid function declaration"
+    }
+    val args = touple.expressions.map(Expression::toFunctionParam)
 
     val block = parseBlock(
         scoped = false,
@@ -994,9 +1079,8 @@ private fun ListIterator<Token>.parseFunction(
 
     return JSFunction(
         name = actualName,
-        parameters = nArgs,
-        body = block,
-        isClassMember =  args != null
+        parameters = args,
+        body = block
     )
 }
 
@@ -1058,9 +1142,8 @@ private fun ListIterator<Token>.parseObject(
 private fun ListIterator<Token>.parseBlock(
     scoped: Boolean = true,
     requireBlock: Boolean = false,
-    isExpressible : Boolean = false,
+    isExpressible: Boolean = false,
     blockContext: List<BlockContext>,
-    static : MutableList<StaticClassMember>? = null,
 ): Expression {
     var funcIndex = 0
 
@@ -1079,13 +1162,19 @@ private fun ListIterator<Token>.parseBlock(
                 }
 
                 when {
-                    expr is OpAssign && expr.isStatic -> {
-                        static?.add(StaticClassMember.Variable(expr.variableName, expr.assignableValue))
+                    expr is OpClassRegistration -> {
+                        add(
+                            index = funcIndex++,
+                            element = OpAssign(
+                                type = VariableType.Local,
+                                variableName = expr.clazz.name,
+                                receiver = null,
+                                assignableValue = expr,
+                                merge = null
+                            )
+                        )
                     }
-                    expr is OpConstant && expr.value is JSFunction && expr.value.isStaticClassMember -> {
-                        static?.add(StaticClassMember.Method(expr.value))
-                    }
-                    expr is OpConstant && (expr.value is JSFunction && !expr.value.isClassMember || expr.value is JSClass) -> {
+                    expr is OpConstant && expr.value is JSFunction -> {
                         val name = (expr.value as Named).name
 
                         add(
@@ -1098,16 +1187,6 @@ private fun ListIterator<Token>.parseBlock(
                                 merge = null
                             )
                         )
-                        if (expr.value is JSClass) {
-                            expr.value.static.forEach { s ->
-                                add(
-                                    index = funcIndex++,
-                                    element = Expression {
-                                        s.assignTo(expr.value, it)
-                                    }
-                                )
-                            }
-                        }
                     }
                     else -> add(expr)
                 }

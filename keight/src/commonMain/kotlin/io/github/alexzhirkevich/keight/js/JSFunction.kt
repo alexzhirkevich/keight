@@ -12,6 +12,7 @@ import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.invoke
+import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import kotlinx.coroutines.async
 
 public class FunctionParam(
@@ -28,15 +29,33 @@ internal open class JSFunction(
     override val name : String,
     val parameters : List<FunctionParam> = emptyList(),
     val body : Expression = OpConstant(Unit),
-    var thisRef : Any? = null,
-    val isClassMember : Boolean = false,
-    val isStaticClassMember : Boolean = false,
     val isAsync : Boolean = false,
     val isArrow : Boolean = false,
-    val isObject : Boolean = false,
-    val extraVariables: Map<String, Pair<VariableType, Any?>> = emptyMap(),
+    properties : MutableMap<Any?, Any?> = mutableMapOf(),
     prototype : Any? = JSObjectImpl()
-) : JSObjectImpl(name), Callable, Named, Constructor {
+) : JSObjectImpl(name, properties), Callable, Named, Constructor {
+
+    override val type: String get() = "function"
+
+    var thisRef : Any? = null
+        private set
+
+
+    init {
+        properties.forEach {
+            val v = it.value
+            if (v is JSFunction && !v.isArrow) {
+                v.thisRef = this
+            }
+        }
+
+        val varargs = parameters.count { it.isVararg }
+
+        if (varargs > 1 || varargs == 1 && !parameters.last().isVararg) {
+            throw SyntaxError("Rest parameter must be last formal parameter")
+        }
+        setPrototype(prototype)
+    }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         return when {
@@ -47,16 +66,23 @@ internal open class JSFunction(
         }
     }
 
-    override val type: String get() =
-        if (isObject) "object" else "function"
+    fun copy(
+        body: Expression = this.body,
+        isAsync: Boolean = this.isAsync,
+        prototype: Any? = Unit
+    ): JSFunction {
+        return JSFunction(
+            name = name,
+            parameters = parameters,
+            body = body,
+            isArrow = isArrow,
+            isAsync = isAsync,
+            prototype = prototype
+        )
+    }
 
-    init {
-        val varargs = parameters.count { it.isVararg }
-
-        if (varargs > 1 || varargs == 1 && !parameters.last().isVararg) {
-            throw SyntaxError("Rest parameter must be last formal parameter")
-        }
-        setPrototype(prototype)
+    override suspend fun isInstance(obj : Any?, runtime: ScriptRuntime) : Boolean {
+        return (obj as? JsAny)?.get(PROTO,runtime) === get(PROTOTYPE, runtime)
     }
 
     override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
@@ -67,37 +93,21 @@ internal open class JSFunction(
         }
     }
 
-    fun copy(
-        body: Expression = this.body,
-        extraVariables: Map<String, Pair<VariableType, Any?>> = emptyMap(),
-        isAsync: Boolean = this.isAsync,
-        isObject : Boolean = this.isObject,
-        prototype: Any? = Unit
-    ): JSFunction {
-        return JSFunction(
-            name = name,
-            parameters = parameters,
-            body = body,
-            thisRef = thisRef,
-            isClassMember = isClassMember,
-            isArrow = isArrow,
-            isAsync = isAsync,
-            isObject = isObject,
-            extraVariables = this.extraVariables + extraVariables,
-            prototype = prototype
-        )
-    }
-
-    override suspend fun isInstance(obj : Any?, runtime: ScriptRuntime) : Boolean {
-        return (obj as? JsAny)?.get(PROTO,runtime) === get(PROTOTYPE, runtime)
-    }
 
     override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
-        return copy(isObject = true).apply {
-            thisRef = this
+        syntaxCheck(!isArrow){
+            "Can't use 'new' keyword with arrow functions"
+        }
+
+        val obj = JSObjectImpl().apply {
             setProto(this@JSFunction.get(PROTOTYPE, runtime))
+        }
+
+        copy().apply {
+            thisRef = obj
             invoke(args, runtime)
         }
+        return obj
     }
 
     override suspend fun invoke(
@@ -135,7 +145,7 @@ internal open class JSFunction(
     ) : Any? {
         return try {
             runtime.withScope(
-                extraVariables = arguments + extraVariables,
+                extraVariables = arguments,
                 isSuspendAllowed = isAsync,
                 block = body::invoke
             )

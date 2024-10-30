@@ -126,38 +126,40 @@ internal sealed interface Token {
     }
 
     sealed interface Identifier : Token {
-        val name: String
+        val identifier: String
 
         @JvmInline
-        value class Property(override val name: String) : Identifier
+        value class Property(override val identifier: String) : Identifier
 
+        enum class Keyword : Identifier {
+            Var,
+            Let,
+            Const,
+            Null,
+            True,
+            False,
+            If,
+            Else,
+            For,
+            While,
+            Do,
+            Break,
+            Continue,
+            Function,
+            Return,
+            Class,
+            Switch,
+            Case,
+            Default,
+            Throw,
+            Try,
+            Catch,
+            Finally,
+            Async,
+            Await,
+            Extends;
 
-        sealed class Keyword(override val name: String) : Identifier {
-            object Var : Keyword("var")
-            object Let : Keyword("let")
-            object Const : Keyword("const")
-            object Null : Keyword("null")
-            object True : Keyword("true")
-            object False : Keyword("false")
-            object If : Keyword("if")
-            object Else : Keyword("else")
-            object For : Keyword("for")
-            object While : Keyword("while")
-            object Do : Keyword("do")
-            object Break : Keyword("break")
-            object Continue : Keyword("continue")
-            object Function : Keyword("function")
-            object Return : Keyword("return")
-            object Class : Keyword("class")
-            object Switch : Keyword("switch")
-            object Case : Keyword("case")
-            object Default : Keyword("default")
-            object Throw : Keyword("throw")
-            object Try : Keyword("try")
-            object Catch : Keyword("catch")
-            object Finally : Keyword("finally")
-            object Async : Keyword("async")
-            object Await : Keyword("await")
+            override val identifier: String = name.lowercase()
         }
     }
 }

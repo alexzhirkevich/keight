@@ -432,6 +432,10 @@ private fun ListIterator<Char>.number(start : Char) : Token.Num {
     return Token.Num(number, numberFormat, isFloat)
 }
 
+private val keywords by lazy {
+    Token.Identifier.Keyword.entries.associateBy { it.identifier }
+}
+
 private fun ListIterator<Char>.identifier(start : Char) : Token {
     val value = StringBuilder(start.toString())
 
@@ -445,39 +449,12 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
         value.append(next)
     }
 
-    return when (val string = value.toString()) {
-        "var" -> Token.Identifier.Keyword.Var
-        "let" -> Token.Identifier.Keyword.Let
-        "const" -> Token.Identifier.Keyword.Const
-        "null" -> Token.Identifier.Keyword.Null
-        "true" -> Token.Identifier.Keyword.True
-        "false" -> Token.Identifier.Keyword.False
-        "if" -> Token.Identifier.Keyword.If
-        "else" -> Token.Identifier.Keyword.Else
-        "for" -> Token.Identifier.Keyword.For
-        "while" -> Token.Identifier.Keyword.While
-        "do" -> Token.Identifier.Keyword.Do
-        "break" -> Token.Identifier.Keyword.Break
-        "continue" -> Token.Identifier.Keyword.Continue
-        "function" -> Token.Identifier.Keyword.Function
-        "return" -> Token.Identifier.Keyword.Return
-        "class" -> Token.Identifier.Keyword.Class
-        "switch" -> Token.Identifier.Keyword.Switch
-        "case" -> Token.Identifier.Keyword.Case
-        "default" -> Token.Identifier.Keyword.Default
-        "throw" -> Token.Identifier.Keyword.Throw
-        "try" -> Token.Identifier.Keyword.Try
-        "catch" -> Token.Identifier.Keyword.Catch
-        "finally" -> Token.Identifier.Keyword.Finally
-        "async" -> Token.Identifier.Keyword.Async
-        "await" -> Token.Identifier.Keyword.Await
-
+    return when (val string = value.toString()){
         "new" -> Token.Operator.New
         "in" -> Token.Operator.In
         "instanceof" -> Token.Operator.Instanceof
         "typeof" -> Token.Operator.Typeof
-
-        else -> Token.Identifier.Property(string)
+        else -> keywords[string] ?: Token.Identifier.Property(string)
     }
 }
 
