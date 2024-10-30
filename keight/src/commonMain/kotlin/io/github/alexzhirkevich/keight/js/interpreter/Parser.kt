@@ -583,7 +583,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
             OpReturn(parseStatement())
         }
 
-        Token.Identifier.Keyword.Class -> OpConstant(parseClass())
+        Token.Identifier.Keyword.Class -> OpClassRegistration(parseClass())
         Token.Identifier.Keyword.Throw -> {
             val throwable = parseStatement()
             Expression {
@@ -785,25 +785,30 @@ private fun ListIterator<Token>.parseClass() : JSClassDeclaration {
         parseStatement()
     } else null
 
-    syntaxCheck(nextIsInstance<Token.Operator.Bracket.CurlyOpen>()) {
+    syntaxCheck(eat(Token.Operator.Bracket.CurlyOpen)) {
         "Invalid class declaration"
     }
 
     val staticMembers = mutableListOf<StaticClassMember>()
-    val methods = mutableListOf<JSFunction>()
     val properties = mutableMapOf<String, Expression>()
+    var construct : JSFunction? = null
 
     while (!eat(Token.Operator.Bracket.CurlyClose)) {
         val token = nextSignificant()
 
         when {
             token is Token.Identifier && nextIsInstance<Token.Operator.Bracket.RoundOpen>() -> {
-                methods.add(
-                    parseFunction(
-                        name = token.identifier,
-                        blockContext = listOf(BlockContext.Class)
-                    )
+                val f =  parseFunction(
+                    name = token.identifier,
+                    blockContext = listOf(BlockContext.Class)
                 )
+                if (token.identifier == "constructor"){
+                    syntaxCheck(construct == null){
+                        "A class may only have one constructor"
+                    }
+                    construct = f
+                }
+                properties[token.identifier] = OpConstant(f)
             }
 
             token is Token.Identifier.Property && token.identifier == "static" -> {
@@ -818,6 +823,7 @@ private fun ListIterator<Token>.parseClass() : JSClassDeclaration {
                     else -> throw SyntaxError("Invalid class member")
                 }
             }
+            else -> throw  SyntaxError("Invalid class declaration")
         }
     }
 
@@ -826,7 +832,7 @@ private fun ListIterator<Token>.parseClass() : JSClassDeclaration {
         extends = extends,
         properties = properties,
         static = staticMembers/*.reversed()*/.associateBy { it.name },
-        construct = methods.firstOrNull { it.name == "constructor" } ?: JSFunction("")
+        construct = construct ?: JSFunction("")
     )
 }
 
@@ -834,12 +840,13 @@ private fun ListIterator<Token>.parseStaticClassMember() : StaticClassMember {
 
     val name = nextSignificant()
 
+
     syntaxCheck(name is Token.Identifier) {
         "Invalid static class member"
     }
 
-    return when(nextSignificant()) {
-        is Token.Operator.Compare.Eq -> {
+    return when(val n = nextSignificant()) {
+        is Token.Operator.Assign.Assignment -> {
             prevSignificant()
             prevSignificant()
             val assign = parseStatement()
@@ -857,7 +864,7 @@ private fun ListIterator<Token>.parseStaticClassMember() : StaticClassMember {
             StaticClassMember.Method(func)
         }
 
-        else -> throw SyntaxError("Invalid static class member")
+        else -> throw SyntaxError("Invalid static class member $n")
     }
 }
 

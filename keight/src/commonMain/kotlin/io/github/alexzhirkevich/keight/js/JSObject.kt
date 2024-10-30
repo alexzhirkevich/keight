@@ -24,7 +24,7 @@ internal fun JSObject.setProto(proto : Any?) {
     this[PROTO] = proto
 }
 
-private class ObjectMap(
+internal class ObjectMap(
     val backedMap : MutableMap<Any?, Any?> = mutableMapOf(),
 ) : MutableMap<Any?, Any?> by backedMap {
 
@@ -53,7 +53,7 @@ internal open class JSObjectImpl(
     map : MutableMap<Any?, Any?> = mutableMapOf()
 ) : JSObject {
 
-    private val map = ObjectMap(map)
+    internal val map = ObjectMap(map)
 
     override val keys: List<String>
         get() = map.keys.map { it.toString() }

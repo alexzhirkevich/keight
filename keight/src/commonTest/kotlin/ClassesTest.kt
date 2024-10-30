@@ -8,18 +8,18 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-@Ignore
+//@Ignore
 class ClassesTest {
 
     @Test
     fun declaration() = runTest {
         """
-           class Test {}
+           class Test {
+                foo = 3
+           } 
 
-           new Test()
-        """.trimIndent().eval().let {
-            assertTrue { it is JSClass }
-        }
+           new Test().foo
+        """.trimIndent().eval().assertEqualsTo(3L)
 
         """
            class Test {
@@ -200,9 +200,7 @@ class ClassesTest {
     }
 
     @Test
-    @Ignore
     fun staticInheritance()= runtimeTest { runtime ->
-
 
         """
             class A {

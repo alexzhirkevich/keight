@@ -59,10 +59,9 @@ internal class OpClassRegistration(val clazz: JSClassDeclaration) : Expression {
             extends = extendsConstructor
         ).apply {
             if (extends != null) {
+                setProto(extends)
                 construct["super"] = extends.bind(listOf(OpConstant(this)), runtime)
-
                 val prototype = get(PROTOTYPE, runtime)
-
                 if (prototype is JSObject) {
                     prototype.setProto(extends.get(PROTOTYPE, runtime))
                 }
@@ -83,6 +82,11 @@ internal open class JSClassImpl(
     body = construct.body,
     prototype = JSObjectImpl(map = properties.toMutableMap()),
     properties = static.toMutableMap()
-), JSClass
+), JSClass {
+
+    override fun toString(): String {
+        return "[class $name]"
+    }
+}
 
 

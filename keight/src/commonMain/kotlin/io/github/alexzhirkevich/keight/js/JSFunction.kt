@@ -102,8 +102,7 @@ internal open class JSFunction(
         val obj = JSObjectImpl().apply {
             setProto(this@JSFunction.get(PROTOTYPE, runtime))
         }
-
-        copy().apply {
+        with(copy()){
             thisRef = obj
             invoke(args, runtime)
         }
@@ -152,6 +151,10 @@ internal open class JSFunction(
         } catch (ret: BlockReturn) {
             ret.value
         }
+    }
+
+    override fun toString(): String {
+        return "[function $name]"
     }
 }
 
