@@ -1,8 +1,11 @@
 package io.github.alexzhirkevich.keight.js
 
+import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.findRoot
+import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 import kotlin.math.pow
 
@@ -35,11 +38,32 @@ internal value class JsNumberWrapper(
         return (runtime.findRoot() as JSRuntime).Number.get(PROTOTYPE, runtime)
     }
 
+    override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
+        return when (property){
+            "toString" -> ToString(value)
+            else -> super.get(property, runtime)
+        }
+    }
+
     override fun toString(): String {
         return value.toString()
     }
 
     override fun compareTo(other: JsWrapper<Number>): Int {
         return value.toDouble().compareTo(other.value.toDouble())
+    }
+
+    @JvmInline
+    private value class ToString(val number: Number) : Callable {
+        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            val radix = if (args.isEmpty())
+                10
+            else args.getOrNull(0)?.invoke(runtime)?.let(runtime::toNumber)?.toInt() ?: 10
+
+            return when(number){
+                is Long -> number.toString(radix)
+                else -> number.toString()
+            }
+        }
     }
 }

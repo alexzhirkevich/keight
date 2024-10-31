@@ -15,6 +15,8 @@ class NumberTest {
         "0o123".eval().assertEqualsTo(83L)
 
         "1e5".eval().assertEqualsTo(1e5)
+
+        "1_000_000".eval().assertEqualsTo(1_000_000L)
     }
 
     @Test
@@ -31,6 +33,8 @@ class NumberTest {
         "123.456.toFixed(2)".eval().assertEqualsTo("123.46")
         "123.51.toFixed(1)".eval().assertEqualsTo("123.5")
         "123.51.toFixed(1)".eval().assertEqualsTo("123.5")
+
+        "0xFF.toString(16)".eval().assertEqualsTo("ff")
     }
 
     @Test
@@ -57,6 +61,13 @@ class NumberTest {
         "1 == Number(1)".eval().assertEqualsTo(true)
         "1 == true".eval().assertEqualsTo(true)
         "0 == false".eval().assertEqualsTo(true)
+        "new Number(1)".eval().assertEqualsTo(1L)
+        "new Number('1')".eval().assertEqualsTo(1L)
+        "new Number(1) === 1".eval().assertEqualsTo(false)
+        "new Number(1) == 1".eval().assertEqualsTo(true)
+        "new Number(1) === Number(1)".eval().assertEqualsTo(false)
+        "new Number('1') == Number(true)".eval().assertEqualsTo(true)
+        "new Number('2') > Number(true)".eval().assertEqualsTo(true)
     }
     @Test
     fun static_props()= runTest {

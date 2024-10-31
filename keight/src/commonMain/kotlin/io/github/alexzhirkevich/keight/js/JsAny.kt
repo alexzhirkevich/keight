@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 
 public interface JsAny {
@@ -13,6 +14,10 @@ public interface JsAny {
     public val keys: List<String> get() = emptyList()
 
     public suspend fun proto(runtime: ScriptRuntime) : Any? = Unit
+
+    public suspend fun delete(property: Any?, runtime: ScriptRuntime){
+
+    }
 
     public suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         return when(property){
@@ -36,11 +41,16 @@ public interface JsAny {
 
     public suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
         get(property, runtime) != Unit
-}
 
-@JvmInline
-internal value class ToString(val value : Any?) : Callable {
-    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-        return value.toString()
+    @JvmInline
+    private value class ToString(val value : Any?) : Callable {
+        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+            return value.toString()
+        }
+
+        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
+            return ToString(args[0].invoke(runtime))
+        }
     }
 }
+

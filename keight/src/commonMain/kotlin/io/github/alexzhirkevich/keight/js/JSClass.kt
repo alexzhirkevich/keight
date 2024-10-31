@@ -4,18 +4,8 @@ import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
-
-internal interface JSClass : JSObject, Named, Constructor {
-
-    val construct: JSFunction?
-
-    val extends : Constructor?
-
-    val static : Map<String, Any?>
-}
 
 internal sealed interface StaticClassMember : Named {
 
@@ -26,64 +16,61 @@ internal sealed interface StaticClassMember : Named {
     }
 }
 
-internal class JSClassDeclaration(
+internal class OpClassInit(
     val name : String,
     val properties : Map<String, Expression>,
     val static : Map<String, StaticClassMember>,
     val construct: JSFunction?,
     val extends : Expression?
-)
-
-internal class OpClassRegistration(val clazz: JSClassDeclaration) : Expression {
+) : Expression {
 
     override suspend fun invokeRaw(runtime: ScriptRuntime): JSClass {
 
-        val extendsConstructor = clazz.extends?.invoke(runtime)
+        val extendsConstructor = extends?.invoke(runtime)
 
         syntaxCheck(extendsConstructor is Constructor?) {
             "$extendsConstructor is not a constructor"
         }
 
-        val construct = clazz.construct ?: JSFunction("")
+        val construct = construct ?: JSFunction("")
 
-        return JSClassImpl(
-            name = clazz.name,
-            properties = clazz.properties.mapValues { it.value.invoke(runtime) },
-            static = clazz.static.mapValues {
+        return JSClass(
+            name = name,
+            properties = properties.mapValues { it.value.invoke(runtime) },
+            static = static.mapValues {
                 when (val v = it.value) {
                     is StaticClassMember.Method -> v.function
                     is StaticClassMember.Variable -> v.init(runtime)
                 }
             },
-            construct = clazz.construct ?: JSFunction(""),
+            construct = construct,
             extends = extendsConstructor
         ).apply {
-            if (extends != null) {
-                setProto(extends)
-                construct["super"] = extends.bind(listOf(OpConstant(this)), runtime)
+            if (extendsConstructor != null) {
+                setProto(extendsConstructor)
                 val prototype = get(PROTOTYPE, runtime)
                 if (prototype is JSObject) {
-                    prototype.setProto(extends.get(PROTOTYPE, runtime))
+                    prototype.setProto(extendsConstructor.get(PROTOTYPE, runtime))
                 }
             }
         }
     }
 }
 
-internal open class JSClassImpl(
-    final override val name : String,
-    final override val static: Map<String, Any?>,
-    final override val construct: JSFunction,
-    final override val extends: Constructor?,
+internal class JSClass(
+    name : String,
+    static: Map<String, Any?>,
+    construct: JSFunction,
+    extends: Constructor?,
     properties : Map<String, Any?>,
 ) : JSFunction(
     name = name,
     parameters = construct.parameters,
     body = construct.body,
     prototype = JSObjectImpl(map = properties.toMutableMap()),
-    properties = static.toMutableMap()
-), JSClass {
-
+    properties = static.toMutableMap(),
+    superConstructor = extends
+) {
     override fun toString(): String {
         return "[class $name]"
     }

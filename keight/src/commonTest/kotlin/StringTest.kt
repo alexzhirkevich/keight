@@ -2,13 +2,32 @@
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
-internal class JsStringExpressionsTest {
+internal class StringTest {
 
 
     @Test
     fun template()= runTest {
         "const x = 1, y ='test';`hello \${x} world \${y}`".eval()
             .assertEqualsTo("hello 1 world test")
+    }
+
+    @Test
+    fun escaping() = runTest {
+        """
+            "hello \"world\""
+        """.eval().assertEqualsTo("hello \"world\"")
+
+        "'\\n\\r\\t\\b\\''".eval().assertEqualsTo("\n\r\t\b'")
+    }
+
+    @Test
+    fun type() = runTest {
+        "new String('str')".eval().assertEqualsTo("str")
+        "new String('str') == 'str'".eval().assertEqualsTo(true)
+        "new String('str') === 'str'".eval().assertEqualsTo(false)
+
+        "String('str') == 'str'".eval().assertEqualsTo(true)
+        "String('str') === 'str'".eval().assertEqualsTo(true)
     }
 
     @Test

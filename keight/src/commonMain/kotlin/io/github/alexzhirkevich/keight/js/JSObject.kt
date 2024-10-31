@@ -1,6 +1,8 @@
 package io.github.alexzhirkevich.keight.js
 
+import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.findRoot
 
 public interface JSObject : JsAny {
 
@@ -9,8 +11,6 @@ public interface JSObject : JsAny {
     public val entries: List<List<Any?>>
 
     public operator fun set(property: Any?, value: Any?)
-
-    public fun delete(property: Any?)
 }
 
 internal const val PROTOTYPE = "prototype"
@@ -40,20 +40,23 @@ internal class ObjectMap(
         return backedMap.containsKey(mapKey(key))
     }
 
-    private fun mapKey(key: Any?) : Any? {
+    private tailrec fun mapKey(key: Any?) : Any? {
         return when (key) {
-            is JsWrapper<*> -> key.value
+            is JsWrapper<*> -> mapKey(key.value)
             else -> key
         }
     }
 }
 
-internal open class JSObjectImpl(
-    open val name : String = "",
+public open class JSObjectImpl(
+    public open val name : String = "",
     map : MutableMap<Any?, Any?> = mutableMapOf()
 ) : JSObject {
 
-    internal val map = ObjectMap(map)
+    private val map = ObjectMap(map)
+
+    protected val properties : Map<Any?, Any?>
+        get() = map.backedMap
 
     override val keys: List<String>
         get() = map.keys.map { it.toString() }
@@ -64,7 +67,11 @@ internal open class JSObjectImpl(
         get() = map.entries.map { listOf(it.key, it.value) }
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {
-        return map[PROTO]
+        return if (PROTO in map) {
+            map[PROTO]
+        } else {
+            (runtime.findRoot() as JSRuntime).Object.get(PROTOTYPE,runtime)
+        }
     }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
@@ -74,8 +81,12 @@ internal open class JSObjectImpl(
         return super.get(property, runtime)
     }
 
-    override fun delete(property: Any?) {
-        map.remove(property)
+    override suspend fun delete(property: Any?, runtime: ScriptRuntime) {
+        if (property in map) {
+            map.remove(property)
+        } else {
+            super.delete(property, runtime)
+        }
     }
 
     override fun set(property: Any?, value: Any?) {
@@ -83,7 +94,7 @@ internal open class JSObjectImpl(
     }
 
     override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
-        property in map
+        property in map || super.contains(property, runtime)
 
     override fun toString(): String {
         return if (name.isNotBlank()){

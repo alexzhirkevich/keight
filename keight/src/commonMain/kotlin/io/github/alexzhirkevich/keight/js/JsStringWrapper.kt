@@ -5,6 +5,14 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
+internal class JsStringObject(
+    override val value : JsStringWrapper
+) : JSObjectImpl("Number"), JsWrapper<JsWrapper<String>>, CharSequence by value {
+
+    override fun toString(): String  = value.value
+}
+
+
 @JvmInline
 internal value class JsStringWrapper(
     override val value : String

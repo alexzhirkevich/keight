@@ -11,6 +11,7 @@ import io.github.alexzhirkevich.keight.js.JSObjectImpl
 import io.github.alexzhirkevich.keight.js.JSPromiseFunction
 import io.github.alexzhirkevich.keight.js.JSSetFunction
 import io.github.alexzhirkevich.keight.js.JSStringFunction
+import io.github.alexzhirkevich.keight.js.JSSymbolFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsConsole
 import io.github.alexzhirkevich.keight.js.JsMapWrapper
@@ -44,6 +45,7 @@ public open class JSRuntime(
     internal lateinit var Set: JSSetFunction
     internal lateinit var String: JSStringFunction
     internal lateinit var Promise: JSPromiseFunction
+    internal lateinit var Symbol: JSSymbolFunction
 
     init {
         init()
@@ -67,6 +69,7 @@ public open class JSRuntime(
         Set = JSSetFunction()
         String = JSStringFunction()
         Promise = JSPromiseFunction()
+        Symbol = JSSymbolFunction()
 
         val globalThis = RuntimeGlobalThis(this)
 
@@ -125,7 +128,8 @@ private class RuntimeGlobalThis(
         return runtime.contains(property)
     }
 
-    override fun delete(property: Any?) {
+
+    override suspend fun delete(property: Any?, runtime: ScriptRuntime) {
         runtime.delete(property)
     }
 }

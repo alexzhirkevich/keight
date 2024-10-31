@@ -5,6 +5,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.argAtOrNull
+import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.checkNotEmpty
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastMap
@@ -45,16 +46,30 @@ internal class JSStringFunction : JSFunction(name = "String") {
         })
     }
 
-    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any {
+    override suspend fun isInstance(obj: Any?, runtime: ScriptRuntime): Boolean {
+        return obj !is JsStringWrapper && super.isInstance(obj, runtime)
+    }
+
+    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
         return if (args.isEmpty()) {
             ""
         } else {
-            args[0].invoke(runtime).toString()
+            val arg = args[0].invoke(runtime)
+
+            val toString = (arg as? JsAny)?.get("toString", runtime)?.callableOrNull()
+
+            if (toString is Callable) {
+                toString.invoke(emptyList(), runtime).toString()
+            } else {
+                arg.toString()
+            }
         }
     }
 
     override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
-        return invoke(args, runtime)
+        return JsStringObject(JsStringWrapper(invoke(args, runtime))).apply {
+            setProto(this@JSStringFunction.get(PROTOTYPE, runtime))
+        }
     }
 
     @JvmInline

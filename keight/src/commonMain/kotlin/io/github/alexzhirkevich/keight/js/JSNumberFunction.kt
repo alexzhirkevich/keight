@@ -102,8 +102,14 @@ internal class JSNumberFunction : JSFunction(name = "Number") {
         }
     }
 
+    override suspend fun isInstance(obj: Any?, runtime: ScriptRuntime): Boolean {
+        return obj !is JsNumberWrapper && super.isInstance(obj, runtime)
+    }
+
     override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): JsNumberObject {
-        return JsNumberObject(JsNumberWrapper(invoke(args, runtime)))
+        return JsNumberObject(JsNumberWrapper(invoke(args, runtime))).apply {
+            setProto(this@JSNumberFunction.get(PROTOTYPE, runtime))
+        }
     }
 
 

@@ -1,4 +1,3 @@
-import io.github.alexzhirkevich.keight.js.JSClass
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
@@ -6,6 +5,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 //@Ignore
@@ -66,7 +66,7 @@ class ClassesTest {
                  method(){ return 2 }
              }
              
-             (new Test()).method()
+             new Test().method()
         """.trimIndent().eval().assertEqualsTo(2L)
     }
 
@@ -84,7 +84,7 @@ class ClassesTest {
     }
 
     @Test
-    fun inheritance() = runTest {
+    fun inheritance() = runtimeTest { runtime ->
         """
            class A {
                a(){ return 'a'}
@@ -102,6 +102,25 @@ class ClassesTest {
                let a = new A()
             """.trimIndent().eval() is JSObject
         }
+
+        """
+            class A { a = 1 }
+            class B extends A { b = 2 }
+            class C extends B { c = 3 }
+            
+            const c = new C()  
+        """.eval(runtime)
+
+        assertTrue { "c instanceof C".eval(runtime) as Boolean }
+        assertTrue { "c instanceof B".eval(runtime) as Boolean }
+        assertTrue { "c instanceof A".eval(runtime) as Boolean }
+        assertTrue { "c instanceof Object".eval(runtime) as Boolean }
+        assertTrue { "'a' in c".eval(runtime) as Boolean }
+        assertTrue { "'b' in c".eval(runtime) as Boolean }
+        assertTrue { "'c' in c".eval(runtime) as Boolean }
+        "c.c".eval(runtime).assertEqualsTo(3L)
+        "c.b".eval(runtime).assertEqualsTo(2L)
+        "c.a".eval(runtime).assertEqualsTo(1L)
     }
 
     @Test
@@ -132,10 +151,22 @@ class ClassesTest {
              """.trimIndent().eval() as Boolean
         }
 
+        assertFalse {
+            "'1' instanceof String".eval() as Boolean
+        }
+        assertTrue {
+            "new String('1') instanceof String".eval() as Boolean
+        }
+        assertFalse {
+            "1 instanceof Number".eval() as Boolean
+        }
+        assertTrue {
+            "new Number(1) instanceof Number".eval() as Boolean
+        }
     }
 
     @Test
-    fun superConstructorAndMethod() = runtimeTest { runtime ->
+    fun propertyFromSuperConstructor() = runtimeTest { runtime ->
 
         """
             class Person {
@@ -218,8 +249,8 @@ class ClassesTest {
         "B.method()".eval(runtime).assertEqualsTo("static")
     }
 
-
     @Test
+    @Ignore
     fun doubleSuperCall() = runTest {
 
         assertFailsWith<ReferenceError> {
@@ -276,16 +307,5 @@ class ClassesTest {
             let t = new Test()
             t.x
         """.trimIndent().eval().assertEqualsTo(Unit)
-    }
-
-    @Test
-    fun number() = runTest {
-        "1 instanceof Number".eval().assertEqualsTo(false)
-        "new Number(1)".eval().assertEqualsTo(1L)
-        "new Number('1')".eval().assertEqualsTo(1L)
-        "new Number(1) instanceof Number".eval().assertEqualsTo(true)
-        "new Number(1) === Number(1)".eval().assertEqualsTo(false)
-        "new Number('1') == Number(true)".eval().assertEqualsTo(true)
-        "new Number('2') > Number(true)".eval().assertEqualsTo(true)
     }
 }

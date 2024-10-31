@@ -60,8 +60,8 @@ private fun ListIterator<Char>.tokenize(
                 } else {
                     Token.Whitespace(c)
                 }
-//                in IDENTIFIER_ALPHABET -> identifier(c) // + keywords
                 else -> identifier(c)
+//                else -> continue
             }
             add(token)
         }
@@ -74,9 +74,20 @@ private fun ListIterator<Char>.questionMark() : Token {
     }
 
     return when(next()){
-        '?' -> Token.Operator.NullishCoalescing
+        '?' -> nullishCoalescing()
         '.' -> Token.Operator.OptionalChaining
         else -> Token.Operator.QuestionMark.also { previous() }
+    }
+}
+
+private fun ListIterator<Char>.nullishCoalescing() : Token {
+    if (!hasNext()) {
+        return Token.Operator.NullishCoalescing
+    }
+
+    return when (next()) {
+        '=' -> Token.Operator.Assign.NullCoalescingAssign
+        else -> Token.Operator.NullishCoalescing.also { previous() }
     }
 }
 
@@ -351,12 +362,28 @@ private fun ListIterator<Char>.comment(isSingleLine : Boolean) : Token.Comment {
 private fun ListIterator<Char>.string(start : Char) : Token.Str {
     val value = StringBuilder()
 
+    var prev : Char? = null
+
     do {
         val next = next()
         value.append(next)
-    } while (hasNext() && next != start)
 
-    return Token.Str(value.deleteAt(value.lastIndex).toString())
+        val isStringEnd = next == start && prev != '\\'
+
+        prev = next
+    } while (hasNext() && !isStringEnd)
+
+    val string = value.deleteAt(value.lastIndex)
+        .toString()
+        .replace("\\'", "'")
+        .replace("\\\"", "\"")
+        .replace("\\n", "\n")
+        .replace("\\r", "\r")
+        .replace("\\t", "\t")
+        .replace("\\b", "\b")
+        .replace("\\\\", "\"")
+
+    return Token.Str(string)
 }
 
 private fun ListIterator<Char>.number(start : Char) : Token.Num {
@@ -397,13 +424,12 @@ private fun ListIterator<Char>.number(start : Char) : Token.Num {
             }
 
             NumberFormat.Bin.prefix -> {
-                if (numberFormat == NumberFormat.Hex) {
-                    continue
+                if (numberFormat != NumberFormat.Hex) {
+                    syntaxCheck(numberFormat == NumberFormat.Dec && !isFloat) {
+                        "Invalid number"
+                    }
+                    numberFormat = NumberFormat.Bin
                 }
-                syntaxCheck(numberFormat == NumberFormat.Dec && !isFloat) {
-                    "Invalid number"
-                }
-                numberFormat = NumberFormat.Bin
             }
         }
         value.append(ch)
@@ -418,9 +444,10 @@ private fun ListIterator<Char>.number(start : Char) : Token.Num {
             isFloat = false
         }
         if (isFloat) {
-            value.toString().toDouble()
+            value.toString().replace("_","").toDouble()
         } else {
             value.toString().trimEnd('.')
+                .replace("_","")
                 .let { n -> numberFormat.prefix?.let(n::substringAfter) ?: n }
                 .toULong(numberFormat.radix)
                 .toLong()
@@ -454,6 +481,7 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
         "in" -> Token.Operator.In
         "instanceof" -> Token.Operator.Instanceof
         "typeof" -> Token.Operator.Typeof
+        "delete" -> Token.Operator.Delete
         else -> keywords[string] ?: Token.Identifier.Property(string)
     }
 }

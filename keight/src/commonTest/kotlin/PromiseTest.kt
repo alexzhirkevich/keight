@@ -1,11 +1,12 @@
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 class PromiseTest {
 
     @Test
-    fun resolve_reject() = runtimeTest {
+    fun construct() = runtimeTest {
         """
             let promise = new Promise((resolve) => resolve(123))
             await promise
@@ -62,5 +63,17 @@ class PromiseTest {
             }
             error
         """.eval().assertEqualsTo("finally")
+    }
+
+    @Test
+    fun static_resolve_reject() = runTest {
+        "await Promise.resolve(3)".eval().assertEqualsTo(3L)
+
+        """
+            try {
+                await Promise.reject(3)
+            } catch(x) { res = x }
+            res
+        """.eval().assertEqualsTo(3L)
     }
 }

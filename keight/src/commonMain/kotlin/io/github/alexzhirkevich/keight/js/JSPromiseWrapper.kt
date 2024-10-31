@@ -9,7 +9,7 @@ import kotlin.jvm.JvmInline
 @JvmInline
 internal value class JSPromiseWrapper(
     override val value: Job
-) : JsAny, JsWrapper<Job>, Job by value{
+) : JsAny, JsWrapper<Job>, Job by value {
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return (runtime.findRoot() as JSRuntime).Promise.get(PROTOTYPE, runtime)

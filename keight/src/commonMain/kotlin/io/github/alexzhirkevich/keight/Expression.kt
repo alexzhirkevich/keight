@@ -6,6 +6,12 @@ import io.github.alexzhirkevich.keight.expressions.OpIndex
 
 public fun interface Expression {
 
+    /**
+     * Evaluate IR expression.
+     *
+     * Should not be called directly because the return value is usually a raw Kotlin object.
+     * Use [invoke] instead to receive wrapped runtime-compatible result
+     * */
     public suspend fun invokeRaw(runtime: ScriptRuntime): Any?
 }
 

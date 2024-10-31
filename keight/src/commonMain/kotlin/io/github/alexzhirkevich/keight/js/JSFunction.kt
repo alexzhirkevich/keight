@@ -25,21 +25,28 @@ internal infix fun String.defaults(default: Expression?) : FunctionParam {
     return FunctionParam(this, false, default)
 }
 
-internal open class JSFunction(
-    override val name : String,
-    val parameters : List<FunctionParam> = emptyList(),
-    val body : Expression = OpConstant(Unit),
-    val isAsync : Boolean = false,
-    val isArrow : Boolean = false,
+public open class JSFunction(
+    override val name : String = "",
+    internal val parameters : List<FunctionParam> = emptyList(),
+    internal val body : Expression = OpConstant(Unit),
+    internal val isAsync : Boolean = false,
+    private val isArrow : Boolean = false,
+    private val superConstructor : Constructor? = null,
+    private val prototype : Any? = JSObjectImpl(),
     properties : MutableMap<Any?, Any?> = mutableMapOf(),
-    prototype : Any? = JSObjectImpl()
 ) : JSObjectImpl(name, properties), Callable, Named, Constructor {
 
     override val type: String get() = "function"
 
-    var thisRef : Any? = null
-        private set
+    private val superConstructorPropertyMap =
+        if (superConstructor != null) {
+            mapOf("super" to Pair(VariableType.Const, superConstructor))
+        } else {
+            emptyMap()
+        }
 
+    internal var thisRef : Any? = null
+        private set
 
     init {
         properties.forEach {
@@ -58,18 +65,16 @@ internal open class JSFunction(
     }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
-        return when {
-            super<JSObjectImpl>.contains(property, runtime) ->
-                super<JSObjectImpl>.get(property, runtime)
-
-            else -> super<Callable>.get(property, runtime)
-        }
+        return super<JSObjectImpl>.get(property, runtime)
+//        return when {
+//            property in properties -> super<JSObjectImpl>.get(property, runtime)
+//            else -> super<Callable>.get(property, runtime)
+//        }
     }
 
-    fun copy(
-        body: Expression = this.body,
+    internal fun copy(
         isAsync: Boolean = this.isAsync,
-        prototype: Any? = Unit
+        body: Expression = this.body,
     ): JSFunction {
         return JSFunction(
             name = name,
@@ -77,12 +82,9 @@ internal open class JSFunction(
             body = body,
             isArrow = isArrow,
             isAsync = isAsync,
-            prototype = prototype
+            prototype = prototype,
+            superConstructor = superConstructor
         )
-    }
-
-    override suspend fun isInstance(obj : Any?, runtime: ScriptRuntime) : Boolean {
-        return (obj as? JsAny)?.get(PROTO,runtime) === get(PROTOTYPE, runtime)
     }
 
     override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
@@ -95,23 +97,24 @@ internal open class JSFunction(
 
 
     override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
-        syntaxCheck(!isArrow){
+        syntaxCheck(!isArrow) {
             "Can't use 'new' keyword with arrow functions"
         }
 
         val obj = JSObjectImpl().apply {
             setProto(this@JSFunction.get(PROTOTYPE, runtime))
         }
-        with(copy()){
+        with(copy()) {
             thisRef = obj
-            invoke(args, runtime)
+            invoke(args, runtime, superConstructorPropertyMap)
         }
         return obj
     }
 
-    override suspend fun invoke(
+    private suspend fun invoke(
         args: List<Expression>,
         runtime: ScriptRuntime,
+        extraArgs : Map<String, Pair<VariableType, Any?>>
     ): Any? {
         val arguments = buildMap {
             parameters.fastForEachIndexed { i, p ->
@@ -127,6 +130,9 @@ internal open class JSFunction(
             thisRef?.let {
                 this["this"] = VariableType.Const to it
             }
+            extraArgs.forEach {
+                this[it.key] = it.value
+            }
         }
 
         return if (isAsync){
@@ -137,6 +143,11 @@ internal open class JSFunction(
             invokeImpl(runtime, arguments)
         }
     }
+
+    override suspend fun invoke(
+        args: List<Expression>,
+        runtime: ScriptRuntime,
+    ): Any? = invoke(args, runtime, emptyMap())
 
     private suspend fun invokeImpl(
         runtime: ScriptRuntime,

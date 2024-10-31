@@ -42,17 +42,15 @@ import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.isAssignable
 import io.github.alexzhirkevich.keight.js.FunctionParam
-import io.github.alexzhirkevich.keight.js.JSClass
-import io.github.alexzhirkevich.keight.js.JSClassDeclaration
-import io.github.alexzhirkevich.keight.js.JSClassImpl
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.Object
-import io.github.alexzhirkevich.keight.js.OpClassRegistration
+import io.github.alexzhirkevich.keight.js.OpClassInit
 import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
+import io.github.alexzhirkevich.keight.js.joinSuccess
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlin.contracts.ExperimentalContracts
@@ -440,9 +438,9 @@ private fun ListIterator<Token>.parseFactor(
         }
         is Token.Operator.New -> parseNew()
         is Token.Operator.Typeof -> parseTypeof()
+        is Token.Operator.Delete -> parseDelete()
         is Token.Identifier.Keyword -> parseKeyword(next, blockContext)
         is Token.Identifier.Property -> OpGetProperty(next.identifier, receiver = null)
-
         else -> throw SyntaxError(unexpected(next::class.simpleName.orEmpty()))
     }
 
@@ -519,6 +517,10 @@ private fun getMergeForAssignment(operator: Token.Operator.Assign): (ScriptRunti
         Token.Operator.Assign.ShlAssign -> { a, b ->
             toNumber(a).toLong() shl toNumber(b).toInt()
         }
+
+        Token.Operator.Assign.NullCoalescingAssign -> { a, b ->
+            if (a == null || a is Unit) b else a
+        }
     }
 }
 
@@ -577,13 +579,19 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
         )
         Token.Identifier.Keyword.Function -> OpConstant(parseFunction(blockContext = blockContext))
         Token.Identifier.Keyword.Return -> {
-            syntaxCheck(BlockContext.Function in blockContext){
+            syntaxCheck(BlockContext.Function in blockContext) {
                 unexpected("return")
             }
-            OpReturn(parseStatement())
+            val next = next()
+            if (next == Token.NewLine || next == Token.Operator.SemiColon){
+                OpReturn(OpConstant(Unit))
+            } else {
+                previous()
+                OpReturn(parseStatement())
+            }
         }
 
-        Token.Identifier.Keyword.Class -> OpClassRegistration(parseClass())
+        Token.Identifier.Keyword.Class -> parseClass()
         Token.Identifier.Keyword.Throw -> {
             val throwable = parseStatement()
             Expression {
@@ -637,6 +645,20 @@ private fun ListIterator<Token>.parseTypeof() : Expression {
         }
     }
 }
+
+private fun ListIterator<Token>.parseDelete() : Expression {
+    val x = parseStatement(precedence = 1)
+
+    val (subj, obj) = when (x) {
+        is OpIndex -> x.property to x.index
+        is OpGetProperty -> (x.receiver ?: Expression { it.get("this") }) to OpConstant(x.name)
+        else -> throw SyntaxError(unexpected("delete"))
+    }
+    return Expression {
+        (subj(it) as JsAny).delete(obj(it), it)
+    }
+}
+
 
 private fun ListIterator<Token>.parseArrayCreation(): Expression {
     check(eat(Token.Operator.Bracket.SquareOpen))
@@ -774,7 +796,7 @@ private fun ListIterator<Token>.parseTernary(
     )
 }
 
-private fun ListIterator<Token>.parseClass() : JSClassDeclaration {
+private fun ListIterator<Token>.parseClass() : OpClassInit {
     val name = nextSignificant()
 
     syntaxCheck(name is Token.Identifier) {
@@ -827,7 +849,7 @@ private fun ListIterator<Token>.parseClass() : JSClassDeclaration {
         }
     }
 
-    return JSClassDeclaration(
+    return OpClassInit(
         name = name.identifier,
         extends = extends,
         properties = properties,
@@ -999,13 +1021,13 @@ private fun ListIterator<Token>.parseAwait(): Expression {
 
         val job = it.toKotlin(subject(it))
         typeCheck(job is Job){
-            "Can't await $job"
+            "$job is not a Promise"
         }
 
         if (job is Deferred<*>){
             job.await()
         } else {
-            job.join()
+            job.joinSuccess()
         }
     }
 }
@@ -1169,12 +1191,12 @@ private fun ListIterator<Token>.parseBlock(
                 }
 
                 when {
-                    expr is OpClassRegistration -> {
+                    expr is OpClassInit -> {
                         add(
                             index = funcIndex++,
                             element = OpAssign(
                                 type = VariableType.Local,
-                                variableName = expr.clazz.name,
+                                variableName = expr.name,
                                 receiver = null,
                                 assignableValue = expr,
                                 merge = null

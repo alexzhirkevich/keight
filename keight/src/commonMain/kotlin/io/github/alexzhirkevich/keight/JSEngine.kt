@@ -13,7 +13,7 @@ private object JSInterpreter : ScriptInterpreter {
     override fun interpret(script: String): Expression {
         return "{$script}"
             .tokenize()
-//            .also { println(it.map { it::class.simpleName }) }
             .parse()
+
     }
 }

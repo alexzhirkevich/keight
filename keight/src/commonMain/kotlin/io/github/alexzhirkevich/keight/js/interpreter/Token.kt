@@ -7,10 +7,10 @@ internal enum class NumberFormat(
     val alphabet : Set<Char>,
     val prefix : Char?
 ) {
-    Dec(10, "eE.0123456789".toHashSet(), null),
-    Hex(16, "0123456789abcdef".toHashSet(), 'x'),
-    Oct(8, "01234567".toHashSet(), 'o'),
-    Bin(2, "01".toHashSet(), 'b')
+    Dec(10, "_eE.0123456789".toHashSet(), null),
+    Hex(16, "_0123456789abcdef".toHashSet(), 'x'),
+    Oct(8, "_01234567".toHashSet(), 'o'),
+    Bin(2, "_01".toHashSet(), 'b')
 }
 
 internal sealed interface TemplateStringToken {
@@ -56,6 +56,7 @@ internal sealed interface Token {
         object In : Operator
         object Instanceof : Operator
         object Typeof : Operator
+        object Delete : Operator
         object New : Operator
         object Spread : Operator
 
@@ -84,6 +85,7 @@ internal sealed interface Token {
             object BitOrAssign : Assign
             object LogicAndAssign : Assign
             object LogicOrAssign : Assign
+            object NullCoalescingAssign : Assign
         }
 
         sealed interface Compare : Operator {

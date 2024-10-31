@@ -47,10 +47,7 @@ internal object JSLangContext : ScriptContext {
     }
 
     override fun sum(a: Any?, b: Any?): Any? {
-        return jssum(
-            a?.numberOrThis(false),
-            b?.numberOrThis(false)
-        )
+        return jssum(a, b)
     }
 
     override fun sub(a: Any?, b: Any?): Any? {
@@ -125,19 +122,18 @@ internal object JSLangContext : ScriptContext {
 }
 
 private fun jssum(a : Any?, b : Any?) : Any? {
-    val a = if (a is List<*>)
+    val ta = if (a is List<*>)
         a.joinToString(",")
     else a
-    val b = if (b is List<*>)
+    val tb = if (b is List<*>)
         b.joinToString(",")
     else b
+
     return when {
-        a == null && b == null -> 0L
-        a == null && b is Number || a is Number && b == null -> a ?: b
-        b is Unit || a is Unit -> Double.NaN
-        a is Long && b is Long -> a + b
-        a is Number && b is Number -> a.toDouble() + b.toDouble()
-        else ->  a.toString() + b.toString()
+        ta is CharSequence || tb is CharSequence -> ta.toString() + tb.toString()
+        ta is Long && tb is Long -> ta + tb
+        ta is Number && tb is Number -> ta.toDouble() + tb.toDouble()
+        else -> jssum(a.numberOrNull() ?: Double.NaN , b.numberOrNull()  ?: Double.NaN)
     }
 }
 
@@ -262,9 +258,9 @@ private tailrec fun Any?.numberOrNull(withNaNs : Boolean = true) : Number? = whe
 
 
     is CharSequence -> when {
-        isEmpty() -> 0L
+        isBlank() -> 0L
         withNaNs -> {
-            val s = trim().toString()
+            val s = trim().toString().trimStart('\n','+').trimEnd('\n')
             s.toLongOrNull() ?: s.toDoubleOrNull()
         }
         else -> null

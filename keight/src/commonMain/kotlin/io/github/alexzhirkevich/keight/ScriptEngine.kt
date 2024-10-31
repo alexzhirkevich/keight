@@ -1,8 +1,10 @@
 package io.github.alexzhirkevich.keight
 
-public interface ScriptEngine : ScriptInterpreter {
+public interface ScriptEngine {
 
     public val runtime : ScriptRuntime
+
+    public val interpreter : ScriptInterpreter
 
     /**
      * Restore engine runtime to its initial state
@@ -14,17 +16,25 @@ public interface ScriptEngine : ScriptInterpreter {
     }
 }
 
+
+public fun ScriptEngine.compile(script: String) : Script {
+    return interpreter.interpret(script).asScript(runtime)
+}
+
 public suspend fun ScriptEngine.evaluate(script: String) : Any? {
-    return interpret(script).asScript(runtime).invoke()
+    return interpreter.interpret(script).asScript(runtime).invoke()
 }
 
 public fun ScriptEngine(
     runtime: ScriptRuntime,
     interpreter: ScriptInterpreter,
     vararg modules: Module
-): ScriptEngine = object : ScriptEngine, ScriptInterpreter by interpreter {
+): ScriptEngine = object : ScriptEngine{
 
     override val runtime: ScriptRuntime get() = runtime
+
+    override val interpreter: ScriptInterpreter
+        get() = interpreter
 
     init {
         importModules()

@@ -24,6 +24,7 @@ class SumTest {
         "'10' + '5'".eval().assertEqualsTo("105")
         "'10' + 5".eval().assertEqualsTo("105")
         "10 + '5'".eval().assertEqualsTo("105")
+        "'' + 0".eval().assertEqualsTo("0")
     }
 
     @Test
@@ -31,6 +32,9 @@ class SumTest {
         "null + 5".eval().assertEqualsTo(5L)
         "5 + null".eval().assertEqualsTo(5L)
         "null + null".eval().assertEqualsTo(0L)
+        "NaN + 1".eval().assertEqualsTo(Double.NaN)
+        "1 + NaN".eval().assertEqualsTo(Double.NaN)
+        "NaN + NaN".eval().assertEqualsTo(Double.NaN)
 
         "undefined + 5".eval().assertEqualsTo(Double.NaN)
         "5 + undefined".eval().assertEqualsTo(Double.NaN)

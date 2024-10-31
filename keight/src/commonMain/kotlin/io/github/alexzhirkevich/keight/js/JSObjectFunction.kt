@@ -15,11 +15,11 @@ internal class JSObjectFunction : JSFunction(name = "Object") {
                 target[k] = source.get(k, this)
             }
         }
-        func("create","object", "source") {
+        func("create", "object", "source") {
             TODO()
         }
 
-        func("entries","object") {
+        func("entries", "object") {
             (it.firstOrNull() as? JSObject)?.entries ?: emptyList<String>()
         }
 
@@ -27,39 +27,39 @@ internal class JSObjectFunction : JSFunction(name = "Object") {
             TODO()
         }
 
-        func("keys","object") {
+        func("keys", "object") {
             (it.firstOrNull() as? JsAny)?.keys ?: emptySet<String>()
         }
 
-        func("values","object") {
+        func("values", "object") {
             (it.firstOrNull() as? JSObject)?.values ?: emptyList<String>()
         }
 
-        func("groupBy","object", "callback") {
+        func("groupBy", "object", "callback") {
             TODO()
         }
 
-        func("defineProperty","object", "property", "descriptor") {
+        func("defineProperty", "object", "property", "descriptor") {
             TODO()
         }
 
-        func("defineProperties","object", "descriptors") {
+        func("defineProperties", "object", "descriptors") {
             TODO()
         }
 
-        func("getOwnPropertyDescriptor","object", "property") {
+        func("getOwnPropertyDescriptor", "object", "property") {
             TODO()
         }
 
-        func("getOwnPropertyDescriptors","object") {
+        func("getOwnPropertyDescriptors", "object") {
             TODO()
         }
 
-        func("getOwnPropertyNames","object") {
+        func("getOwnPropertyNames", "object") {
             TODO()
         }
 
-        func("getPrototypeOf","object") {
+        func("getPrototypeOf", "object") {
             val obj = it.getOrElse(0) {
                 throw TypeError("Cannot convert undefined or null to object")
             }
@@ -67,32 +67,44 @@ internal class JSObjectFunction : JSFunction(name = "Object") {
             (obj as? JsAny)?.get(PROTO, this) ?: Unit
         }
 
-        func("preventExtensions","object") {
+        func("preventExtensions", "object") {
             TODO()
         }
 
-        func("isExtensible","object") {
+        func("isExtensible", "object") {
             TODO()
         }
 
-        func("seal","object") {
+        func("seal", "object") {
             TODO()
         }
 
-        func("isSealed","object") {
+        func("isSealed", "object") {
             TODO()
         }
 
-        func("freeze","object") {
+        func("freeze", "object") {
             TODO()
         }
 
         func("isFrozen", "object") {
             TODO()
         }
+
+        setPrototype(
+            Object("") {
+                noArgsFunc("valueOf") {
+                    this.get("this")
+                }
+            }.apply {
+                setProto(null)
+            }
+        )
     }
 
-
+    override suspend fun isInstance(obj: Any?, runtime: ScriptRuntime): Boolean {
+        return obj is JSObject || super.isInstance(obj, runtime)
+    }
 
     override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any {
         return if (args.isEmpty()){

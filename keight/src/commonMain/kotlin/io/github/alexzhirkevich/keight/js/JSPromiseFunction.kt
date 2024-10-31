@@ -10,22 +10,56 @@ import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.jvm.JvmInline
+
+public class SomeFunction : JSFunction(){
+
+    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        return super.invoke(args, runtime)
+    }
+}
 
 internal class JSPromiseFunction : JSFunction(name = "Promise") {
 
     init {
         setPrototype(Object {
-            val job = SupervisorJob()
-            "catch" eq Catch(job)
-            "then" eq Then(job)
-            "finally" eq Finally(job)
+            "catch" eq Catch(Job())
+            "then" eq Then(Job())
+            "finally" eq Finally(Job())
         })
+
+        func("resolve", FunctionParam("value", default = OpConstant(Unit))) {
+            CompletableDeferred(it[0])
+        }
+
+        func("reject", FunctionParam("reason", default = OpConstant(Unit))) {
+            val v = it[0]
+
+            CompletableDeferred<Unit>().apply {
+                completeExceptionally(
+                    if (v is Throwable) v else ThrowableValue(v)
+                )
+            }
+        }
+
+        func("all", FunctionParam("values", isVararg = true)) { args ->
+            async {
+                (args[0] as Iterable<*>).map {
+                    val job = toKotlin(it)
+                    typeCheck(job is Job){ "$job is not a Promise" }
+                    if (job is Deferred<*>) job.await() else job.joinSuccess()
+                }
+            }
+        }
     }
 
     override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any {
@@ -52,7 +86,7 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
 
     @JvmInline
     private value class Then(val value: Job) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Deferred<*> {
             val arg = args.getOrNull(0)?.invoke(runtime)
             val callable = arg?.callableOrNull()
             typeCheck(callable is Callable) {
@@ -75,7 +109,7 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
     @JvmInline
     private value class Catch(val value: Job) : Callable {
 
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Deferred<*> {
             val arg = args.getOrNull(0)?.invoke(runtime)
             val callable = arg?.callableOrNull()
             typeCheck(callable is Callable) {
@@ -89,7 +123,7 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
                     if (job is Deferred<*>) {
                         job.await()
                     } else {
-                        job.join()
+                        job.joinSuccess()
                     }
                 } catch (t: CancellationException) {
                     throw t
@@ -112,16 +146,16 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
     @JvmInline
     private value class Finally(val value: Job) : Callable {
 
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Deferred<Unit> {
             val arg = args.getOrNull(0)?.invoke(runtime)
             val callable = arg?.callableOrNull()
             typeCheck(callable is Callable) {
                 "$arg is not a function"
             }
 
-            return runtime.launch {
+            return runtime.async {
                 try {
-                    value.join()
+                    value.joinSuccess()
                 } finally {
                     callable.invoke(emptyList(), runtime)
                 }
@@ -136,4 +170,21 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
 
 private suspend fun List<Expression>.firstJobOrEmpty(runtime: ScriptRuntime) : Job {
     return firstOrNull()?.invoke(runtime)?.let(runtime::fromKotlin) as? Job ?: Job()
+}
+
+internal suspend fun Job.joinSuccess(){
+    join()
+    ensureSuccess()
+}
+
+@OptIn(InternalCoroutinesApi::class)
+internal fun Job.ensureSuccess() {
+    if (isCancelled) {
+        val err = try {
+            getCancellationException()
+        } catch (t: Throwable) {
+            throw CancellationException("Promise was rejected or cancelled", t)
+        }
+        throw err.cause ?: err
+    }
 }
