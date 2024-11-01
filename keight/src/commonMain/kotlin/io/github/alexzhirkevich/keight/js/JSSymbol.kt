@@ -19,7 +19,8 @@ public value class JSSymbol(public val value : String) : JsAny {
 
     public companion object {
         public val toPrimitive: JSSymbol = JSSymbol("Symbol.toPrimitive")
+        public val toStringTag: JSSymbol = JSSymbol("Symbol.toStringTag")
 
-        internal val defaults = setOf(toPrimitive)
+        internal val defaults = setOf(toPrimitive, toStringTag)
     }
 }

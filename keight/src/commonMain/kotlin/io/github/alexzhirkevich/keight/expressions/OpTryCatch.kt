@@ -6,10 +6,7 @@ import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.JSError
 
-internal class ThrowableValue(val value : Any?) : JSError(
-    message = "Uncaught $value",
-    cause = null
-) {
+internal class ThrowableValue(val value : Any?) : JSError(value) {
     override fun toString(): String {
         return value.toString() + " (thrown)"
     }

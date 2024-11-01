@@ -67,7 +67,7 @@ internal class JSClass(
     name = name,
     parameters = construct.parameters,
     body = construct.body,
-    prototype = JSObjectImpl(map = properties.toMutableMap()),
+    prototype = JSObjectImpl(properties = properties.toMutableMap()),
     properties = static.toMutableMap(),
     superConstructor = extends
 ) {

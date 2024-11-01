@@ -50,10 +50,10 @@ internal class ObjectMap(
 
 public open class JSObjectImpl(
     public open val name : String = "",
-    map : MutableMap<Any?, Any?> = mutableMapOf()
+    properties : MutableMap<Any?, Any?> = mutableMapOf()
 ) : JSObject {
 
-    private val map = ObjectMap(map)
+    private val map = ObjectMap(properties)
 
     protected val properties : Map<Any?, Any?>
         get() = map.backedMap

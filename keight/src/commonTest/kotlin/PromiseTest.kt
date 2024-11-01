@@ -1,7 +1,10 @@
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import kotlin.time.measureTime
 
 class PromiseTest {
 
@@ -75,5 +78,17 @@ class PromiseTest {
             } catch(x) { res = x }
             res
         """.eval().assertEqualsTo(3L)
+    }
+
+    @Test
+    fun delay() = runTest {
+        measureTime {
+            """
+            var delay = function(ms) {
+                return new Promise((res) => setTimeout(() => res(), ms)) 
+            }
+            await delay(50)
+           """.eval()
+        }.let { assertTrue { it.inWholeMilliseconds >= 50L } }
     }
 }

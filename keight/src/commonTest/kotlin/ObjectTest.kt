@@ -11,12 +11,19 @@ class ObjectTest {
     fun context() = runtimeTest { runtime ->
 
         assertTrue {
-            "const person = {}; person".eval(runtime) is JSObject
+            "const person = {}; person".eval() is JSObject
         }
 
         assertTrue {
-            "function x(obj) { return obj }; x({})".eval(runtime) is JSObject
+            "function x(obj) { return obj }; x({})".eval() is JSObject
         }
+
+        """
+            function x() { 
+                return { test: 1 }
+            }
+            x().test
+        """.eval().assertEqualsTo(1L)
 
         val obj = "{ name : 'test', x : 1 }".eval(runtime) as JSObject
 

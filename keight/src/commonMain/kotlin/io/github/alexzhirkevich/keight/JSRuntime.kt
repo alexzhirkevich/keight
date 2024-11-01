@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.expressions.JSErrorFunction
 import io.github.alexzhirkevich.keight.js.JSArrayFunction
 import io.github.alexzhirkevich.keight.js.JSLangContext
 import io.github.alexzhirkevich.keight.js.JSMapFunction
@@ -7,23 +8,25 @@ import io.github.alexzhirkevich.keight.js.JSMath
 import io.github.alexzhirkevich.keight.js.JSNumberFunction
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JSObjectFunction
-import io.github.alexzhirkevich.keight.js.JSObjectImpl
 import io.github.alexzhirkevich.keight.js.JSPromiseFunction
 import io.github.alexzhirkevich.keight.js.JSSetFunction
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JSSymbolFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsConsole
-import io.github.alexzhirkevich.keight.js.JsMapWrapper
+import io.github.alexzhirkevich.keight.js.defaults
+import io.github.alexzhirkevich.keight.js.func
+import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.setupNumberMethods
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
-import kotlin.jvm.JvmInline
 
 public open class JSRuntime(
     context: CoroutineContext,
@@ -31,12 +34,12 @@ public open class JSRuntime(
     override var io: ScriptIO = DefaultScriptIO,
 ) : DefaultRuntime(), ScriptContext by JSLangContext {
 
-    override var coroutineContext: CoroutineContext =
+    override val coroutineContext: CoroutineContext =
         context + SupervisorJob(context[Job]).also {
-            if (!isSuspendAllowed){
+            if (!isSuspendAllowed) {
                 it.cancel()
             }
-        }
+        } + CoroutineName("JS coroutine")
 
     internal lateinit var Number: JSNumberFunction
     internal lateinit var Object: JSObjectFunction
@@ -46,6 +49,10 @@ public open class JSRuntime(
     internal lateinit var String: JSStringFunction
     internal lateinit var Promise: JSPromiseFunction
     internal lateinit var Symbol: JSSymbolFunction
+    internal lateinit var Error: JSErrorFunction
+
+    private var jobsCounter = 1L
+    private val jobsMap = mutableMapOf<Long, Job>()
 
     init {
         init()
@@ -59,6 +66,8 @@ public open class JSRuntime(
         init()
 
         coroutineContext.cancelChildren()
+        jobsMap.clear()
+        jobsCounter = 1
     }
 
     private fun init() {
@@ -70,6 +79,13 @@ public open class JSRuntime(
         String = JSStringFunction()
         Promise = JSPromiseFunction()
         Symbol = JSSymbolFunction()
+        Error = JSErrorFunction()
+
+        listOf(
+            Number, Object, Array, Map, Set, String, Promise, Symbol, Error
+        ).fastForEach {
+            set(it.name, it, VariableType.Global)
+        }
 
         val globalThis = RuntimeGlobalThis(this)
 
@@ -81,15 +97,12 @@ public open class JSRuntime(
         set("NaN", Double.NaN, VariableType.Const)
         set("undefined", Unit, VariableType.Const)
 
-        set("Object", Object, VariableType.Global)
-        set("Array", Array, VariableType.Global)
-        set("Map", Map, VariableType.Global)
-        set("Set", Set, VariableType.Global)
-        set("Number", Number, VariableType.Global)
-        set("String", String, VariableType.Global)
-        set("Promise", Promise, VariableType.Global)
-
         globalThis.setupNumberMethods()
+
+        globalThis.regSetTimeout()
+        globalThis.regSetInterval()
+        globalThis.regClearJob("Timeout")
+        globalThis.regClearJob("Interval")
     }
 
     final override suspend fun get(property: Any?): Any? {
@@ -97,6 +110,51 @@ public open class JSRuntime(
             return super.get(property)
         }
         return (super.get("globalThis") as JsAny?)?.get(property, this)
+    }
+
+    private fun JSObject.regSetTimeout() = func("setTimeout", "handler", "timeout") {
+        registerJob(it){ handler, timeout ->
+            delay(timeout)
+            handler.invoke(emptyList(), this@func)
+        }
+    }
+
+    private fun JSObject.regSetInterval() = func("setInterval", "handler", "interval") {
+        registerJob(it) { handler, timeout ->
+            while (isActive) {
+                handler.invoke(emptyList(), this@func)
+                delay(timeout)
+            }
+        }
+    }
+
+    private fun JSObject.regClearJob(what : String) = func("clear$what", "id") {
+        val id = toNumber(it.getOrNull(0)).toLong()
+        jobsMap[id]?.cancel()
+    }
+
+    private fun registerJob(
+        args : List<Any?>,
+        block : suspend CoroutineScope.(Callable, Long) -> Unit
+    ) : Long {
+        val jobId = jobsCounter++
+
+        val handler = args[0]?.callableOrNull()
+        val timeout = toNumber(args.getOrNull(1)).toLong()
+
+        typeCheck(handler is Callable) {
+            "${args[0]} is not a function"
+        }
+
+        jobsMap[jobId] = launch(
+            coroutineContext + CoroutineName("JS interval/timeout job $jobId")
+        ) {
+            block(handler, timeout)
+        }.apply {
+            invokeOnCompletion { jobsMap.remove(jobId) }
+        }
+
+        return jobId
     }
 }
 

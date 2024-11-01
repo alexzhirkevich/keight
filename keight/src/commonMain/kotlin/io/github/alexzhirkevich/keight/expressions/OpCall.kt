@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.invoke
@@ -16,11 +17,11 @@ internal fun OpCall(
     callable : Expression,
     arguments : List<Expression>,
     isOptional : Boolean
-) = Expression {
+) = Expression { r->
     OpCallImpl(
-        runtime = it,
+        runtime = r,
         callable = callable,
-        arguments = arguments,
+        arguments = arguments.fastMap { it(r) },
         isOptional = isOptional
     )
 }
@@ -28,13 +29,13 @@ internal fun OpCall(
 private tailrec suspend fun OpCallImpl(
     runtime: ScriptRuntime,
     callable: Any?,
-    arguments: List<Expression>,
+    arguments: List<Any?>,
     isOptional: Boolean
 ) : Any? {
     return when {
         callable is Expression -> OpCallImpl(runtime, callable(runtime), arguments, isOptional)
         callable is Callable -> callable.invoke(arguments, runtime)
-        callable is Function<*> -> execKotlinFunction(runtime, callable, arguments.fastMap { runtime.toKotlin(it(runtime)) })
+        callable is Function<*> -> execKotlinFunction(runtime, callable, arguments.fastMap(runtime::toKotlin))
         isOptional && (callable == null || callable == Unit) -> Unit
         else -> throw TypeError("$callable is not a function")
     }
@@ -46,8 +47,12 @@ internal fun Function<*>.asCallable() : Callable = KotlinCallable(this)
 private value class KotlinCallable(
     val function: Function<*>
 ) : Callable {
-    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-        return execKotlinFunction(runtime, function, args.fastMap { it(runtime) })
+    override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+        return thisArg?.callableOrNull()!!
+    }
+
+    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+        return execKotlinFunction(runtime, function, args)
     }
 }
 

@@ -1,8 +1,6 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.expressions.OpConstant
 
 internal class JSObjectFunction : JSFunction(name = "Object") {
 
@@ -106,7 +104,7 @@ internal class JSObjectFunction : JSFunction(name = "Object") {
         return obj is JSObject || super.isInstance(obj, runtime)
     }
 
-    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any {
+    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any {
         return if (args.isEmpty()){
             JSObjectImpl()
         } else {
@@ -115,7 +113,7 @@ internal class JSObjectFunction : JSFunction(name = "Object") {
     }
 
 
-    override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
+    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
         return invoke(args, runtime)
     }
 }

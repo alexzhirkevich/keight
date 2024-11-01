@@ -17,6 +17,11 @@ public fun interface Expression {
 
 public suspend operator fun Expression.invoke(runtime: ScriptRuntime): Any? =
     runtime.fromKotlin(invokeRaw(runtime))
+//        .let {
+//        if (it is Expression){
+//            it.invoke(runtime)
+//        } else {it}
+//    }
 
 
 internal fun Expression.isAssignable() : Boolean {

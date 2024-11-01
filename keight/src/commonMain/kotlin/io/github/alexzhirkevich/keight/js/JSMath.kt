@@ -69,8 +69,7 @@ private fun ScriptRuntime.op1(
     args: List<Any?>,
     func: (Double) -> Number
 ): Any? {
-    checkArgs(args, 1, "")
-    return func(toNumber(args[0]).toDouble())
+    return func(toNumber(args.getOrNull(0) ?: 0).toDouble())
 }
 
 private fun  ScriptRuntime.op2(

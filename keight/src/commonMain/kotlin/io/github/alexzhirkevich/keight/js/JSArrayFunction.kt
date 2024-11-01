@@ -1,9 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
-import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.argAt
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.checkNotEmpty
 import io.github.alexzhirkevich.keight.comparator
@@ -12,7 +10,6 @@ import io.github.alexzhirkevich.keight.fastAny
 import io.github.alexzhirkevich.keight.fastFilter
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastMap
-import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit
 import kotlin.jvm.JvmInline
@@ -65,23 +62,23 @@ internal class JSArrayFunction : JSFunction(
         return obj is List<*>
     }
 
-    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): List<*> {
+    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): List<*> {
         if (args.isEmpty()) {
             return emptyList<Unit>()
         }
 
         if (args.size == 1) {
-            val size = runtime.toNumber(args[0].invoke(runtime), strict = true)
+            val size = runtime.toNumber(args[0], strict = true)
             when {
                 size is Long || size is Double && size.isFinite() && abs(size - size.toInt()) < Float.MIN_VALUE ->
                     return List(size.toInt()) { Unit }
                 size is Double ->  throw RangeError("Invalid array length")
             }
         }
-        return args.map { it(runtime) }
+        return args
     }
 
-    override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): List<*> {
+    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): List<*> {
         return invoke(args, runtime)
     }
 
@@ -89,212 +86,200 @@ internal class JSArrayFunction : JSFunction(
     @JvmInline
     private value class IndexOf(val value: MutableList<Any?>) : Callable {
 
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return value.indexOf(false, runtime, args)
         }
 
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return IndexOf(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return IndexOf((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class LastIndexOf(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return value.indexOf(true, runtime, args)
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return LastIndexOf(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return LastIndexOf((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class ForEach(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return op(runtime, args) { callable ->
                 value.fastForEach {
-                    callable.invoke(listOf(OpConstant(it)), runtime)
+                    callable.invoke(listOf(it), runtime)
                 }
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return ForEach(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return ForEach((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Map(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return op(runtime, args) { callable ->
                 value.fastMap {
-                    callable.invoke(listOf(OpConstant(it)), runtime)
+                    callable.invoke(listOf(it), runtime)
                 }
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Map(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Map((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Filter(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return op(runtime, args) { callable ->
                 value.fastFilter {
-                    !runtime.isFalse(callable.invoke(listOf(OpConstant(it)), runtime))
+                    !runtime.isFalse(callable.invoke(listOf(it), runtime))
                 }
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Filter(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Filter((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Reduce(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             val v = if (args.size > 1) {
-                listOf(args[1].invoke(runtime)) + value
+                listOf(args[1]) + value
             } else {
                 value
             }
             return op(runtime, args) { callable ->
                 v.reduce { acc, any ->
-                    callable.invoke(
-                        listOf(
-                            OpConstant(acc),
-                            OpConstant(any),
-                        ),
-                        runtime
-                    )
+                    callable.invoke(listOf(acc, any), runtime)
                 }
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Reduce(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Reduce((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class ReduceRight(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             val v = if (args.size > 1) {
-                value + args[1].invoke(runtime)
+                value + args[1]
             } else {
                 value
             }
             return op(runtime, args) { callable ->
                 v.reduceRight { acc, any ->
-                    callable.invoke(
-                        listOf(
-                            OpConstant(acc),
-                            OpConstant(any),
-                        ),
-                        runtime
-                    )
+                    callable.invoke(listOf(acc, any), runtime)
                 }
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return ReduceRight(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return ReduceRight((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Some(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return op(runtime, args) { callable ->
                 value.any {
-                    !runtime.isFalse(callable.invoke(listOf(OpConstant(it)), runtime))
+                    !runtime.isFalse(callable.invoke(listOf(it), runtime))
                 }
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Some(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Some((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Every(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return op(runtime, args) { callable ->
                 value.fastAny {
-                    !runtime.isFalse(callable.invoke(listOf(OpConstant(it)), runtime))
+                    !runtime.isFalse(callable.invoke(listOf(it), runtime))
                 }
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Every(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Every((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Reverse(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime) {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime) {
             return value.reverse()
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Reverse(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Reverse((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class ToReversed(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return value.reversed()
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return ToReversed(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return ToReversed((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Sort(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime) {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime) {
             return value.sortWith(runtime.comparator)
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Sort(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Sort((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class ToSorted(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return value.sortedWith(runtime.comparator)
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return ToSorted(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return ToSorted((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Slice(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return if (args.isEmpty()) {
                 value
             } else {
-                val start = args[0].invoke(runtime).let(runtime::toNumber).toInt()
+                val start = args[0].let(runtime::toNumber).toInt()
                 val end = if (args.size < 2)
                     value.size
                 else
-                    args[1].invoke(runtime).let(runtime::toNumber).toInt()
+                    args[1].let(runtime::toNumber).toInt()
                         .coerceIn(0, value.size)
 
                 value.slice(start..<end)
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Slice(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Slice((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Splice(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-            val pos = args[0](runtime).let(runtime::toNumber).toInt()
-            val remove = args[1](runtime).let(runtime::toNumber).toInt()
-            val rest = args.drop(2).map { it.invoke(runtime) }
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+            val pos = args[0].let(runtime::toNumber).toInt()
+            val remove = args[1].let(runtime::toNumber).toInt()
+            val rest = args.drop(2)
 
             val deleted = buildList {
                 repeat(remove) {
@@ -305,135 +290,134 @@ internal class JSArrayFunction : JSFunction(
             value.addAll(pos, rest)
             return deleted
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Splice(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Splice((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class ToSpliced(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             val copy = value.toMutableList()
             Splice(copy).invoke(args, runtime)
             return copy
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return ToSpliced(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return ToSpliced((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
 
     @JvmInline
     private value class At(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-            val idx = args[0].invoke(runtime).let(runtime::toNumber).toInt()
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+            val idx = args[0].let(runtime::toNumber).toInt()
             return value.valueAtIndexOrUnit(idx)
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return At(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return At((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Includes(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-            val v = args[0].invoke(runtime)
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+            val v = args[0]
             val fromIndex = args.getOrNull(1)?.let(runtime::toNumber)?.toInt() ?: 0
             return value.indexOf(v) > fromIndex
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Includes(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Includes((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Join(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-            val sep = args.getOrElse(0) { OpConstant(",") }
-                .invoke(runtime).toString()
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+            val sep = JSStringFunction.toString(args.getOrElse(0) { "," }, runtime)
             return value.joinToString(separator = sep)
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Join(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Join((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Push(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-            value.addAll(args.fastMap { it(runtime) })
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+            value.addAll(args)
             return args.size
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Push(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Push((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Pop(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return if (value.isEmpty()) {
                 Unit
             } else {
                 value.removeLast()
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Pop(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Pop((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Shift(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return if (value.isEmpty()) {
                 Unit
             } else {
                 value.removeFirst()
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Shift(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Shift((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Unshift(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-            value.addAll(0, args.fastMap { it(runtime) })
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+            value.addAll(0, args)
             return args.size
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Unshift(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Unshift((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Concat(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return buildList {
                 addAll(value)
                 args.forEach {
-                    when (val x = it(runtime)) {
-                        is List<*> -> addAll(x)
-                        else -> add(x)
+                    when (it) {
+                        is List<*> -> addAll(it)
+                        else -> add(it)
                     }
                 }
             }
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Concat(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Concat((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class CopyWithin(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-            val to = runtime.toNumber(args[0](runtime)).toInt()
-            val from = runtime.toNumber(args[1](runtime)).toInt()
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+            val to = runtime.toNumber(args[0]).toInt()
+            val from = runtime.toNumber(args[1]).toInt()
 
             val num = if (args.size >= 3) {
-                runtime.toNumber(args[2](runtime)).toInt()
+                runtime.toNumber(args[2]).toInt()
             } else {
                 value.size
             }
@@ -443,48 +427,38 @@ internal class JSArrayFunction : JSFunction(
             }
             return value
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return CopyWithin(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return CopyWithin((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class Flat(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             val depth = args.getOrNull(0)
-                ?.invoke(runtime)
                 ?.let(runtime::toNumber)
                 ?.toInt()
                 ?.coerceAtLeast(0)
                 ?: 1
             return value.flat(depth)
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Flat(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Flat((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
     }
 
     @JvmInline
     private value class FlatMap(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return op(runtime, args) { callable ->
                 value.fastMap {
-                    callable.invoke(listOf(OpConstant(it)), runtime)
+                    callable.invoke(listOf(it), runtime)
                 }
             }.flat(1)
         }
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return FlatMap(args.firstListOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return FlatMap((thisArg as? MutableList<Any?>) ?: mutableListOf())
         }
-    }
-}
-
-private suspend fun List<Expression>.firstListOrEmpty(runtime: ScriptRuntime) : MutableList<Any?> {
-    val list = (getOrNull(0)?.invoke(runtime) as? MutableList<*>)
-    return if (list != null){
-        list as MutableList<Any?>
-    } else {
-        mutableListOf()
     }
 }
 
@@ -501,10 +475,10 @@ private fun List<*>.flat(depth : Int, collector : MutableList<Any?> = mutableLis
 
 private suspend fun <R> op(
     runtime: ScriptRuntime,
-    arguments: List<Expression>,
+    arguments: List<Any?>,
     op: suspend (Callable) -> R
 ) : R {
-    val func = arguments[0].invoke(runtime)?.callableOrNull()
+    val func = arguments[0]?.callableOrNull()
     typeCheck(func != null){
         throw TypeError("$func is not a function")
     }
@@ -514,9 +488,9 @@ private suspend fun <R> op(
 private suspend fun List<*>.indexOf(
     last : Boolean,
     context: ScriptRuntime,
-    arguments: List<Expression>
+    arguments: List<Any?>
 ): Any {
-    val search = checkNotEmpty(arguments.argAt(0).invoke(context))
+    val search = checkNotEmpty(arguments[0])
 
     return if (last)
         lastIndexOf(search)

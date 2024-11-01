@@ -1,10 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
-import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.expressions.OpConstant
-import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 
 public interface JsAny {
@@ -28,7 +25,7 @@ public interface JsAny {
                 if (proto is JsAny){
                     val value = proto.get(property, runtime)
                     if (value is Callable){
-                        value.bind(listOf(OpConstant(this)), runtime)
+                        value.bind(this, emptyList(), runtime)
                     } else {
                         value
                     }
@@ -44,12 +41,12 @@ public interface JsAny {
 
     @JvmInline
     private value class ToString(val value : Any?) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return value.toString()
         }
 
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return ToString(args[0].invoke(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return ToString(thisArg)
         }
     }
 }

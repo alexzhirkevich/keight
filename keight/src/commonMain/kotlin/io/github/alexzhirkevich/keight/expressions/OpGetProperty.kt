@@ -6,7 +6,6 @@ import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.TypeError
-import io.github.alexzhirkevich.keight.js.unresolvedReference
 import kotlin.jvm.JvmInline
 
 @JvmInline
@@ -17,22 +16,6 @@ internal value class OpConstant(val value: Any?) : Expression {
 }
 
 private object UNINITIALIZED
-
-internal class OpLazy(
-    private val init : suspend (ScriptRuntime) -> Any?
-) : Expression {
-
-    private var value : Any? = UNINITIALIZED
-
-    override suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
-
-        if (value is UNINITIALIZED){
-            value = init(runtime)
-        }
-
-        return value
-    }
-}
 
 internal class OpGetProperty(
     val name : String,
@@ -51,7 +34,7 @@ internal class OpGetProperty(
             } else {
                 throw ReferenceError("$name is not defined")
             }
-            res is Expression -> getImpl(res.invoke(runtime), runtime)
+            res is Expression -> getImpl(res(runtime), runtime)
             res is JsAny -> res.get(name, runtime)
             isOptional && (res == null || res == Unit) -> Unit
             else -> throw TypeError("Cannot get properties of $res")

@@ -1,29 +1,24 @@
 package io.github.alexzhirkevich.keight.js
 
+import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 
-public open class JSError(message : String?, cause : Throwable?)
-    : Exception(message, cause), JsAny {
-
-    override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
-        return when(property){
-            "message" -> message
-            "stack" -> stackTraceToString()
-            "name" -> this::class.simpleName
-            else -> super.get(property, runtime)
-        }
+public open class JSError(msg : Any?, name : String = "Error", cause : Throwable? = null)
+    : Exception("Uncaught $name: $msg", cause),
+    JSObject by JSObjectImpl(properties = mutableMapOf("message" to msg, "name" to name)) {
+    override suspend fun proto(runtime: ScriptRuntime): Any? {
+        return (runtime as JSRuntime).Error.get(PROTOTYPE, runtime)
     }
 }
 
-public class SyntaxError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
+public class SyntaxError(message : String? = null, cause : Throwable? = null)
+    : JSError(message, "SyntaxError", cause)
 
-public class TypeError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
+public class TypeError(message : String? = null, cause : Throwable? = null)
+    : JSError(message, "TypeError", cause)
 
-public class RangeError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
+public class RangeError(message : String? = null, cause : Throwable? = null)
+    : JSError(message, "RangeError", cause)
 
-public class ReferenceError(message : String? = null, cause : Throwable? = null) : JSError(message, cause)
-
-internal fun unresolvedReference(ref : String, obj : String? = null) : Nothing =
-    if (obj != null)
-        throw ReferenceError("Unresolved reference '$ref' for $obj")
-    else throw ReferenceError("$ref is not defined")
+public class ReferenceError(message : String? = null, cause : Throwable? = null)
+    : JSError(message, "ReferenceError", cause)

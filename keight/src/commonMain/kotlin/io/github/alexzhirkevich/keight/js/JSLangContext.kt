@@ -94,7 +94,7 @@ internal object JSLangContext : ScriptContext {
             is UShort -> JsNumberWrapper(a.toLong())
             is UInt -> JsNumberWrapper(a.toLong())
             is ULong -> {
-                check(a < Long.MAX_VALUE.toULong()){
+                check(a <= Long.MAX_VALUE.toULong()){
                     "Unsigned numbers greater than ${Long.MAX_VALUE} can't be used in JavaScript"
                 }
                 JsNumberWrapper(a.toLong())

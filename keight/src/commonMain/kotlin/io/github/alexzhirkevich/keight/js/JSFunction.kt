@@ -5,12 +5,10 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.argForNameOrIndex
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastForEachIndexed
-import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import kotlinx.coroutines.async
@@ -45,7 +43,7 @@ public open class JSFunction(
             emptyMap()
         }
 
-    internal var thisRef : Any? = null
+    final override var thisRef : Any? = null
         private set
 
     init {
@@ -87,16 +85,16 @@ public open class JSFunction(
         )
     }
 
-    override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
+    override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
         return copy().apply {
             if (!isArrow) {
-                thisRef = args[0](runtime)
+                thisRef = thisArg
             }
         }
     }
 
 
-    override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
+    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
         syntaxCheck(!isArrow) {
             "Can't use 'new' keyword with arrow functions"
         }
@@ -112,18 +110,16 @@ public open class JSFunction(
     }
 
     private suspend fun invoke(
-        args: List<Expression>,
+        args: List<Any?>,
         runtime: ScriptRuntime,
         extraArgs : Map<String, Pair<VariableType, Any?>>
     ): Any? {
         val arguments = buildMap {
             parameters.fastForEachIndexed { i, p ->
                 val value = if (p.isVararg) {
-                    args.drop(i).fastMap { it.invoke(runtime) }
+                    args.drop(i)
                 } else {
-                    (args.argForNameOrIndex(i, p.name) ?: p.default)
-                        ?.invoke(runtime)
-                        ?: Unit
+                    (args.getOrElse(i) { p.default?.invoke(runtime) }) ?: Unit
                 }
                 this[p.name] = VariableType.Local to value
             }
@@ -145,7 +141,7 @@ public open class JSFunction(
     }
 
     override suspend fun invoke(
-        args: List<Expression>,
+        args: List<Any?>,
         runtime: ScriptRuntime,
     ): Any? = invoke(args, runtime, emptyMap())
 

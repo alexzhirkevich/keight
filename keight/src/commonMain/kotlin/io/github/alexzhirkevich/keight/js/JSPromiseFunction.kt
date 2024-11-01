@@ -1,29 +1,22 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
-import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
-import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.job
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.jvm.JvmInline
 
 public class SomeFunction : JSFunction(){
 
-    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
+    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
         return super.invoke(args, runtime)
     }
 }
@@ -62,12 +55,12 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
         }
     }
 
-    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any {
+    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any {
         throw TypeError("Promise constructor cannot be invoked without 'new'")
     }
 
-    override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
-        val resolveReject = args.getOrNull(0)?.invoke(runtime)?.callableOrNull()
+    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
+        val resolveReject = args.getOrNull(0)?.callableOrNull()
 
         typeCheck(resolveReject is Callable) {
             "Promise resolver is not a function"
@@ -79,15 +72,15 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
         val reject = { x : Any? -> deferred.completeExceptionally(if (x is ThrowableValue) x else ThrowableValue(x)); Unit}
 
         return runtime.async {
-            resolveReject.invoke(listOf(OpConstant(resolve), OpConstant(reject)), runtime)
+            resolveReject.invoke(listOf(resolve, reject), runtime)
             deferred.await()
         }
     }
 
     @JvmInline
     private value class Then(val value: Job) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Deferred<*> {
-            val arg = args.getOrNull(0)?.invoke(runtime)
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Deferred<*> {
+            val arg = args.getOrNull(0)
             val callable = arg?.callableOrNull()
             typeCheck(callable is Callable) {
                 "$arg is not a function"
@@ -97,20 +90,20 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
             val res = if (job is Deferred<*>) job::await else job::join
 
             return runtime.async {
-                callable.invoke(listOf(OpConstant(res())), runtime)
+                callable.invoke(listOf(res()), runtime)
             }
         }
 
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Then(args.firstJobOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Then((thisArg as? Job) ?: Job())
         }
     }
 
     @JvmInline
     private value class Catch(val value: Job) : Callable {
 
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Deferred<*> {
-            val arg = args.getOrNull(0)?.invoke(runtime)
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Deferred<*> {
+            val arg = args.getOrNull(0)
             val callable = arg?.callableOrNull()
             typeCheck(callable is Callable) {
                 "$arg is not a function"
@@ -131,23 +124,23 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
                     val value = when (t){
                         is ThrowableValue -> t.value
                         is JSError -> t
-                        else -> JSError(t.message, t)
+                        else -> JSError(t.message, cause = t)
                     }
-                    callable.invoke(listOf(OpConstant(value)), runtime)
+                    callable.invoke(listOf(value), runtime)
                 }
             }
         }
 
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Catch(args.firstJobOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Catch((thisArg as? Job) ?: Job())
         }
     }
 
     @JvmInline
     private value class Finally(val value: Job) : Callable {
 
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Deferred<Unit> {
-            val arg = args.getOrNull(0)?.invoke(runtime)
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Deferred<Unit> {
+            val arg = args.getOrNull(0)
             val callable = arg?.callableOrNull()
             typeCheck(callable is Callable) {
                 "$arg is not a function"
@@ -162,14 +155,10 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
             }
         }
 
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return Finally(args.firstJobOrEmpty(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return Finally((thisArg as? Job) ?: Job())
         }
     }
-}
-
-private suspend fun List<Expression>.firstJobOrEmpty(runtime: ScriptRuntime) : Job {
-    return firstOrNull()?.invoke(runtime)?.let(runtime::fromKotlin) as? Job ?: Job()
 }
 
 internal suspend fun Job.joinSuccess(){

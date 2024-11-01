@@ -1,22 +1,9 @@
 package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.invoke
 
-internal fun  OpCompare(
-    a : Expression,
-    b : Expression,
-    comparator : (Comparable<*>, Comparable<*>, ScriptRuntime) -> Any
-) = Expression {
-    comparator(
-        a(it) as Comparable<*>,
-        b(it) as Comparable<*>,
-        it
-    )
-}
-
-internal fun OpCompare2(
+internal fun OpCompare(
     a : Expression,
     b : Expression,
     result : (Int) -> Boolean

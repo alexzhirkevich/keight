@@ -1,6 +1,5 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 
 internal class JSSymbolFunction : JSFunction("Symbol") {
@@ -11,11 +10,11 @@ internal class JSSymbolFunction : JSFunction("Symbol") {
         }
     }
 
-    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-        return super.invoke(args, runtime)
+    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): JSSymbol {
+        return JSSymbol(args.getOrElse(0) { "" }.toString())
     }
 
-    override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): Any {
+    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
         throw TypeError("Symbol is not a constructor")
     }
 }

@@ -1,11 +1,8 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
-import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.argAtOrNull
 import io.github.alexzhirkevich.keight.expressions.OpConstant
-import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -36,7 +33,7 @@ internal fun JSObject.setupNumberMethods() {
             ?.takeIf { !it.toDouble().isNaN() && it.toDouble().isFinite() }
             ?.toInt() ?: 10
 
-        arg.toString().trim().trimParseInt(radix)
+        JSStringFunction.toString(arg, this).trim().trimParseInt(radix)
     }
 
     func(
@@ -49,7 +46,7 @@ internal fun JSObject.setupNumberMethods() {
             ?.takeIf { !it.toDouble().isNaN() && it.toDouble().isFinite() }
             ?.toInt() ?: 10
 
-        arg.toString().trim().trimParseInt(radix)
+        JSStringFunction.toString(arg, this).trim().trimParseInt(radix)
     }
 
     func("isSafeInteger", "number") {
@@ -94,11 +91,11 @@ internal class JSNumberFunction : JSFunction(name = "Number") {
         setupNumberMethods()
     }
 
-    override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Number {
+    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Number {
         return if (args.isEmpty()){
             runtime.toNumber(0)
         } else {
-            runtime.toNumber(args.first().invoke(runtime))
+            runtime.toNumber(args.first())
         }
     }
 
@@ -106,7 +103,7 @@ internal class JSNumberFunction : JSFunction(name = "Number") {
         return obj !is JsNumberWrapper && super.isInstance(obj, runtime)
     }
 
-    override suspend fun construct(args: List<Expression>, runtime: ScriptRuntime): JsNumberObject {
+    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): JsNumberObject {
         return JsNumberObject(JsNumberWrapper(invoke(args, runtime))).apply {
             setProto(this@JSNumberFunction.get(PROTOTYPE, runtime))
         }
@@ -115,20 +112,20 @@ internal class JSNumberFunction : JSFunction(name = "Number") {
 
     @JvmInline
     private value class ToPrecision(val value: Number) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Double {
-            val digits = args.argAtOrNull(0)?.invoke(runtime) ?: return value.toDouble()
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Double {
+            val digits = args.getOrNull(0) ?: return value.toDouble()
             return value.toDouble().roundTo(runtime.toNumber(digits).toInt() - 1)
         }
 
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return ToPrecision(args.firstNumberOrZero(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return ToPrecision(runtime.toNumber(thisArg))
         }
     }
 
     @JvmInline
     private value class ToFixed(val value: Number) : Callable {
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): String {
-            val digits = args.argAtOrNull(0)?.invoke(runtime)?.let(runtime::toNumber)?.toInt() ?: 0
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): String {
+            val digits = args.getOrNull(0)?.let(runtime::toNumber)?.toInt() ?: 0
 
             if (digits == 0) {
                 return value.toDouble().roundToLong().toString()
@@ -146,14 +143,10 @@ internal class JSNumberFunction : JSFunction(name = "Number") {
             return (intPart + "." + floatPart.padEnd(digits, '0'))
         }
 
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            return ToFixed(args.firstNumberOrZero(runtime))
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            return ToFixed(runtime.toNumber(thisArg))
         }
     }
-}
-
-private suspend fun List<Expression>.firstNumberOrZero(runtime: ScriptRuntime) : Number {
-    return getOrNull(0)?.invoke(runtime)?.let(runtime::toNumber) ?: 0
 }
 
 private fun String.trimParseInt(radix : Int) : Long? {

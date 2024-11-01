@@ -15,7 +15,7 @@ public fun Expression.asScript(runtime: ScriptRuntime): Script = object : Script
             if (t is JsAny) {
                 throw t
             } else {
-                throw JSError(t.message, t)
+                throw JSError(t.message, cause = t)
             }
         }
     }

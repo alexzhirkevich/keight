@@ -152,11 +152,11 @@ class JsArrayTest {
 
         assertFailsWith<RangeError> {
             "Array(2.5)".eval()
-        }.message.assertEqualsTo("Invalid array length")
+        }.message.assertEqualsTo("Uncaught RangeError: Invalid array length")
 
         assertFailsWith<RangeError> {
             "Array(NaN)".eval()
-        }.message.assertEqualsTo("Invalid array length")
+        }.message.assertEqualsTo("Uncaught RangeError: Invalid array length")
 
         assertTrue {
             "[1,2,3] instanceof Array".eval() as Boolean

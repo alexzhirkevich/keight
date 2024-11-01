@@ -1,6 +1,5 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.expressions.asCallable
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
@@ -8,22 +7,15 @@ import kotlin.jvm.JvmInline
 
 public interface Callable : JsAny {
 
-    public suspend fun apply(args: List<Expression>, runtime: ScriptRuntime) : Any? {
-        val a = args.getOrNull(1)?.invoke(runtime)?.let {
-            if (it is Iterable<*>){
-                it.map(::OpConstant)
-            } else {
-                listOf(OpConstant(it))
-            }
-        } ?: emptyList()
-        return bind(listOf(args[0]), runtime).invoke(a, runtime)
+    public val thisRef : Any? get() = null
+
+    public suspend fun call(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime) : Any? {
+        return bind(thisArg, args, runtime).invoke(args, runtime)
     }
 
-    public suspend fun bind(args: List<Expression>, runtime: ScriptRuntime) : Callable {
-        TODO()
-    }
+    public suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime) : Callable
 
-    public suspend operator fun invoke(args: List<Expression>, runtime: ScriptRuntime) : Any?
+    public suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime) : Any?
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         return when(property){
@@ -35,34 +27,34 @@ public interface Callable : JsAny {
     }
 
     @JvmInline
-    private value class Bind(val callable: Callable) : Callable {
+    private value class Bind(override val thisRef: Callable) : Callable {
 
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            val callable = args[0].invoke(runtime)?.callableOrNull()
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            val callable = thisArg?.callableOrNull()
             typeCheck(callable != null){
                 "$callable is not a function"
             }
             return Bind(callable)
         }
 
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-            return callable.bind(args, runtime)
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+            return thisRef.bind(args.getOrNull(0), args.drop(1), runtime)
         }
     }
 
     @JvmInline
-    private value class Apply(val callable: Callable) : Callable {
+    private value class Apply(override val thisRef: Callable) : Callable {
 
-        override suspend fun bind(args: List<Expression>, runtime: ScriptRuntime): Callable {
-            val callable = args[0].invoke(runtime)?.callableOrNull()
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            val callable = thisArg?.callableOrNull()
             typeCheck(callable != null){
                 "$callable is not a function"
             }
             return Apply(callable)
         }
 
-        override suspend fun invoke(args: List<Expression>, runtime: ScriptRuntime): Any? {
-            return callable.apply(args, runtime)
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+            return thisRef.call(args.getOrNull(0), (args.getOrNull(1) as? List<*>).orEmpty(), runtime)
         }
     }
 }

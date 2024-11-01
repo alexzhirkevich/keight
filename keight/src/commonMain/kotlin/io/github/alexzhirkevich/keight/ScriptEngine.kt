@@ -22,7 +22,7 @@ public fun ScriptEngine.compile(script: String) : Script {
 }
 
 public suspend fun ScriptEngine.evaluate(script: String) : Any? {
-    return interpreter.interpret(script).asScript(runtime).invoke()
+    return compile(script).invoke()
 }
 
 public fun ScriptEngine(
