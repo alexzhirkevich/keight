@@ -9,12 +9,12 @@ import io.github.alexzhirkevich.keight.js.JSNumberFunction
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JSObjectFunction
 import io.github.alexzhirkevich.keight.js.JSPromiseFunction
+import io.github.alexzhirkevich.keight.js.JSPropertyDescriptor
 import io.github.alexzhirkevich.keight.js.JSSetFunction
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JSSymbolFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsConsole
-import io.github.alexzhirkevich.keight.js.defaults
 import io.github.alexzhirkevich.keight.js.func
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.setupNumberMethods
@@ -178,8 +178,18 @@ private class RuntimeGlobalThis(
         }
     }
 
-    override fun set(property: Any?, value: Any?) {
+    override fun set(
+        property: Any?,
+        value: Any?,
+        writable: Boolean?,
+        enumerable: Boolean?,
+        configurable: Boolean?
+    ) {
         runtime.set(property, value, null)
+    }
+
+    override fun descriptor(property: Any?): JSPropertyDescriptor? {
+        return null
     }
 
     override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean {

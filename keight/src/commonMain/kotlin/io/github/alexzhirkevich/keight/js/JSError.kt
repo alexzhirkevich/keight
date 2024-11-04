@@ -5,7 +5,7 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 
 public open class JSError(msg : Any?, name : String = "Error", cause : Throwable? = null)
     : Exception("Uncaught $name: $msg", cause),
-    JSObject by JSObjectImpl(properties = mutableMapOf("message" to msg, "name" to name)) {
+    JSObject by JSObjectImpl(properties = mapOf("message" to msg, "name" to name)) {
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return (runtime as JSRuntime).Error.get(PROTOTYPE, runtime)
     }

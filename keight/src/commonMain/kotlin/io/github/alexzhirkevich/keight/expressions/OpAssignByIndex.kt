@@ -2,7 +2,6 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.JsArrayWrapper
@@ -56,9 +55,15 @@ internal class OpAssignByIndex(
                 is JSObject -> {
                     
                     if (current.contains(idx, runtime) && merge != null){
-                        current[idx] = merge.invoke(runtime, current.get(idx, runtime), v)
+                        current.set(
+                            idx,
+                            merge.invoke(runtime, current.get(idx, runtime), v),
+                            true,
+                            true,
+                            true
+                        )
                     } else {
-                        current[idx] = v
+                        current.set(idx, v)
                     }
                 }
                 else -> error("Can't assign '$current' by index ($index)")

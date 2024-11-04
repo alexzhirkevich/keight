@@ -6,8 +6,11 @@ import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.fastMapTo
 import io.github.alexzhirkevich.keight.invoke
+import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.SyntaxError
+import io.github.alexzhirkevich.keight.js.call
 import kotlinx.coroutines.async
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -17,13 +20,49 @@ internal fun OpCall(
     callable : Expression,
     arguments : List<Expression>,
     isOptional : Boolean
-) = Expression { r->
-    OpCallImpl(
-        runtime = r,
-        callable = callable,
-        arguments = arguments.fastMap { it(r) },
-        isOptional = isOptional
-    )
+) : Expression {
+
+    val argsList = MutableList<Any?>(arguments.size) {}
+
+    return when {
+        callable is OpIndex -> Expression { r ->
+            val receiver = callable.receiver.invoke(r)
+
+            if ((receiver == null || receiver == Unit) && callable.isOptional) {
+                return@Expression Unit
+            }
+            (receiver as JsAny).call(
+                func = callable.index(r),
+                thisRef = receiver,
+                args = arguments.fastMapTo(argsList) { it(r) },
+                isOptional = callable.isOptional,
+                runtime = r
+            )
+        }
+
+        callable is OpGetProperty && callable.receiver != null -> Expression { r ->
+            val receiver = callable.receiver.invoke(r)
+            if ((receiver == null || receiver == Unit) && callable.isOptional) {
+                return@Expression Unit
+            }
+            (receiver as JsAny).call(
+                func = callable.name,
+                thisRef = receiver,
+                args = arguments.fastMapTo(argsList) { it(r) },
+                isOptional = callable.isOptional,
+                runtime = r
+            )
+        }
+
+        else -> Expression { r ->
+            OpCallImpl(
+                runtime = r,
+                callable = callable,
+                arguments = arguments.fastMapTo(argsList) { it(r) },
+                isOptional = isOptional
+            )
+        }
+    }
 }
 
 private tailrec suspend fun OpCallImpl(

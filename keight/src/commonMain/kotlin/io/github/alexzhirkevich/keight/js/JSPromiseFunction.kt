@@ -90,7 +90,7 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
             val res = if (job is Deferred<*>) job::await else job::join
 
             return runtime.async {
-                callable.invoke(listOf(res()), runtime)
+                callable.invoke(res().listOf(), runtime)
             }
         }
 
@@ -126,7 +126,7 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
                         is JSError -> t
                         else -> JSError(t.message, cause = t)
                     }
-                    callable.invoke(listOf(value), runtime)
+                    callable.invoke(value.listOf(), runtime)
                 }
             }
         }

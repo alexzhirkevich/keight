@@ -21,9 +21,9 @@ internal fun OpIncDecAssign(
                 merge = null
             )
 
-        variable is OpIndex && variable.property is OpGetProperty ->
+        variable is OpIndex && variable.receiver is OpGetProperty ->
             OpAssignByIndex(
-                variableName = variable.property.name,
+                variableName = variable.receiver.name,
                 index = variable.index,
                 assignableValue = value,
                 merge = null

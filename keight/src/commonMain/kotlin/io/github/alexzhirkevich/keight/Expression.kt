@@ -2,6 +2,8 @@ package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.expressions.OpGetProperty
 import io.github.alexzhirkevich.keight.expressions.OpIndex
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 
 public fun interface Expression {
@@ -15,18 +17,15 @@ public fun interface Expression {
     public suspend fun invokeRaw(runtime: ScriptRuntime): Any?
 }
 
-public suspend operator fun Expression.invoke(runtime: ScriptRuntime): Any? =
-    runtime.fromKotlin(invokeRaw(runtime))
-//        .let {
-//        if (it is Expression){
-//            it.invoke(runtime)
-//        } else {it}
-//    }
+public suspend operator fun Expression.invoke(runtime: ScriptRuntime): Any? {
+    currentCoroutineContext().ensureActive()
+    return runtime.fromKotlin(invokeRaw(runtime))
+}
 
 
 internal fun Expression.isAssignable() : Boolean {
     return this is OpGetProperty ||
-            this is OpIndex && property is OpGetProperty
+            this is OpIndex && receiver is OpGetProperty
 }
 
 

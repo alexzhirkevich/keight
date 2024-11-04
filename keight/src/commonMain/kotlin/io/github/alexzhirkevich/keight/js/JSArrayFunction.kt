@@ -124,7 +124,7 @@ internal class JSArrayFunction : JSFunction(
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return op(runtime, args) { callable ->
                 value.fastMap {
-                    callable.invoke(listOf(it), runtime)
+                    callable.invoke(it.listOf(), runtime)
                 }
             }
         }
@@ -138,7 +138,7 @@ internal class JSArrayFunction : JSFunction(
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return op(runtime, args) { callable ->
                 value.fastFilter {
-                    !runtime.isFalse(callable.invoke(listOf(it), runtime))
+                    !runtime.isFalse(callable.invoke(it.listOf(), runtime))
                 }
             }
         }
@@ -190,7 +190,7 @@ internal class JSArrayFunction : JSFunction(
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             return op(runtime, args) { callable ->
                 value.any {
-                    !runtime.isFalse(callable.invoke(listOf(it), runtime))
+                    !runtime.isFalse(callable.invoke(it.listOf(), runtime))
                 }
             }
         }

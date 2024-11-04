@@ -6,7 +6,7 @@ internal class JSSymbolFunction : JSFunction("Symbol") {
 
     init {
         JSSymbol.defaults.forEach {
-            this[it.value] = it
+            set(it.value, it)
         }
     }
 

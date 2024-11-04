@@ -32,7 +32,7 @@ public interface ScriptRuntime : ScriptContext, CoroutineScope {
     ): Any?
 
     /**
-     * Restore runtime to its initial state
+     * Restore runtime to its initial state, cancel all running jobs
      * */
     public fun reset()
 }

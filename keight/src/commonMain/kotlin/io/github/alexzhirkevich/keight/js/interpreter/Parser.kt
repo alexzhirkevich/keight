@@ -459,8 +459,8 @@ private fun ListIterator<Token>.parseAssignmentValue(
     merge: (ScriptRuntime.(Any?, Any?) -> Any?)? = null
 ): Expression {
     return when {
-        x is OpIndex && x.property is OpGetProperty -> OpAssignByIndex(
-            variableName = x.property.name,
+        x is OpIndex && x.receiver is OpGetProperty -> OpAssignByIndex(
+            variableName = x.receiver.name,
             index = x.index,
             assignableValue = parseStatement(blockType = ExpectedBlockType.Object),
             merge = merge
@@ -656,7 +656,7 @@ private fun ListIterator<Token>.parseDelete() : Expression {
     val x = parseStatement(precedence = 1, blockType = ExpectedBlockType.Object)
 
     val (subj, obj) = when (x) {
-        is OpIndex -> x.property to x.index
+        is OpIndex -> x.receiver to x.index
         is OpGetProperty -> (x.receiver ?: Expression { it.get("this") }) to OpConstant(x.name)
         else -> throw SyntaxError(unexpected("delete"))
     }
@@ -715,7 +715,7 @@ private fun ListIterator<Token>.parseMemberOf(receiver: Expression, ): Expressio
         }
         is Token.Operator.Bracket.SquareOpen -> {
             OpIndex(
-                property = receiver,
+                receiver = receiver,
                 index = parseStatement(blockType = ExpectedBlockType.Object)
             ).also {
                 syntaxCheck(nextSignificant() is Token.Operator.Bracket.SquareClose) {
@@ -731,7 +731,7 @@ private fun ListIterator<Token>.parseOptionalChaining(receiver: Expression): Exp
     return when(val next = nextSignificant()){
         is Token.Operator.Bracket.SquareOpen -> {
             OpIndex(
-                property = receiver,
+                receiver = receiver,
                 index = parseStatement(blockType = ExpectedBlockType.Object),
                 isOptional = true
             ).also {

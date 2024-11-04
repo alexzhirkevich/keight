@@ -2,6 +2,8 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.callableOrNull
+import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import kotlin.jvm.JvmInline
 
 public interface JsAny {
@@ -12,9 +14,10 @@ public interface JsAny {
 
     public suspend fun proto(runtime: ScriptRuntime) : Any? = Unit
 
-    public suspend fun delete(property: Any?, runtime: ScriptRuntime){
-
+    public suspend fun delete(property: Any?, runtime: ScriptRuntime) {
     }
+
+
 
     public suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         return when(property){
@@ -23,12 +26,7 @@ public interface JsAny {
             else -> {
                 val proto = proto(runtime)
                 if (proto is JsAny){
-                    val value = proto.get(property, runtime)
-                    if (value is Callable){
-                        value.bind(this, emptyList(), runtime)
-                    } else {
-                        value
-                    }
+                    return proto.get(property, runtime)
                 } else {
                     Unit
                 }
@@ -51,3 +49,19 @@ public interface JsAny {
     }
 }
 
+internal suspend fun JsAny.call(
+    func : Any?,
+    thisRef : Any?,
+    args: List<Any?>,
+    isOptional : Boolean,
+    runtime: ScriptRuntime,
+) : Any? {
+    val callable = get(func, runtime)?.callableOrNull()
+    if (callable == null && isOptional) {
+        return Unit
+    }
+    typeCheck(callable != null) {
+        "$callable is not a function"
+    }
+    return callable.call(thisRef, args, runtime)
+}

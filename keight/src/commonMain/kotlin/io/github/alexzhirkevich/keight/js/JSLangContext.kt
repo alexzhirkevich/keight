@@ -112,7 +112,7 @@ internal object JSLangContext : ScriptContext {
 
     override fun toKotlin(a: Any?): Any? {
         return when (a) {
-            is JsMapWrapper -> a.value.map { fromKotlin(it.key) to fromKotlin(it.value) }.toMap()
+            is JsMapWrapper -> a.value.map { toKotlin(it.key) to toKotlin(it.value) }.toMap()
             is JsSetWrapper -> a.value.map(::toKotlin).toSet()
             is JsArrayWrapper -> a.value.fastMap(::toKotlin)
             is JsWrapper<*> -> toKotlin(a.value)

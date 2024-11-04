@@ -10,29 +10,45 @@ public interface JSObject : JsAny {
 
     public val entries: List<List<Any?>>
 
-    public operator fun set(property: Any?, value: Any?)
+    public fun set(
+        property: Any?,
+        value: Any?,
+        writable: Boolean? = null,
+        enumerable: Boolean? = null,
+        configurable: Boolean? = null
+    )
+
+    public fun descriptor(property: Any?) : JSPropertyDescriptor?
 }
 
 internal const val PROTOTYPE = "prototype"
 internal const val PROTO = "__proto__"
 
 internal fun JSObject.setPrototype(prototype : Any?) {
-    this[PROTOTYPE] = prototype
+    set(PROTOTYPE, prototype)
 }
 
 internal fun JSObject.setProto(proto : Any?) {
-    this[PROTO] = proto
+    set(PROTO, proto)
+}
+
+internal suspend fun JSObject.getOrElse(property: Any?, runtime: ScriptRuntime, orElse : () -> Any?) : Any? {
+    return if (contains(property, runtime)){
+        get(property, runtime)
+    } else {
+        orElse()
+    }
 }
 
 internal class ObjectMap(
-    val backedMap : MutableMap<Any?, Any?> = mutableMapOf(),
-) : MutableMap<Any?, Any?> by backedMap {
+    val backedMap : MutableMap<Any?, JSProperty> = mutableMapOf(),
+) : MutableMap<Any?, JSProperty> by backedMap {
 
-    override fun get(key: Any?): Any? {
+    override fun get(key: Any?): JSProperty? {
         return backedMap[mapKey(key)]
     }
 
-    override fun put(key: Any?, value: Any?): Any? {
+    override fun put(key: Any?, value: JSProperty): JSProperty? {
         return backedMap.put(mapKey(key), value)
     }
 
@@ -50,10 +66,12 @@ internal class ObjectMap(
 
 public open class JSObjectImpl(
     public open val name : String = "",
-    properties : MutableMap<Any?, Any?> = mutableMapOf()
+    properties : Map<Any?, Any?> = mutableMapOf()
 ) : JSObject {
 
-    private val map = ObjectMap(properties)
+    private val map = ObjectMap(
+        properties.mapValues { JSProperty(it.value) }.toMutableMap()
+    )
 
     protected val properties : Map<Any?, Any?>
         get() = map.backedMap
@@ -61,14 +79,14 @@ public open class JSObjectImpl(
     override val keys: List<String>
         get() = map.keys.map { it.toString() }
 
-    override val values: List<Any?> get() = map.values.toList()
+    override val values: List<Any?> get() = map.values.map { it.value }
 
     override val entries: List<List<Any?>>
-        get() = map.entries.map { listOf(it.key, it.value) }
+        get() = map.entries.map { listOf(it.key, it.value.value) }
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return if (PROTO in map) {
-            map[PROTO]
+            map[PROTO]?.value
         } else {
             (runtime.findRoot() as JSRuntime).Object.get(PROTOTYPE,runtime)
         }
@@ -76,7 +94,7 @@ public open class JSObjectImpl(
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         if (property in map) {
-            return map[property]
+            return map[property]?.value
         }
         return super.get(property, runtime)
     }
@@ -89,8 +107,36 @@ public open class JSObjectImpl(
         }
     }
 
-    override fun set(property: Any?, value: Any?) {
-        map[property] = value
+    override fun set(
+        property: Any?,
+        value: Any?,
+        writable: Boolean?,
+        enumerable: Boolean?,
+        configurable: Boolean?
+    ) {
+        if (property in map) {
+            map[property]?.value = value
+            if (writable != null) {
+                map[property]?.writable = writable
+            }
+            if (enumerable != null) {
+                map[property]?.writable = enumerable
+            }
+            if (configurable != null) {
+                map[property]?.writable = configurable
+            }
+        } else {
+            map[property] = JSProperty(
+                value = value,
+                writable = writable,
+                enumerable = enumerable,
+                configurable = configurable
+            )
+        }
+    }
+
+    override fun descriptor(property: Any?): JSPropertyDescriptor? {
+        return map[property]
     }
 
     override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
@@ -154,7 +200,7 @@ internal class ObjectScopeImpl(
 }
 
 public fun Object(name: String, contents : Map<Any?, Any?>) : JSObject {
-    return JSObjectImpl(name, contents.toMutableMap())
+    return JSObjectImpl(name, contents)
 }
 
 public inline fun Object(name: String = "", builder : ObjectScope.() -> Unit) : JSObject {
@@ -164,10 +210,6 @@ public inline fun Object(name: String = "", builder : ObjectScope.() -> Unit) : 
 
 internal fun JSObject.init(scope: ObjectScope.() -> Unit) {
     ObjectScopeImpl("", this).apply(scope)
-}
-
-internal interface SuspendReadOnlyProperty<out V> {
-    suspend fun getValue(): V
 }
 
 
@@ -206,7 +248,7 @@ internal fun JSObject.func(
             }
         }
     ).also {
-        this[name] = it
+        set(name, it)
     }
 }
 
@@ -234,7 +276,7 @@ internal fun JSObject.func(
         params = params,
         body = body
     ).also {
-        this[name] = it
+        set(name, it)
     }
 }
 

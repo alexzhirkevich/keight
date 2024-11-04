@@ -7,13 +7,13 @@ import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit
 
 internal class OpIndex(
-    val property : Expression,
+    val receiver : Expression,
     val index : Expression,
     val isOptional : Boolean = false
 ) : Expression {
 
     override suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
-        val prop = property(runtime)
+        val prop = receiver(runtime)
 
         val v = when {
             isOptional && (prop == null || prop == Unit) -> return Unit
