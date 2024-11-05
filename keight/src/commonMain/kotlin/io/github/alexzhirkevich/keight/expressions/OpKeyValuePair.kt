@@ -6,4 +6,8 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 internal class OpKeyValuePair(
     val key : String,
     val value : Expression
-) : Expression by value
+) : Expression() {
+    override suspend fun execute(runtime: ScriptRuntime): Any? {
+        return value.invoke(runtime)
+    }
+}

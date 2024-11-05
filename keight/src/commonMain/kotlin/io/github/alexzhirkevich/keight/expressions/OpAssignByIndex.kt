@@ -3,7 +3,6 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.JSObject
-import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.JsArrayWrapper
 
 internal class OpAssignByIndex(
@@ -11,9 +10,9 @@ internal class OpAssignByIndex(
     private val index : Expression,
     private val assignableValue : Expression,
     private val merge : (ScriptRuntime.(Any?, Any?) -> Any?)?
-) : Expression {
+) : Expression() {
 
-    override tailrec suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): Any? {
         val v = assignableValue.invoke(runtime)
         val current = runtime.get(variableName)
 

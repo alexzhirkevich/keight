@@ -6,19 +6,17 @@ import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.TypeError
-import io.github.alexzhirkevich.keight.invoke
 
 
 internal class OpAssign(
-    val type : VariableType? = null,
-    val variableName : String,
-    val receiver : Expression?=null,
-    var isStatic : Boolean = false,
-    val assignableValue : Expression,
-    private val merge : (ScriptRuntime.(Any?, Any?) -> Any?)?
-) : Expression {
+    val type: VariableType? = null,
+    val variableName: String,
+    val receiver: Expression? = null,
+    val assignableValue: Expression,
+    private val merge: (ScriptRuntime.(Any?, Any?) -> Any?)?
+) : Expression() {
 
-    override suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): Any? {
         val v = assignableValue.invoke(runtime)
         val r = receiver?.invoke(runtime)
 
@@ -41,7 +39,7 @@ internal class OpAssign(
 
         if (receiver == null) {
             runtime.set(
-                variable = variableName,
+                property = variableName,
                 value = value,
                 type = type
             )

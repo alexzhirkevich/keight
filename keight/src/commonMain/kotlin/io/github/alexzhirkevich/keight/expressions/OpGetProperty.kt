@@ -3,27 +3,23 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.JsAny
-import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.TypeError
-import kotlin.jvm.JvmInline
 
-@JvmInline
-internal value class OpConstant(val value: Any?) : Expression {
-    override suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
+internal class OpConstant(val value: Any?) : Expression() {
+    override suspend fun execute(runtime: ScriptRuntime): Any? {
         return value
     }
 }
 
-private object UNINITIALIZED
 
 internal class OpGetProperty(
     val name : String,
     val receiver : Expression?,
     val isOptional : Boolean = false
-) : Expression {
-
-    override suspend fun invokeRaw(runtime: ScriptRuntime, ): Any? {
+) : Expression() {
+    
+    override suspend fun execute(runtime: ScriptRuntime, ): Any? {
         return getImpl(receiver, runtime)
     }
 

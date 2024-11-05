@@ -1,7 +1,6 @@
 package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.invoke
 import kotlin.math.pow
 
 internal fun OpExp(

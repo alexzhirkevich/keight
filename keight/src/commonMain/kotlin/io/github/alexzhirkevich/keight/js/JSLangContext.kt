@@ -116,6 +116,8 @@ internal object JSLangContext : ScriptContext {
             is JsSetWrapper -> a.value.map(::toKotlin).toSet()
             is JsArrayWrapper -> a.value.fastMap(::toKotlin)
             is JsWrapper<*> -> toKotlin(a.value)
+            is Int -> a.toLong()
+            is Float -> a.toDouble()
             else -> a
         }
     }

@@ -3,30 +3,33 @@ package io.github.alexzhirkevich.keight
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.sync.Mutex
 
 
 public enum class VariableType {
     Global, Local, Const
 }
 
-public interface ScriptRuntime : ScriptContext, CoroutineScope {
+public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
 
-    public var io : ScriptIO
+    public abstract var io: ScriptIO
 
-    public val isSuspendAllowed : Boolean
+    public open val isSuspendAllowed: Boolean get() = true
 
-    public fun isEmpty() : Boolean
+    internal val lock: Mutex = Mutex()
 
-    public fun delete(property: Any?)
+    public abstract fun isEmpty(): Boolean
 
-    public operator fun contains(variable: Any?): Boolean
+    public abstract fun delete(property: Any?)
 
-    public suspend fun get(variable: Any?): Any?
+    public abstract operator fun contains(property: Any?): Boolean
 
-    public fun set(variable: Any?, value: Any?, type: VariableType?)
+    public abstract suspend fun get(property: Any?): Any?
 
-    public suspend fun withScope(
-        extraVariables: Map<String, Pair<VariableType, Any?>> = emptyMap(),
+    public abstract fun set(property: Any?, value: Any?, type: VariableType?)
+
+    public abstract suspend fun withScope(
+        extraProperties: Map<String, Pair<VariableType, Any?>> = emptyMap(),
         isSuspendAllowed: Boolean = this.isSuspendAllowed,
         block: suspend (ScriptRuntime) -> Any?
     ): Any?
@@ -34,11 +37,11 @@ public interface ScriptRuntime : ScriptContext, CoroutineScope {
     /**
      * Restore runtime to its initial state, cancel all running jobs
      * */
-    public fun reset()
+    public abstract fun reset()
 }
 
-public operator fun ScriptRuntime.set(variable: Any?, value: Any?): Unit =
-    set(variable, fromKotlin(value), null)
+public operator fun ScriptRuntime.set(property: Any?, value: Any?): Unit =
+    set(property, fromKotlin(value), null)
 
 private class ScopedRuntime(
     val parent : ScriptRuntime,
@@ -69,11 +72,11 @@ private class ScopedRuntime(
         return super.contains(property) || parent.contains(property)
     }
 
-    override fun set(variable: Any?, value: Any?, type: VariableType?) {
+    override fun set(property: Any?, value: Any?, type: VariableType?) {
         when {
-            type == VariableType.Global -> parent.set(variable, value, type)
-            type != null || variable in variables -> super.set(variable, value, type)
-            else -> parent.set(variable, value, type)
+            type == VariableType.Global -> parent.set(property, value, type)
+            type != null || property in variables -> super.set(property, value, type)
+            else -> parent.set(property, value, type)
         }
     }
 
@@ -82,16 +85,13 @@ private class ScopedRuntime(
     }
 }
 
-public abstract class DefaultRuntime : ScriptRuntime {
+public abstract class DefaultRuntime : ScriptRuntime() {
 
     protected val variables: MutableMap<Any?, Pair<VariableType, Any?>> = mutableMapOf()
 
     private val child by lazy {
         ScopedRuntime(this, isSuspendAllowed)
     }
-
-    override val isSuspendAllowed: Boolean
-        get() = true
 
     override fun contains(property: Any?): Boolean {
         return property in variables
@@ -101,14 +101,14 @@ public abstract class DefaultRuntime : ScriptRuntime {
         variables.remove(property)
     }
 
-    override fun set(variable: Any?, value: Any?, type: VariableType?) {
-        if (type != null && variable in variables) {
-            throw SyntaxError("Identifier '$variable' is already declared")
+    override fun set(property: Any?, value: Any?, type: VariableType?) {
+        if (type != null && property in variables) {
+            throw SyntaxError("Identifier '$property' is already declared")
         }
-        if (type == null && variables[variable]?.first == VariableType.Const) {
-            throw TypeError("Assignment to constant variable ('$variable')")
+        if (type == null && variables[property]?.first == VariableType.Const) {
+            throw TypeError("Assignment to constant variable ('$property')")
         }
-        variables[variable] = (type ?: variables[variable]?.first ?: VariableType.Global) to value
+        variables[property] = (type ?: variables[property]?.first ?: VariableType.Global) to value
     }
 
     override suspend fun get(property: Any?): Any? {
@@ -118,13 +118,13 @@ public abstract class DefaultRuntime : ScriptRuntime {
     }
 
     final override suspend fun withScope(
-        extraVariables: Map<String, Pair<VariableType, Any?>>,
+        extraProperties: Map<String, Pair<VariableType, Any?>>,
         isSuspendAllowed: Boolean,
         block: suspend (ScriptRuntime) -> Any?
     ): Any? {
         child.reset()
         child.isSuspendAllowed = isSuspendAllowed
-        extraVariables.forEach { (n, v) ->
+        extraProperties.forEach { (n, v) ->
             child.set(n, v.second, v.first)
         }
         return block(child)

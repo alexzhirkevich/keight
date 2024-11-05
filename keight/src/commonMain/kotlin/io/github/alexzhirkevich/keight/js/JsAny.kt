@@ -17,8 +17,6 @@ public interface JsAny {
     public suspend fun delete(property: Any?, runtime: ScriptRuntime) {
     }
 
-
-
     public suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         return when(property){
             "toString" -> ToString(this)
@@ -56,12 +54,13 @@ internal suspend fun JsAny.call(
     isOptional : Boolean,
     runtime: ScriptRuntime,
 ) : Any? {
-    val callable = get(func, runtime)?.callableOrNull()
+    val v = get(func, runtime)
+    val callable = v?.callableOrNull()
     if (callable == null && isOptional) {
         return Unit
     }
     typeCheck(callable != null) {
-        "$callable is not a function"
+        "$v is not a function"
     }
     return callable.call(thisRef, args, runtime)
 }

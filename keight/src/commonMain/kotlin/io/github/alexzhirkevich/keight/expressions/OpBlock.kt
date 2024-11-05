@@ -2,7 +2,6 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.invoke
 import kotlin.jvm.JvmInline
 
 
@@ -11,9 +10,9 @@ internal data class OpBlock(
     val isScoped : Boolean,
     val isExpressible : Boolean = true,
     val isSurroundedWithBraces : Boolean
-) : Expression {
+) : Expression() {
 
-    override suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): Any? {
         return if (isScoped) {
             runtime.withScope(block = ::invokeInternal)
         } else {
@@ -48,22 +47,21 @@ internal data object BlockContinue : ScopeException()
 internal data object BlockBreak : ScopeException()
 internal class BlockReturn(val value: Any?) : ScopeException()
 
-@JvmInline
-internal value class OpReturn(
+internal class OpReturn(
     val value : Expression
-) : Expression {
-    override suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
+) : Expression() {
+    override suspend fun execute(runtime: ScriptRuntime): Any? {
         throw BlockReturn(value(runtime))
     }
 }
 
-internal object OpContinue : Expression {
-    override suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
+internal object OpContinue : Expression() {
+    override suspend fun execute(runtime: ScriptRuntime): Any? {
         throw BlockContinue
     }
 }
-internal object OpBreak : Expression {
-    override suspend fun invokeRaw(runtime: ScriptRuntime): Any? {
+internal object OpBreak : Expression() {
+    override suspend fun execute(runtime: ScriptRuntime): Any? {
         throw BlockBreak
     }
 }

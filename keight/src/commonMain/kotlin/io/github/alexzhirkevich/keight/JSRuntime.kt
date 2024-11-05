@@ -201,3 +201,8 @@ private class RuntimeGlobalThis(
         runtime.delete(property)
     }
 }
+
+internal suspend inline fun <reified T> ScriptRuntime.thisRef() : T {
+    return get("this") as T
+}
+

@@ -19,23 +19,28 @@ public interface Script {
     public suspend operator fun invoke(): Any?
 }
 
-public fun Expression.asScript(runtime: ScriptRuntime): Script = object : Script {
+internal fun Expression.asScript(runtime: ScriptRuntime): Script = object : Script {
 
     override suspend fun invoke(): Any? {
         return withContext(runtime.coroutineContext) {
-            try {
-                runtime.toKotlin(invoke(runtime))
-            } catch (c: CancellationException) {
-                throw c
-            } catch (t: Throwable) {
-                if (t is JsAny) {
-                    throw t
-                } else {
-                    throw JSError(t.message, cause = t)
+            check(!runtime.lock.isLocked || runtime.isSuspendAllowed) {
+                "Simultaneous script launching is not allowed for runtimes with " +
+                        "prohibited suspension (ScriptRuntime.isSuspendAllowed = false)"
+            }
+
+            runtime.lock.withLock {
+                try {
+                    runtime.toKotlin(invoke(runtime))
+                } catch (c: CancellationException) {
+                    throw c
+                } catch (t: Throwable) {
+                    if (t is JSError) {
+                        throw t
+                    } else {
+                        throw JSError(t.message, cause = t)
+                    }
                 }
             }
         }
     }
 }
-
-private enum class CompletionFlag { Finished, Cancelled }

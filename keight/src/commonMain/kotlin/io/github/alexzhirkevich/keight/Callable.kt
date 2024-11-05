@@ -7,10 +7,8 @@ import kotlin.jvm.JvmInline
 
 public interface Callable : JsAny {
 
-    public val thisRef : Any? get() = null
-
     public suspend fun call(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime) : Any? {
-        return bind(thisArg, args, runtime).invoke(args, runtime)
+        return bind(thisArg, emptyList(), runtime).invoke(args, runtime)
     }
 
     public suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime) : Callable
@@ -19,7 +17,7 @@ public interface Callable : JsAny {
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         return when(property){
-            "call" -> this
+            "call" -> Call(this)
             "bind" -> Bind(this)
             "apply" -> Apply(this)
             else -> super.get(property, runtime)
@@ -27,7 +25,23 @@ public interface Callable : JsAny {
     }
 
     @JvmInline
-    private value class Bind(override val thisRef: Callable) : Callable {
+    private value class Call(val thisRef: Callable) : Callable {
+
+        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+            val callable = thisArg?.callableOrNull()
+            typeCheck(callable != null){
+                "$callable is not a function"
+            }
+            return Call(callable)
+        }
+
+        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+            return thisRef.call(args.getOrNull(0), args.drop(1), runtime)
+        }
+    }
+
+    @JvmInline
+    private value class Bind(val thisRef: Callable) : Callable {
 
         override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
             val callable = thisArg?.callableOrNull()
@@ -43,7 +57,7 @@ public interface Callable : JsAny {
     }
 
     @JvmInline
-    private value class Apply(override val thisRef: Callable) : Callable {
+    private value class Apply(val thisRef: Callable) : Callable {
 
         override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
             val callable = thisArg?.callableOrNull()

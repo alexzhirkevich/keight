@@ -1,6 +1,5 @@
 import io.github.alexzhirkevich.keight.DefaultScriptIO
 import io.github.alexzhirkevich.keight.ScriptIO
-import io.github.alexzhirkevich.keight.evaluate
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.JavaScriptEngine
 import kotlinx.coroutines.Job
@@ -25,6 +24,10 @@ internal fun runtimeTest(
 
 internal suspend fun String.eval(runtime: JSRuntime = JSRuntime(Job())) : Any? {
     return JavaScriptEngine(runtime).evaluate(this)
+}
+
+internal suspend fun String.eval2() : Any? {
+    return JavaScriptEngine(JSRuntime(Job())).evaluate(this)
 }
 
 internal suspend fun String.eval(io : ScriptIO = DefaultScriptIO, runtime: JSRuntime =

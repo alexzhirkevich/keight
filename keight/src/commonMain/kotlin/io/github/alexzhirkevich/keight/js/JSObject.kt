@@ -1,7 +1,9 @@
 package io.github.alexzhirkevich.keight.js
 
+import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.fastMapTo
 import io.github.alexzhirkevich.keight.findRoot
 
 public interface JSObject : JsAny {
@@ -183,12 +185,14 @@ internal class ObjectScopeImpl(
         vararg args: FunctionParam,
         body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
     ) {
+        val argsList = MutableList<Any?>(args.size) { }
+
         this eq JSFunction(
             this,
             parameters = args.toList(),
-            body = { ctx ->
+            body = Expression { ctx ->
                 with(ctx) {
-                    body(args.map { ctx.get(it.name) })
+                    body(args.fastMapTo(argsList) { ctx.get(it.name) })
                 }
             }
         )
@@ -242,7 +246,7 @@ internal fun JSObject.func(
     return JSFunction(
         name = name,
         parameters = args.toList(),
-        body = {
+        body = Expression {
             with(it) {
                 body(args.map { get(it.name) })
             }
@@ -259,7 +263,7 @@ internal fun String.func(
 ) = JSFunction(
     trimStart('_'),
     parameters = args.toList(),
-    body = {
+    body = Expression {
         with(it) {
             body(args.map { get(it.name) })
         }

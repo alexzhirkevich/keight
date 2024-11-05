@@ -4,7 +4,6 @@ import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 
 internal sealed interface StaticClassMember : Named {
@@ -22,9 +21,9 @@ internal class OpClassInit(
     val static : Map<String, StaticClassMember>,
     val construct: JSFunction?,
     val extends : Expression?
-) : Expression {
+) : Expression() {
 
-    override suspend fun invokeRaw(runtime: ScriptRuntime): JSClass {
+    override suspend fun execute(runtime: ScriptRuntime): JSClass {
 
         val extendsConstructor = extends?.invoke(runtime)
 

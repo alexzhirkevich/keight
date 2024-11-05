@@ -1,7 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.invoke
+
 
 internal class JSSetFunction : JSFunction(name = "Set",) {
 

@@ -3,7 +3,6 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.fastForEachIndexed
-import io.github.alexzhirkevich.keight.invoke
 
 internal fun OpSwitch(
     value : Expression,
@@ -37,8 +36,8 @@ internal fun OpSwitch(
 
 internal class OpCase(
     val value : Expression,
-) : Expression {
-    override suspend fun invokeRaw(runtime: ScriptRuntime): Any = Unit
+) : Expression() {
+    override suspend fun execute(runtime: ScriptRuntime): Any = Unit
 
     companion object {
         val Default = Expression {  }

@@ -9,6 +9,29 @@ import kotlin.test.assertTrue
 class JsArrayTest {
 
     @Test
+    fun indexOf() = runtimeTest {
+        "const array = [2, 9, 9];".eval(it)
+        "array.indexOf(2);".eval(it).assertEqualsTo(0L)
+        "array.indexOf(7);".eval(it).assertEqualsTo(-1L)
+        "array.indexOf(9, 2);".eval(it).assertEqualsTo(2L)
+        "array.indexOf(2, -1);".eval(it).assertEqualsTo(-1L)
+        "array.indexOf(2, -3);".eval(it).assertEqualsTo(0L)
+    }
+    @Test
+    fun lastIndexOf() = runtimeTest {
+        "const numbers = [2, 5, 9, 2];".eval(it)
+        "numbers.lastIndexOf(2);".eval(it).assertEqualsTo(3L)
+        "numbers.lastIndexOf(7);".eval(it).assertEqualsTo(-1L)
+        "numbers.lastIndexOf(2, 3);".eval(it).assertEqualsTo(3L)
+        "numbers.lastIndexOf(2, 2);".eval(it).assertEqualsTo(0L)
+        "numbers.lastIndexOf(2, -2);".eval(it).assertEqualsTo(0L)
+        "numbers.lastIndexOf(2, -1);".eval(it).assertEqualsTo(3L)
+
+        "[1,2,2,3].lastIndexOf(2)".eval().assertEqualsTo(2L)
+        "[1,2,2,3].lastIndexOf(2,1)".eval().assertEqualsTo(1L)
+    }
+
+    @Test
     fun forEach() = runTest {
         """
             let x = 0

@@ -4,16 +4,21 @@ import io.github.alexzhirkevich.keight.js.interpreter.parse
 import io.github.alexzhirkevich.keight.js.interpreter.tokenize
 import kotlinx.coroutines.Job
 
-public fun JavaScriptEngine(
-    runtime: JSRuntime,
+public class JavaScriptEngine(
+    override val runtime: JSRuntime,
     vararg modules : Module
-) : ScriptEngine = ScriptEngine(runtime, JSInterpreter, *modules)
+) : ScriptEngine() {
 
-private object JSInterpreter : ScriptInterpreter {
-    override fun interpret(script: String): Expression {
+    init {
+        modules.forEach {
+            it.importInto(runtime)
+        }
+    }
+
+    override fun compile(script: String): Script {
         return "{$script}"
             .tokenize()
             .parse()
-
+            .asScript(runtime)
     }
 }

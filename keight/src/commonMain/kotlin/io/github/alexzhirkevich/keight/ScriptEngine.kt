@@ -1,10 +1,21 @@
 package io.github.alexzhirkevich.keight
 
-public interface ScriptEngine {
+public abstract class ScriptEngine {
 
-    public val runtime : ScriptRuntime
+    public abstract val runtime : ScriptRuntime
 
-    public val interpreter : ScriptInterpreter
+    /**
+     * Compile [script] code to an executable [Script] instance.
+     *
+     * - The resulting [Script] instance is NOT thread safe. The same script instance cannot be
+     * executed multiple times in parallel - it will wait for the previous execution to finish
+     * - Script is always executed in the coroutine context of the engine runtime
+     * */
+    public abstract fun compile(script: String) : Script
+
+    public open suspend fun evaluate(script: String) : Any? {
+        return compile(script).invoke()
+    }
 
     /**
      * Restore engine runtime to its initial state
@@ -14,49 +25,7 @@ public interface ScriptEngine {
      *
      * @see [ScriptRuntime.reset]
      * */
-    public fun reset() {
+    public open fun reset() {
         runtime.reset()
-    }
-}
-
-
-/**
- * Compile [script] code to an executable [Script] instance.
- *
- * - The resulting [Script] instance is not thread safe. It will be executed in the coroutine
- * context of the [ScriptEngine.runtime]
- * */
-public fun ScriptEngine.compile(script: String) : Script {
-    return interpreter.interpret(script).asScript(runtime)
-}
-
-public suspend fun ScriptEngine.evaluate(script: String) : Any? {
-    return compile(script).invoke()
-}
-
-public fun ScriptEngine(
-    runtime: ScriptRuntime,
-    interpreter: ScriptInterpreter,
-    vararg modules: Module
-): ScriptEngine = object : ScriptEngine{
-
-    override val runtime: ScriptRuntime get() = runtime
-
-    override val interpreter: ScriptInterpreter
-        get() = interpreter
-
-    init {
-        importModules()
-    }
-
-    override fun reset() {
-        super.reset()
-        importModules()
-    }
-
-    private fun importModules(){
-        modules.forEach {
-            it.importInto(runtime)
-        }
     }
 }

@@ -1,5 +1,9 @@
 package io.github.alexzhirkevich.keight.js
 
+import io.github.alexzhirkevich.keight.expressions.OpConstant
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 import kotlin.jvm.JvmInline
 
 internal fun <T> T.listOf() : List<T> = SingleElementList(this)
@@ -38,4 +42,19 @@ internal value class SingleElementList<T>(private val element : T) : List<T> {
         }
         return SingleElementList(element)
     }
+}
+
+internal object ArgOmitted
+internal val OpArgOmitted = OpConstant(ArgOmitted)
+
+@OptIn(ExperimentalContracts::class)
+internal inline fun <T> List<T>.argOrElse(index: Int, defaultValue: (Int) -> T): T {
+    contract {
+        callsInPlace(defaultValue, InvocationKind.AT_MOST_ONCE)
+    }
+    return if (index in indices) {
+        get(index).let {
+            if (it == ArgOmitted) defaultValue(index) else it
+        }
+    } else defaultValue(index)
 }

@@ -1,7 +1,6 @@
 package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.js.JsAny
-import io.github.alexzhirkevich.keight.invoke
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
@@ -21,22 +20,6 @@ internal fun <T : Any?> checkNotEmpty(value : T?) : T {
         "TypeError: Cannot read properties of $type"
     }
     return value
-}
-
-
-internal fun <T, R : Any> Expression.cast(block: (T) -> R) : Expression =
-    Expression { block(invoke(it) as T) }
-
-internal fun <T, R : Any> Expression.withCast(block: T.(
-    context: ScriptRuntime,
-) -> R) : Expression = Expression {
-    block(invoke(it) as T, it)
-}
-
-internal fun Any.valueAtIndex(index : Int) : Any {
-    return checkNotNull(valueAtIndexOrUnit(index)){
-        "Index $index out of bounds of $this length"
-    }
 }
 
 internal fun Any.valueAtIndexOrUnit(index : Int) : Any {
@@ -163,6 +146,13 @@ internal inline fun <T, R> List<T>.fastMapTo(destination : MutableList<R>, trans
     contract { callsInPlace(transform) }
     fastForEachIndexed { i, it ->
         destination[i] = transform(it)
+    }
+    return destination
+}
+
+public inline fun <T, R, C : MutableList<in R>> Array<out T>.fastMapTo(destination: C, transform: (T) -> R): C {
+    for (i in indices){
+        destination[i] = transform(get(i))
     }
     return destination
 }

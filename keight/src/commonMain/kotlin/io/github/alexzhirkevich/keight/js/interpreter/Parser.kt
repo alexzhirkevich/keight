@@ -41,8 +41,6 @@ import io.github.alexzhirkevich.keight.expressions.OpWhileLoop
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.fastAll
 import io.github.alexzhirkevich.keight.fastMap
-import io.github.alexzhirkevich.keight.invoke
-import io.github.alexzhirkevich.keight.isAssignable
 import io.github.alexzhirkevich.keight.js.FunctionParam
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
@@ -66,6 +64,7 @@ internal fun List<Token>.parse() : Expression {
             scoped = false,
             isExpressible = true,
             blockContext = emptyList(),
+            type = ExpectedBlockType.Block
         )
 }
 
@@ -1232,7 +1231,7 @@ private fun ListIterator<Token>.parseBlock(
                         }
 
                         is OpSpread -> {
-                            val any = (expr.value(r) as JsAny)
+                            val any = expr.value(r) as JsAny
                             any.keys.forEach {
                                 it eq any.get(it, r)
                             }
@@ -1301,7 +1300,7 @@ internal fun checkArgs(args : List<*>?, count : Int, func : String) {
 
 
 @OptIn(ExperimentalContracts::class)
-public inline fun syntaxCheck(value: Boolean, lazyMessage: () -> Any) {
+internal inline fun syntaxCheck(value: Boolean, lazyMessage: () -> Any) {
     contract {
         returns() implies value
     }
@@ -1313,7 +1312,7 @@ public inline fun syntaxCheck(value: Boolean, lazyMessage: () -> Any) {
 }
 
 @OptIn(ExperimentalContracts::class)
-public inline fun typeCheck(value: Boolean, lazyMessage: () -> Any) {
+internal inline fun typeCheck(value: Boolean, lazyMessage: () -> Any) {
     contract {
         returns() implies value
     }
@@ -1322,6 +1321,11 @@ public inline fun typeCheck(value: Boolean, lazyMessage: () -> Any) {
         val message = lazyMessage()
         throw TypeError(message.toString())
     }
+}
+
+internal fun Expression.isAssignable() : Boolean {
+    return this is OpGetProperty ||
+            this is OpIndex && receiver is OpGetProperty
 }
 
 

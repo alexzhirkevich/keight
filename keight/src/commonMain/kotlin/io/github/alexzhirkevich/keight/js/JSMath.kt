@@ -5,7 +5,7 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.fastSumBy
 import io.github.alexzhirkevich.keight.js.interpreter.checkArgs
-import io.github.alexzhirkevich.keight.invoke
+
 import kotlin.math.*
 import kotlin.random.Random
 

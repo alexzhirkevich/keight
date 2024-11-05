@@ -2,7 +2,6 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import kotlinx.coroutines.currentCoroutineContext
@@ -14,8 +13,7 @@ internal class OpForLoop(
     private val increment: Expression?,
     private val comparison : Expression?,
     private val body: Expression
-) : Expression {
-
+) : Expression() {
 
     private val condition: suspend (ScriptRuntime) -> Boolean = if (comparison == null) {
         { true }
@@ -23,7 +21,7 @@ internal class OpForLoop(
         { !it.isFalse(comparison.invoke(it)) }
     }
 
-    override suspend fun invokeRaw(runtime: ScriptRuntime): Any {
+    override suspend fun execute(runtime: ScriptRuntime): Any {
         runtime.withScope {
             assignment?.invoke(it)
             block(it)
@@ -52,9 +50,9 @@ internal class OpForInLoop(
     private val assign : suspend (ScriptRuntime, Any?) -> Unit,
     private val inObject : Expression,
     private val body: Expression
-) : Expression {
+) : Expression() {
 
-    override suspend fun invokeRaw(runtime: ScriptRuntime): Any {
+    override suspend fun execute(runtime: ScriptRuntime): Any {
         runtime.withScope {
             val o = inObject(it)
 

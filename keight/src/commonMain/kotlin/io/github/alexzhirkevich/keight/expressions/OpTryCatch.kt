@@ -3,7 +3,6 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.SyntaxError
-import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.JSError
 
 internal class ThrowableValue(val value : Any?) : JSError(value) {
@@ -47,7 +46,7 @@ private fun TryCatchFinally(
         if (catchVariableName != null) {
             val throwable = if (t is ThrowableValue) t.value else t
             it.withScope(
-                extraVariables = mapOf(catchVariableName to (VariableType.Local to throwable)),
+                extraProperties = mapOf(catchVariableName to (VariableType.Local to throwable)),
                 block = catchBlock::invoke
             )
         } else {

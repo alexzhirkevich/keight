@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.coroutineContext
+import kotlin.coroutines.resume
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

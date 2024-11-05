@@ -3,14 +3,15 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
-import io.github.alexzhirkevich.keight.checkNotEmpty
 import io.github.alexzhirkevich.keight.comparator
 import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.fastAll
 import io.github.alexzhirkevich.keight.fastAny
 import io.github.alexzhirkevich.keight.fastFilter
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
+import io.github.alexzhirkevich.keight.thisRef
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit
 import kotlin.jvm.JvmInline
 import kotlin.math.abs
@@ -28,20 +29,97 @@ internal class JSArrayFunction : JSFunction(
 
         setPrototype(Object {
             "length" eq JsNumberWrapper(0)
-            "indexOf" eq IndexOf(mutableListOf())
-            "lastIndexOf" eq LastIndexOf(mutableListOf())
-            "forEach" eq ForEach(mutableListOf())
-            "map" eq Map(mutableListOf())
-            "filter" eq Filter(mutableListOf())
-            "reduce" eq Reduce(mutableListOf())
-            "reduceRight" eq ReduceRight(mutableListOf())
-            "some" eq Some(mutableListOf())
-            "every" eq Every(mutableListOf())
-            "reverse" eq Reverse(mutableListOf())
-            "toReversed" eq ToReversed(mutableListOf())
-            "sort" eq Sort(mutableListOf())
-            "toSorted" eq ToSorted(mutableListOf())
-            "slice" eq Slice(mutableListOf())
+            "indexOf".func(
+                FunctionParam("search"),
+                "position" defaults OpConstant(0)
+            ) {
+                thisRef<List<*>>().indexOf(this, it)
+            }
+            "lastIndexOf".func(
+                FunctionParam("search"),
+                "position" defaults OpArgOmitted
+            ) {
+                thisRef<List<*>>().lastIndexOf(this, it)
+            }
+            "forEach".func("callback") { args ->
+                op(args) { callable ->
+                    thisRef<List<*>>().fastForEach {
+                        callable.invoke(it.listOf(), this)
+                    }
+                }
+            }
+
+            "map".func("callback") { args ->
+                op(args) { callable ->
+                    thisRef<List<*>>().fastMap {
+                        callable.invoke(it.listOf(), this)
+                    }
+                }
+            }
+            "filter".func("callback") { args ->
+                op(args) { callable ->
+                    thisRef<List<*>>().fastFilter {
+                        !isFalse(callable.invoke(it.listOf(), this))
+                    }
+                }
+            }
+            "reduce".func("callback") { args ->
+                val v = if (args.size > 1) {
+                    listOf(args[1]) + thisRef<List<*>>()
+                } else {
+                    thisRef<List<*>>()
+                }
+                op(args) { callable ->
+                    v.reduce { acc, any ->
+                        callable.invoke(listOf(acc, any), this)
+                    }
+                }
+            }
+            "reduceRight".func("callback") { args ->
+                val v = if (args.size > 1) {
+                    thisRef<List<*>>() + args[1]
+                } else {
+                    thisRef<List<*>>()
+                }
+                op(args) { callable ->
+                    v.reduceRight { acc, any ->
+                        callable.invoke(listOf(acc, any), this)
+                    }
+                }
+            }
+            "some".func("callback") { args ->
+                op(args) { callable ->
+                    thisRef<List<*>>().fastAny {
+                        !isFalse(callable.invoke(it.listOf(), this))
+                    }
+                }
+            }
+            "every".func("callback") { args ->
+                op(args) { callable ->
+                    thisRef<List<*>>().fastAll {
+                        !isFalse(callable.invoke(it.listOf(), this))
+                    }
+                }
+            }
+            "reverse".func { thisRef<MutableList<*>>().reverse() }
+            "toReversed".func { thisRef<List<*>>().reversed() }
+            "sort".func { thisRef<MutableList<*>>().sortWith(comparator) }
+            "toSorted".func { thisRef<List<*>>().sortedWith(comparator) }
+            "slice".func(
+                "start" defaults OpConstant(0),
+                "end" defaults OpArgOmitted
+            ) { args ->
+                if (args.isEmpty()) {
+                    thisRef()
+                } else {
+                    val start = args[0].let(this::toNumber).toInt()
+                    val list = thisRef<List<*>>()
+                    val end = args.argOrElse(1) { list.size }
+                        .let(this::toNumber).toInt()
+                        .coerceIn(0,  list.size)
+                    list.slice(start until end)
+                }
+            }
             "splice" eq Splice(mutableListOf())
             "toSpliced" eq ToSpliced(mutableListOf())
             "at" eq At(mutableListOf())
@@ -80,198 +158,6 @@ internal class JSArrayFunction : JSFunction(
 
     override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): List<*> {
         return invoke(args, runtime)
-    }
-
-
-    @JvmInline
-    private value class IndexOf(val value: MutableList<Any?>) : Callable {
-
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return value.indexOf(false, runtime, args)
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return IndexOf((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class LastIndexOf(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return value.indexOf(true, runtime, args)
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return LastIndexOf((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class ForEach(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return op(runtime, args) { callable ->
-                value.fastForEach {
-                    callable.invoke(listOf(it), runtime)
-                }
-            }
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return ForEach((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Map(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return op(runtime, args) { callable ->
-                value.fastMap {
-                    callable.invoke(it.listOf(), runtime)
-                }
-            }
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Map((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Filter(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return op(runtime, args) { callable ->
-                value.fastFilter {
-                    !runtime.isFalse(callable.invoke(it.listOf(), runtime))
-                }
-            }
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Filter((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Reduce(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            val v = if (args.size > 1) {
-                listOf(args[1]) + value
-            } else {
-                value
-            }
-            return op(runtime, args) { callable ->
-                v.reduce { acc, any ->
-                    callable.invoke(listOf(acc, any), runtime)
-                }
-            }
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Reduce((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class ReduceRight(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            val v = if (args.size > 1) {
-                value + args[1]
-            } else {
-                value
-            }
-            return op(runtime, args) { callable ->
-                v.reduceRight { acc, any ->
-                    callable.invoke(listOf(acc, any), runtime)
-                }
-            }
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return ReduceRight((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Some(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return op(runtime, args) { callable ->
-                value.any {
-                    !runtime.isFalse(callable.invoke(it.listOf(), runtime))
-                }
-            }
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Some((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Every(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return op(runtime, args) { callable ->
-                value.fastAny {
-                    !runtime.isFalse(callable.invoke(listOf(it), runtime))
-                }
-            }
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Every((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Reverse(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime) {
-            return value.reverse()
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Reverse((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class ToReversed(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return value.reversed()
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return ToReversed((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Sort(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime) {
-            return value.sortWith(runtime.comparator)
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Sort((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class ToSorted(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return value.sortedWith(runtime.comparator)
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return ToSorted((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Slice(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return if (args.isEmpty()) {
-                value
-            } else {
-                val start = args[0].let(runtime::toNumber).toInt()
-                val end = if (args.size < 2)
-                    value.size
-                else
-                    args[1].let(runtime::toNumber).toInt()
-                        .coerceIn(0, value.size)
-
-                value.slice(start..<end)
-            }
-        }
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Slice((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
     }
 
     @JvmInline
@@ -450,7 +336,7 @@ internal class JSArrayFunction : JSFunction(
     @JvmInline
     private value class FlatMap(val value: MutableList<Any?>) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return op(runtime, args) { callable ->
+            return op(args) { callable ->
                 value.fastMap {
                     callable.invoke(listOf(it), runtime)
                 }
@@ -474,7 +360,6 @@ private fun List<*>.flat(depth : Int, collector : MutableList<Any?> = mutableLis
 }
 
 private suspend fun <R> op(
-    runtime: ScriptRuntime,
     arguments: List<Any?>,
     op: suspend (Callable) -> R
 ) : R {
@@ -485,14 +370,62 @@ private suspend fun <R> op(
     return op(func)
 }
 
-private suspend fun List<*>.indexOf(
-    last : Boolean,
+private fun List<*>.indexOf(
     context: ScriptRuntime,
     arguments: List<Any?>
 ): Any {
-    val search = checkNotEmpty(arguments[0])
+    val search = arguments[0]
 
-    return if (last)
-        lastIndexOf(search)
-    else indexOf(search)
+    var position = context.toNumber(
+        arguments.argOrElse(1){ 0 }
+    ).toInt()
+
+    if (position >= size){
+        return -1
+    }
+
+    position = when {
+        position >= size -> return -1
+        position < -size -> 0
+        position < 0 -> position + size
+        else -> position
+    }
+
+    for (i in position until size) {
+        if (this[i] == search) {
+            return i
+        }
+    }
+
+    return -1
+}
+
+private fun List<*>.lastIndexOf(
+    context: ScriptRuntime,
+    arguments: List<Any?>
+): Any {
+    val search = arguments[0]
+
+    var position = context.toNumber(
+        arguments.argOrElse(1) { lastIndex }
+    ).toInt()
+
+    if (position < -size) {
+        return -1
+    }
+
+    position = when {
+        position < -size -> return -1
+        position >= size -> lastIndex
+        position < 0 -> position + size
+        else -> position
+    }
+
+    for (i in position downTo 0) {
+        if (this[i] == search) {
+            return i
+        }
+    }
+
+    return -1
 }

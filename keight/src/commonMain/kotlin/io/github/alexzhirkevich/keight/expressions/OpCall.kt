@@ -7,7 +7,6 @@ import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.fastMapTo
-import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.call

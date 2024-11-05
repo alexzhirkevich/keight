@@ -1,7 +1,11 @@
 package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.ScriptRuntime
 import kotlin.jvm.JvmInline
 
-@JvmInline
-internal value class OpSpread(val value : Expression) : Expression by value
+internal class OpSpread(val value : Expression) : Expression() {
+    override suspend fun execute(runtime: ScriptRuntime): Any? {
+        return value.invoke(runtime)
+    }
+}

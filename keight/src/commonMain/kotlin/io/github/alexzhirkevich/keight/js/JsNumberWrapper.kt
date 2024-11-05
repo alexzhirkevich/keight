@@ -4,7 +4,7 @@ import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.findRoot
-import io.github.alexzhirkevich.keight.invoke
+
 import kotlin.jvm.JvmInline
 
 internal class JsNumberObject(

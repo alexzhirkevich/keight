@@ -252,6 +252,23 @@ class FunctionsTest {
     }
 
     @Test
+    fun call() = runtimeTest{
+        "Array.prototype.indexOf.call([2, 9, 9], 2)".eval().assertEqualsTo(0L)
+    }
+
+    @Test
+    fun bind() = runtimeTest{
+        "Array.prototype.indexOf.bind([2, 9, 9])(2)".eval().assertEqualsTo(0L)
+        "Array.prototype.indexOf.bind([2, 9, 9], 2)()".eval().assertEqualsTo(0L)
+        "Array.prototype.indexOf.bind([2, 5, 9, 2], 2)()".eval().assertEqualsTo(0L)
+        "Array.prototype.indexOf.bind([2, 5, 9, 2], 2)(3)".eval().assertEqualsTo(3L)
+        "Array.prototype.indexOf.bind([2, 5, 9, 2], 2).bind([2, 5, 9, 2], 3)()".eval().assertEqualsTo(3L)
+        "Array.prototype.indexOf.bind([2, 5, 9, 2], 2).bind('not rebindable', 3)()".eval().assertEqualsTo(3L)
+        "Array.prototype.indexOf.bind([2, 5, 9, 2], 2).call('not rebindable', 3)".eval().assertEqualsTo(3L)
+        "Array.prototype.indexOf.bind([2, 5, 9, 2], 2).apply('not rebindable', [3])".eval().assertEqualsTo(3L)
+    }
+
+    @Test
     fun async_function() = runTest {
         assertFailsWith<JSError> {
             """

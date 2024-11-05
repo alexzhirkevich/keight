@@ -9,7 +9,6 @@ import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastForEachIndexed
-import io.github.alexzhirkevich.keight.invoke
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import kotlinx.coroutines.async
 
@@ -36,6 +35,10 @@ public open class JSFunction(
 
     override val type: String get() = "function"
 
+    private var thisRef : Any? = null
+    private var isMutableThisRef = !isArrow
+    private var bindedArgs = emptyList<Any?>()
+
     private val superConstructorPropertyMap =
         if (superConstructor != null) {
             mapOf("super" to Pair(VariableType.Const, superConstructor))
@@ -43,13 +46,10 @@ public open class JSFunction(
             emptyMap()
         }
 
-    final override var thisRef : Any? = null
-        private set
-
     init {
         properties.forEach {
             val v = it.value
-            if (v is JSFunction && !v.isArrow) {
+            if (v is JSFunction && isMutableThisRef) {
                 v.thisRef = this
             }
         }
@@ -63,65 +63,68 @@ public open class JSFunction(
     }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
-        return super<JSObjectImpl>.get(property, runtime)
-//        return when {
-//            property in properties -> super<JSObjectImpl>.get(property, runtime)
-//            else -> super<Callable>.get(property, runtime)
-//        }
+        return when {
+            property in properties -> super<JSObjectImpl>.get(property, runtime)
+            else -> super<Callable>.get(property, runtime)
+        }
     }
 
     internal fun copy(
         isAsync: Boolean = this.isAsync,
-        body: Expression = this.body,
-    ): JSFunction {
-        return JSFunction(
-            name = name,
-            parameters = parameters,
-            body = body,
-            isArrow = isArrow,
-            isAsync = isAsync,
-            prototype = prototype,
-            superConstructor = superConstructor
+    ): JSFunction = JSFunction(
+        name = name,
+        parameters = parameters,
+        body = body,
+        isArrow = isArrow,
+        isAsync = isAsync,
+        superConstructor = superConstructor,
+        prototype = prototype,
+    )
+
+    override suspend fun call(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Any? {
+        return invoke(
+            args = args,
+            runtime = runtime,
+            extraArgs = emptyMap(),
+            thisRef = if (isMutableThisRef) thisArg else thisRef
         )
     }
 
     override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-        return copy().apply {
-            if (!isArrow) {
-                thisRef = thisArg
-            }
+        return copy().also {
+            it.thisRef = if (isMutableThisRef) thisArg else thisRef
+            it.isMutableThisRef = false
+            it.bindedArgs = bindedArgs + args
         }
     }
 
-
     override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
-        syntaxCheck(!isArrow) {
-            "Can't use 'new' keyword with arrow functions"
+        syntaxCheck(isMutableThisRef) {
+            "Illegal usage of 'new' operator"
         }
 
-        val obj = JSObjectImpl().apply {
-            setProto(this@JSFunction.get(PROTOTYPE, runtime))
+        return JSObjectImpl().also {
+            it.setProto(get(PROTOTYPE, runtime))
+            invoke(args, runtime, superConstructorPropertyMap, it)
         }
-        with(copy()) {
-            thisRef = obj
-            invoke(args, runtime, superConstructorPropertyMap)
-        }
-        return obj
     }
 
     private suspend fun invoke(
         args: List<Any?>,
         runtime: ScriptRuntime,
-        extraArgs : Map<String, Pair<VariableType, Any?>>
+        extraArgs : Map<String, Pair<VariableType, Any?>>,
+        thisRef: Any? = this.thisRef
     ): Any? {
+        val allArgs = if (bindedArgs.isEmpty()) args else bindedArgs + args
+
         val arguments = buildMap {
             parameters.fastForEachIndexed { i, p ->
-                val value = if (p.isVararg) {
-                    args.drop(i)
-                } else {
-                    (args.getOrElse(i) { p.default?.invoke(runtime) }) ?: Unit
+                this[p.name] = VariableType.Local to when {
+                    p.isVararg -> allArgs.drop(i)
+                    i in allArgs.indices -> allArgs[i]
+                    p.default != null -> p.default.invoke(runtime)
+                    else -> Unit
                 }
-                this[p.name] = VariableType.Local to value
             }
             thisRef?.let {
                 this["this"] = VariableType.Const to it
@@ -151,7 +154,7 @@ public open class JSFunction(
     ) : Any? {
         return try {
             runtime.withScope(
-                extraVariables = arguments,
+                extraProperties = arguments,
                 isSuspendAllowed = isAsync,
                 block = body::invoke
             )
@@ -164,5 +167,3 @@ public open class JSFunction(
         return "[function $name]"
     }
 }
-
-
