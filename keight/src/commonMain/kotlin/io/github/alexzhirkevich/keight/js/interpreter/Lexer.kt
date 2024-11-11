@@ -2,6 +2,7 @@ package io.github.alexzhirkevich.keight.js.interpreter
 
 import io.github.alexzhirkevich.keight.js.SyntaxError
 
+
 internal fun String.tokenize(
     ignoreWhitespaces: Boolean =  true
 ) : List<Token> = toList()
@@ -337,56 +338,66 @@ private fun ListIterator<Char>.neq() : Token {
 }
 
 private fun ListIterator<Char>.comment(isSingleLine : Boolean) : Token.Comment {
-    val value = StringBuilder()
-    if (isSingleLine) {
-        while (hasNext()) {
-            val n = next()
-            if (n == '\n')
-                break
-            value.append(n)
-        }
-    } else {
-        var a = next()
-        var b = next()
+    val value = buildString {
+        if (isSingleLine) {
+            while (hasNext()) {
+                val n = next()
+                if (n == '\n')
+                    break
+                append(n)
+            }
+        } else {
+            var a = next()
+            var b = next()
 
-        while (a.toString() + b != "*/") {
-            value.append(a)
-            a = b
-            b = next()
+            while (a.toString() + b != "*/") {
+                append(a)
+                a = b
+                b = next()
+            }
         }
     }
 
-    return Token.Comment(value.toString())
+    return Token.Comment(value)
 }
 
-private fun ListIterator<Char>.string(start : Char) : Token.Str {
-    val value = StringBuilder()
+internal fun ListIterator<Char>.string(start : Char) : Token.Str {
+    val str = buildString {
+        var isEscaping = false
 
-    var prev : Char? = null
+        var n = next()
 
-    do {
-        val next = next()
-        value.append(next)
+        while (isEscaping || n != start) {
+            append(n)
+            isEscaping = if (n == '\\') !isEscaping else false
+            n = next()
+        }
+    }.applyEscaping()
 
-        val isStringEnd = next == start && prev != '\\'
+    return Token.Str(str)
+}
 
-        prev = next
-    } while (hasNext() && !isStringEnd)
-
-    val string = value.deleteAt(value.lastIndex)
-        .toString()
-        .replace("\\'", "'")
+private fun String.applyEscaping() : String {
+    return replace("\\'", "'")
         .replace("\\\"", "\"")
         .replace("\\n", "\n")
         .replace("\\r", "\r")
         .replace("\\t", "\t")
         .replace("\\b", "\b")
         .replace("\\\\", "\"")
-
-    return Token.Str(string)
 }
 
-private fun ListIterator<Char>.number(start : Char) : Token.Num {
+internal fun String.escape() : String {
+    return replace("'", "\\'")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+        .replace("\b", "\\b")
+        .replace("\"", "\\\\")
+}
+
+internal fun ListIterator<Char>.number(start : Char) : Token.Num {
     val value = StringBuilder()
     var numberFormat = NumberFormat.Dec
     var isFloat = false

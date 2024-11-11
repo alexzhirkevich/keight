@@ -12,8 +12,6 @@ public enum class VariableType {
 
 public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
 
-    public abstract var io: ScriptIO
-
     public open val isSuspendAllowed: Boolean get() = true
 
     internal val lock: Mutex = Mutex()
@@ -49,8 +47,6 @@ private class ScopedRuntime(
 ) : DefaultRuntime(),
     ScriptContext by parent ,
     CoroutineScope by parent {
-
-    override var io: ScriptIO by parent::io
 
     override fun fromKotlin(a: Any?): Any? {
         return parent.fromKotlin(a)

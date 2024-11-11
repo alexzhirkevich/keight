@@ -17,7 +17,7 @@ internal class StringTest {
             "hello \"world\""
         """.eval().assertEqualsTo("hello \"world\"")
 
-        "'\\n\\r\\t\\b\\''".eval().assertEqualsTo("\n\r\t\b'")
+        "'\\n\\r\\t\\b\\'\\1'".eval().assertEqualsTo("\n\r\t\b'\\1")
     }
 
     @Test

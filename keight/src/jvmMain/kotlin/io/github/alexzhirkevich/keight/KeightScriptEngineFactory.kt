@@ -1,7 +1,6 @@
 package io.github.alexzhirkevich.keight
 
 import kotlinx.coroutines.Job
-import io.github.alexzhirkevich.keight.ScriptEngine as KeightScriptEngine
 import javax.script.ScriptEngine
 import javax.script.ScriptEngineFactory
 
@@ -55,7 +54,7 @@ public class KeightScriptEngineFactory : ScriptEngineFactory  {
         return getScriptEngine(JavaScriptEngine(JSRuntime(Job())))
     }
 
-    public fun getScriptEngine(engine: KeightScriptEngine) : ScriptEngine {
+    public fun getScriptEngine(engine: JavaScriptEngine) : ScriptEngine {
         return KeightScriptEngine(this, engine)
     }
 }

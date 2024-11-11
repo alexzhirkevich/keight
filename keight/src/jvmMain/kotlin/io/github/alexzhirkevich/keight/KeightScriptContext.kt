@@ -8,13 +8,13 @@ import javax.script.ScriptContext
 
 internal class KeightScriptContext(
     private val factory : KeightScriptEngineFactory,
-    val runtime: ScriptRuntime
+    val runtime: JSRuntime
 ) : ScriptContext {
 
-    private var mWriter = runtime.io.asWriter(isError = false)
-    private var mErrorWriter = runtime.io.asWriter(isError = true)
+    private var mWriter = runtime.console.asWriter(isError = false)
+    private var mErrorWriter = runtime.console.asWriter(isError = true)
 
-    init { runtime.io = ScriptIO(::mWriter, ::mErrorWriter) }
+    init { runtime.console = ScriptIO(::mWriter, ::mErrorWriter) }
 
     override fun setBindings(bindings: Bindings?, scope: Int) {
         val r = if (scope == ScriptContext.GLOBAL_SCOPE) factory.globalRuntime else runtime
@@ -71,11 +71,11 @@ internal class KeightScriptContext(
     }
 
     override fun getWriter(): Writer {
-        return runtime.io.asWriter(isError = false)
+        return runtime.console.asWriter(isError = false)
     }
 
     override fun getErrorWriter(): Writer {
-        return runtime.io.asWriter(isError = true)
+        return runtime.console.asWriter(isError = true)
     }
 
     override fun setWriter(w: Writer) {

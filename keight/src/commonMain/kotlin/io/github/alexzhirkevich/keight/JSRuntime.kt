@@ -6,6 +6,7 @@ import io.github.alexzhirkevich.keight.js.JSLangContext
 import io.github.alexzhirkevich.keight.js.JSMapFunction
 import io.github.alexzhirkevich.keight.js.JSMath
 import io.github.alexzhirkevich.keight.js.JSNumberFunction
+import io.github.alexzhirkevich.keight.js.JSON
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JSObjectFunction
 import io.github.alexzhirkevich.keight.js.JSPromiseFunction
@@ -31,7 +32,7 @@ import kotlin.coroutines.CoroutineContext
 public open class JSRuntime(
     context: CoroutineContext,
     override val isSuspendAllowed: Boolean = true,
-    override var io: ScriptIO = DefaultScriptIO,
+    public var console: Console = DefaultConsole,
 ) : DefaultRuntime(), ScriptContext by JSLangContext {
 
     override val coroutineContext: CoroutineContext =
@@ -89,13 +90,14 @@ public open class JSRuntime(
 
         val globalThis = RuntimeGlobalThis(this)
 
-        set("console", JsConsole(), VariableType.Global)
-        set("Math", JSMath(), VariableType.Global)
         set("globalThis", globalThis, VariableType.Global)
         set("this", this, VariableType.Const)
         set("Infinity", Double.POSITIVE_INFINITY, VariableType.Const)
         set("NaN", Double.NaN, VariableType.Const)
         set("undefined", Unit, VariableType.Const)
+        set("console", JsConsole(::console), VariableType.Global)
+        set("Math", JSMath(), VariableType.Global)
+        set("JSON", JSON(), VariableType.Global)
 
         globalThis.setupNumberMethods()
 

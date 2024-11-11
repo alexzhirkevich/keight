@@ -10,7 +10,7 @@ import javax.script.ScriptEngine as JXScriptEngine
 
 internal class KeightScriptEngine(
     private val factory: KeightScriptEngineFactory,
-    private var engine : ScriptEngine
+    private var engine : JavaScriptEngine
 ) : JXScriptEngine {
 
     override fun eval(script: String?, context: ScriptContext?): Any? {
@@ -81,9 +81,9 @@ internal class KeightScriptEngine(
     override fun setContext(context: ScriptContext) {
         engine.reset()
         if (context is KeightScriptContext){
-            engine.runtime.io = context.runtime.io
+            engine.runtime.console = context.runtime.console
         } else {
-            engine.runtime.io = ScriptIO(
+            engine.runtime.console = ScriptIO(
                 { context.writer },
                 { context.errorWriter }
             )

@@ -1,5 +1,5 @@
-import io.github.alexzhirkevich.keight.DefaultScriptIO
-import io.github.alexzhirkevich.keight.ScriptIO
+import io.github.alexzhirkevich.keight.DefaultConsole
+import io.github.alexzhirkevich.keight.Console
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.JavaScriptEngine
 import kotlinx.coroutines.Job
@@ -30,7 +30,7 @@ internal suspend fun String.eval2() : Any? {
     return JavaScriptEngine(JSRuntime(Job())).evaluate(this)
 }
 
-internal suspend fun String.eval(io : ScriptIO = DefaultScriptIO, runtime: JSRuntime =
-    JSRuntime(context = Job(), io = io)) : Any? {
+internal suspend fun String.eval(io : Console = DefaultConsole, runtime: JSRuntime =
+    JSRuntime(context = Job(), console = io)) : Any? {
     return JavaScriptEngine(runtime).evaluate(this)
 }

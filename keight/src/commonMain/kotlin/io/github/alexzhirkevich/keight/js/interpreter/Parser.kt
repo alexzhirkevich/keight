@@ -1157,11 +1157,18 @@ private fun ListIterator<Token>.parseBlock(
             isSurroundedWithBraces = true
             while (!nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
                 val expr = parseStatement(blockContext, blockType = ExpectedBlockType.None)
-                if (type != ExpectedBlockType.Block &&
-                    expr is OpGetProperty && expr.receiver == null && eat(Token.Operator.Colon)
+
+                if (type != ExpectedBlockType.Block
+                    && (expr is OpGetProperty && expr.receiver == null || expr is OpConstant && expr.value is CharSequence)
+                    && eat(Token.Operator.Colon)
                 ) {
                     val value = parseStatement(blockContext, blockType = ExpectedBlockType.Object)
-                    add(OpKeyValuePair(expr.name, value))
+                    val name = when (expr){
+                        is OpConstant -> expr.value.toString()
+                        is OpGetProperty -> expr.name
+                        else -> error("Should never happen")
+                    }
+                    add(OpKeyValuePair(name, value))
                 } else {
                     when {
                         expr is OpClassInit -> {

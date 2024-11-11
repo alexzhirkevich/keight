@@ -1,4 +1,4 @@
-import io.github.alexzhirkevich.keight.ScriptIO
+import io.github.alexzhirkevich.keight.Console
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
@@ -10,9 +10,9 @@ class JsConsoleTest {
         var out : Any? = null
         var err : Any? = null
 
-        val io = object : ScriptIO {
-            override fun out(message: Any?) { out = message }
-            override fun err(message: Any?) { err = message }
+        val io = object : Console {
+            override fun verbose(message: Any?) { out = message }
+            override fun error(message: Any?) { err = message }
         }
 
         "console.log(123)".eval(io).assertEqualsTo(Unit)
@@ -38,9 +38,9 @@ class JsConsoleTest {
         var out : Any? = null
         var err : Any? = null
 
-        val io = object : ScriptIO {
-            override fun out(message: Any?) { out = message }
-            override fun err(message: Any?) { err = message }
+        val io = object : Console {
+            override fun verbose(message: Any?) { out = message }
+            override fun error(message: Any?) { err = message }
         }
 
         "console.log()".eval(io).assertEqualsTo(Unit)
@@ -53,9 +53,9 @@ class JsConsoleTest {
         var out : Any? = null
         var err : Any? = null
 
-        val io = object : ScriptIO {
-            override fun out(message: Any?) { out = message }
-            override fun err(message: Any?) { err = message }
+        val io = object : Console {
+            override fun verbose(message: Any?) { out = message }
+            override fun error(message: Any?) { err = message }
         }
 
         "console.log(123, 456, '789')".eval(io).assertEqualsTo(Unit)

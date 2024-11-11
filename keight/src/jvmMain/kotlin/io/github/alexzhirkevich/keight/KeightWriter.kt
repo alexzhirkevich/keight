@@ -2,7 +2,7 @@ package io.github.alexzhirkevich.keight
 
 import java.io.Writer
 
-internal fun ScriptIO.asWriter(
+internal fun Console.asWriter(
     isError : Boolean
 ) = object : Writer() {
     override fun close() {}
@@ -27,9 +27,9 @@ internal fun ScriptIO.asWriter(
 
     private fun writeAny(value : Any?){
         if (isError){
-            err(value)
+            error(value)
         } else {
-            out(value)
+            verbose(value)
         }
     }
 }
@@ -38,13 +38,13 @@ internal fun ScriptIO.asWriter(
 internal fun ScriptIO(
     writer: () -> Writer,
     errorWriter : () -> Writer
-) = object : ScriptIO{
+) = object : Console{
 
-    override fun out(message: Any?) {
+    override fun verbose(message: Any?) {
         writer().write(message.toString())
     }
 
-    override fun err(message: Any?) {
+    override fun error(message: Any?) {
         errorWriter().write(message.toString())
     }
 }

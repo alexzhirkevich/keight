@@ -1,10 +1,14 @@
 package io.github.alexzhirkevich.keight.js
 
+import io.github.alexzhirkevich.keight.Console
 import io.github.alexzhirkevich.keight.ScriptRuntime
 
-internal fun JsConsole() = Object("console") {
-    "log".func(FunctionParam("data", isVararg = true)) { out(it, io::out) }
-    "error".func(FunctionParam("data", isVararg = true)) { out(it, io::err) }
+internal fun JsConsole(io: () -> Console) = Object("console") {
+    "log".func(FunctionParam("data", isVararg = true)) { out(it, io()::verbose) }
+    "info".func(FunctionParam("data", isVararg = true)) { out(it, io()::info) }
+    "debug".func(FunctionParam("data", isVararg = true)) { out(it, io()::debug) }
+    "warn".func(FunctionParam("data", isVararg = true)) { out(it, io()::warn) }
+    "error".func(FunctionParam("data", isVararg = true)) { out(it, io()::error) }
 }
 
 private fun ScriptRuntime.out(message : List<Any?>, out : (Any?) -> Unit){
