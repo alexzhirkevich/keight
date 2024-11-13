@@ -159,6 +159,7 @@ internal sealed interface Token {
             Finally,
             Async,
             Await,
+            This,
             Extends;
 
             override val identifier: String = name.lowercase()

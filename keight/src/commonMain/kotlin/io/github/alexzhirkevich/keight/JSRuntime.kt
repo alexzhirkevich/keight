@@ -18,7 +18,7 @@ import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsConsole
 import io.github.alexzhirkevich.keight.js.func
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
-import io.github.alexzhirkevich.keight.js.setupNumberMethods
+import io.github.alexzhirkevich.keight.js.numberMethods
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -55,6 +55,8 @@ public open class JSRuntime(
     private var jobsCounter = 1L
     private val jobsMap = mutableMapOf<Long, Job>()
 
+    final override val thisRef: JSObject = RuntimeObject()
+
     init {
         init()
     }
@@ -88,10 +90,7 @@ public open class JSRuntime(
             set(it.name, it, VariableType.Global)
         }
 
-        val globalThis = RuntimeGlobalThis(this)
-
-        set("globalThis", globalThis, VariableType.Global)
-        set("this", this, VariableType.Const)
+        set("globalThis", thisRef, VariableType.Global)
         set("Infinity", Double.POSITIVE_INFINITY, VariableType.Const)
         set("NaN", Double.NaN, VariableType.Const)
         set("undefined", Unit, VariableType.Const)
@@ -99,12 +98,14 @@ public open class JSRuntime(
         set("Math", JSMath(), VariableType.Global)
         set("JSON", JSON(), VariableType.Global)
 
-        globalThis.setupNumberMethods()
+        numberMethods().forEach {
+            thisRef.set(it.name, it, this)
+        }
 
-        globalThis.regSetTimeout()
-        globalThis.regSetInterval()
-        globalThis.regClearJob("Timeout")
-        globalThis.regClearJob("Interval")
+        thisRef.regSetTimeout()
+        thisRef.regSetInterval()
+        thisRef.regClearJob("Timeout")
+        thisRef.regClearJob("Interval")
     }
 
     final override suspend fun get(property: Any?): Any? {
@@ -114,31 +115,42 @@ public open class JSRuntime(
         return (super.get("globalThis") as JsAny?)?.get(property, this)
     }
 
-    private fun JSObject.regSetTimeout() = func("setTimeout", "handler", "timeout") {
-        registerJob(it){ handler, timeout ->
-            delay(timeout)
-            handler.invoke(emptyList(), this@func)
-        }
-    }
-
-    private fun JSObject.regSetInterval() = func("setInterval", "handler", "interval") {
-        registerJob(it) { handler, timeout ->
-            while (isActive) {
-                handler.invoke(emptyList(), this@func)
+    private fun JSObject.regSetTimeout() = this.set(
+        "setTimeout",
+        "setTimeout".func("handler", "timeout") {
+            registerJob(it) { handler, timeout ->
                 delay(timeout)
+                handler.invoke(emptyList(), this@func)
             }
-        }
-    }
+        },
+        this@JSRuntime
+    )
 
-    private fun JSObject.regClearJob(what : String) = func("clear$what", "id") {
-        val id = toNumber(it.getOrNull(0)).toLong()
-        jobsMap[id]?.cancel()
-    }
+    private fun JSObject.regSetInterval() = this.set(
+        "setInterval",
+        "setInterval".func("handler", "interval") {
+            registerJob(it) { handler, timeout ->
+                while (isActive) {
+                    handler.invoke(emptyList(), this@func)
+                    delay(timeout)
+                }
+            }
+        },
+        this@JSRuntime
+    )
+
+    private fun JSObject.regClearJob(what: String) = this.set(
+        "clear$what",
+        "clear$what".func("id") {
+            val id = toNumber(it.getOrNull(0)).toLong()
+            jobsMap[id]?.cancel()
+        }, this@JSRuntime
+    )
 
     private fun registerJob(
-        args : List<Any?>,
-        block : suspend CoroutineScope.(Callable, Long) -> Unit
-    ) : Long {
+        args: List<Any?>,
+        block: suspend CoroutineScope.(Callable, Long) -> Unit
+    ): Long {
         val jobId = jobsCounter++
 
         val handler = args[0]?.callableOrNull()
@@ -160,9 +172,7 @@ public open class JSRuntime(
     }
 }
 
-private class RuntimeGlobalThis(
-    private val runtime: ScriptRuntime
-) : JSObject {
+private class RuntimeObject : JSObject {
 
     override val keys: List<String>
         get() = emptyList()
@@ -170,7 +180,6 @@ private class RuntimeGlobalThis(
         get() = emptyList()
     override val entries: List<List<Any?>>
         get() = emptyList()
-
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         return if (runtime.contains(property)){
@@ -183,9 +192,10 @@ private class RuntimeGlobalThis(
     override fun set(
         property: Any?,
         value: Any?,
-        writable: Boolean?,
+        runtime: ScriptRuntime,
         enumerable: Boolean?,
-        configurable: Boolean?
+        configurable: Boolean?,
+        writable: Boolean?
     ) {
         runtime.set(property, value, null)
     }
@@ -204,7 +214,7 @@ private class RuntimeGlobalThis(
     }
 }
 
-internal suspend inline fun <reified T> ScriptRuntime.thisRef() : T {
-    return get("this") as T
+internal inline fun <reified T> ScriptRuntime.thisRef() : T {
+    return thisRef as T
 }
 

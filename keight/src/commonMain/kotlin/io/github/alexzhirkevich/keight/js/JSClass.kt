@@ -46,10 +46,10 @@ internal class OpClassInit(
             extends = extendsConstructor
         ).apply {
             if (extendsConstructor != null) {
-                setProto(extendsConstructor)
+                setProto(extendsConstructor, runtime)
                 val prototype = get(PROTOTYPE, runtime)
                 if (prototype is JSObject) {
-                    prototype.setProto(extendsConstructor.get(PROTOTYPE, runtime))
+                    prototype.setProto(extendsConstructor.get(PROTOTYPE, runtime), runtime)
                 }
             }
         }

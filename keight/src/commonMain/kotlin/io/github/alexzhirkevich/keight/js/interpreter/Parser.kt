@@ -457,15 +457,15 @@ private fun ListIterator<Token>.parseAssignmentValue(
     x: Expression,
     merge: (ScriptRuntime.(Any?, Any?) -> Any?)? = null
 ): Expression {
-    return when {
-        x is OpIndex && x.receiver is OpGetProperty -> OpAssignByIndex(
-            variableName = x.receiver.name,
+    return when (x) {
+        is OpIndex -> OpAssignByIndex(
+            receiver = x.receiver,
             index = x.index,
             assignableValue = parseStatement(blockType = ExpectedBlockType.Object),
             merge = merge
         )
 
-        x is OpGetProperty -> OpAssign(
+        is OpGetProperty -> OpAssign(
             variableName = x.name,
             receiver = x.receiver,
             assignableValue = parseStatement(blockType = ExpectedBlockType.Object),
@@ -607,6 +607,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
         Token.Identifier.Keyword.Async -> parseAsync()
         Token.Identifier.Keyword.Await -> parseAwait()
         Token.Identifier.Keyword.Try -> parseTryCatch(blockContext)
+        Token.Identifier.Keyword.This -> Expression { it.thisRef }
         Token.Identifier.Keyword.Else,
         Token.Identifier.Keyword.Extends,
         Token.Identifier.Keyword.Finally,

@@ -8,16 +8,18 @@ class JsonTest {
     @Test
     fun parse() = runtimeTest {
         """
-            let string = `{ 
+            let str = `{ 
                 "int" : 1, 
                 "float": 1.5, 
+                "nl" : null,
                 "string" : "test", 
                 "list": [1, 1.5, "test"],
                 "object" : { "variable": "value" }
             }`
-            var obj = JSON.parse(string)
-        """.eval(it)
+            var obj = JSON.parse(str)
+        """.trimIndent().eval(it)
         "obj.int".eval(it).assertEqualsTo(1L)
+        "obj.nl".eval(it).assertEqualsTo(null)
         "obj.float".eval(it).assertEqualsTo(1.5)
         "obj.string".eval(it).assertEqualsTo("test")
         "obj.list".eval(it).assertEqualsTo(listOf(1L, 1.5, "test"))

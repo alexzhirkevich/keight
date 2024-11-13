@@ -15,9 +15,10 @@ public interface JSObject : JsAny {
     public fun set(
         property: Any?,
         value: Any?,
-        writable: Boolean? = null,
+        runtime: ScriptRuntime,
         enumerable: Boolean? = null,
-        configurable: Boolean? = null
+        configurable: Boolean? = null,
+        writable: Boolean? = null,
     )
 
     public fun descriptor(property: Any?) : JSPropertyDescriptor?
@@ -26,12 +27,13 @@ public interface JSObject : JsAny {
 internal const val PROTOTYPE = "prototype"
 internal const val PROTO = "__proto__"
 
-internal fun JSObject.setPrototype(prototype : Any?) {
-    set(PROTOTYPE, prototype)
+
+internal fun JSObject.setPrototype(prototype : Any?, runtime: ScriptRuntime) {
+    set(PROTOTYPE, prototype, runtime)
 }
 
-internal fun JSObject.setProto(proto : Any?) {
-    set(PROTO, proto)
+internal fun JSObject.setProto(proto : Any?, runtime: ScriptRuntime) {
+    set(PROTO, proto, runtime)
 }
 
 internal suspend fun JSObject.getOrElse(property: Any?, runtime: ScriptRuntime, orElse : () -> Any?) : Any? {
@@ -112,9 +114,26 @@ public open class JSObjectImpl(
     override fun set(
         property: Any?,
         value: Any?,
-        writable: Boolean?,
+        runtime: ScriptRuntime,
         enumerable: Boolean?,
-        configurable: Boolean?
+        configurable: Boolean?,
+        writable: Boolean?
+    ) {
+        set(
+            property = property,
+            value = value,
+            enumerable = enumerable,
+            configurable = configurable,
+            writable = writable
+        )
+    }
+
+    internal fun set(
+        property: Any?,
+        value: Any?,
+        enumerable: Boolean? = null,
+        configurable: Boolean? = null,
+        writable: Boolean? = null,
     ) {
         if (property in map) {
             map[property]?.value = value
@@ -178,7 +197,7 @@ public sealed interface ObjectScope {
 @PublishedApi
 internal class ObjectScopeImpl(
     name: String,
-    val o : JSObject = JSObjectImpl(name)
+    val o : JSObjectImpl = JSObjectImpl(name)
 ) : ObjectScope {
 
     override fun String.func(
@@ -199,7 +218,7 @@ internal class ObjectScopeImpl(
     }
 
     override fun String.eq(value: Any?) {
-        o.set(this, value)
+        o.set(this, value,)
     }
 }
 
@@ -212,12 +231,13 @@ public inline fun Object(name: String = "", builder : ObjectScope.() -> Unit) : 
 }
 
 
-internal fun JSObject.init(scope: ObjectScope.() -> Unit) {
+internal fun JSObjectImpl.init(scope: ObjectScope.() -> Unit) : JSObjectImpl {
     ObjectScopeImpl("", this).apply(scope)
+    return this
 }
 
 
-internal fun JSObject.noArgsFunc(
+internal fun JSObjectImpl.noArgsFunc(
     name: String,
     body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
 ) : JSFunction = func(
@@ -226,7 +246,7 @@ internal fun JSObject.noArgsFunc(
     body = body
 )
 
-internal fun JSObject.func(
+internal fun JSObjectImpl.func(
     name: String,
     vararg args: String,
     params: (String) -> FunctionParam = { FunctionParam(it) },
@@ -238,7 +258,7 @@ internal fun JSObject.func(
 )
 
 
-internal fun JSObject.func(
+internal fun JSObjectImpl.func(
     name: String,
     vararg args: FunctionParam,
     body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
@@ -259,7 +279,7 @@ internal fun JSObject.func(
 
 internal fun String.func(
     vararg args: FunctionParam,
-    body: ScriptRuntime.(args: List<Any?>) -> Any?
+    body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
 ) = JSFunction(
     trimStart('_'),
     parameters = args.toList(),
@@ -270,7 +290,7 @@ internal fun String.func(
     }
 )
 
-internal fun JSObject.func(
+internal fun JSObjectImpl.func(
     name: String,
     params: (String) -> FunctionParam = { FunctionParam(it) },
     body: ScriptRuntime.(args: List<Any?>) -> Any?
@@ -280,14 +300,14 @@ internal fun JSObject.func(
         params = params,
         body = body
     ).also {
-        set(name, it)
+        set(name, it,)
     }
 }
 
 internal fun String.func(
     vararg args: String,
     params: (String) -> FunctionParam = { FunctionParam(it) },
-    body: ScriptRuntime.(args: List<Any?>) -> Any?
+    body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
 ) : JSFunction = func(
     args = args.map(params).toTypedArray(),
     body = body

@@ -3,7 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.ScriptRuntime
 
 
-internal class JSSetFunction : JSFunction(name = "Set",) {
+internal class JSSetFunction : JSFunction(name = "Set") {
 
     override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any {
         throw TypeError("Constructor Set requires 'new'")

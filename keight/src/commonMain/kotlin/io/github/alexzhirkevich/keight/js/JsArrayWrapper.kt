@@ -9,7 +9,27 @@ import kotlin.math.abs
 @JvmInline
 internal value class JsArrayWrapper(
     override val value : MutableList<Any?>
-) : JsAny, JsWrapper<MutableList<Any?>>, MutableList<Any?> by value {
+) : JSObject, JsWrapper<MutableList<Any?>>, MutableList<Any?> by value {
+
+    override val values: List<Any?>
+        get() = value.toList()
+
+    override val entries: List<List<Any?>>
+        get() = value.mapIndexed { index, v ->  kotlin.collections.listOf(index,v) }
+
+    override fun set(
+        property: Any?,
+        value: Any?,
+        runtime: ScriptRuntime,
+        enumerable: Boolean?,
+        configurable: Boolean?,
+        writable: Boolean?
+    ) {
+    }
+
+    override fun descriptor(property: Any?): JSPropertyDescriptor? {
+        TODO("Not yet implemented")
+    }
 
     override val keys: List<String>
         get() = value.indices.map(Int::toString)

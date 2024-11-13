@@ -9,6 +9,10 @@ internal class StringTest {
     fun template()= runTest {
         "const x = 1, y ='test';`hello \${x} world \${y}`".eval()
             .assertEqualsTo("hello 1 world test")
+        """
+            `multiline
+            //comment`
+        """.trimIndent().eval().assertEqualsTo("multiline\n//comment")
     }
 
     @Test

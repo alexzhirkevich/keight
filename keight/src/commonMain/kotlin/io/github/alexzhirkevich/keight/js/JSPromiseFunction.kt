@@ -14,27 +14,18 @@ import kotlinx.coroutines.async
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.jvm.JvmInline
 
-public class SomeFunction : JSFunction(){
-
-    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-        return super.invoke(args, runtime)
-    }
-}
-
-internal class JSPromiseFunction : JSFunction(name = "Promise") {
-
-    init {
-        setPrototype(Object {
-            "catch" eq Catch(Job())
-            "then" eq Then(Job())
-            "finally" eq Finally(Job())
-        })
-
-        func("resolve", FunctionParam("value", default = OpConstant(Unit))) {
+internal class JSPromiseFunction : JSFunction(
+    name = "Promise",
+    prototype = Object {
+        "catch" eq Catch(Job())
+        "then" eq Then(Job())
+        "finally" eq Finally(Job())
+    },
+    properties = listOf(
+        "resolve".func( FunctionParam("value", default = OpConstant(Unit))) {
             CompletableDeferred(it[0])
-        }
-
-        func("reject", FunctionParam("reason", default = OpConstant(Unit))) {
+        },
+        "reject".func(FunctionParam("reason", default = OpConstant(Unit))) {
             val v = it[0]
 
             CompletableDeferred<Unit>().apply {
@@ -42,9 +33,8 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
                     if (v is Throwable) v else ThrowableValue(v)
                 )
             }
-        }
-
-        func("all", FunctionParam("values", isVararg = true)) { args ->
+        },
+        "all".func(FunctionParam("values", isVararg = true)) { args ->
             async {
                 (args[0] as Iterable<*>).map {
                     val job = toKotlin(it)
@@ -53,7 +43,8 @@ internal class JSPromiseFunction : JSFunction(name = "Promise") {
                 }
             }
         }
-    }
+    ).associateBy { it.name }.toMutableMap()
+) {
 
     override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any {
         throw TypeError("Promise constructor cannot be invoked without 'new'")

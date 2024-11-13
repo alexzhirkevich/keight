@@ -45,7 +45,7 @@ internal class OpAssign(
             )
         } else {
             when (r) {
-                is JSObject -> r.set(variableName, value)
+                is JSObject -> r.set(variableName, value, runtime)
                 else -> throw TypeError("Cannot set properties of ${if (r == Unit) "undefined" else r}")
             }
         }

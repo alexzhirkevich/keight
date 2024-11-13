@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.comparator
@@ -10,6 +11,7 @@ import io.github.alexzhirkevich.keight.fastAny
 import io.github.alexzhirkevich.keight.fastFilter
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.thisRef
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit
@@ -19,123 +21,119 @@ import kotlin.math.min
 
 internal class JSArrayFunction : JSFunction(
     name = "Array",
-    parameters = emptyList(),
-    body = OpConstant(Unit)
-) {
-    init {
-        func("isArray", "object") {
-            isInstance(it.getOrNull(0), this)
+    properties = mutableMapOf(
+        "isArray" to "isArray".func("object") {
+            (findRoot() as JSRuntime).Array.isInstance(it.getOrNull(0), this)
+        }
+    ),
+    prototype = Object {
+        "length" eq JsNumberWrapper(0)
+        "indexOf".func(
+            FunctionParam("search"),
+            "position" defaults OpConstant(0)
+        ) {
+            thisRef<List<*>>().indexOf(this, it)
+        }
+        "lastIndexOf".func(
+            FunctionParam("search"),
+            "position" defaults OpArgOmitted
+        ) {
+            thisRef<List<*>>().lastIndexOf(this, it)
+        }
+        "forEach".func("callback") { args ->
+            op(args) { callable ->
+                thisRef<List<*>>().fastForEach {
+                    callable.invoke(it.listOf(), this)
+                }
+            }
         }
 
-        setPrototype(Object {
-            "length" eq JsNumberWrapper(0)
-            "indexOf".func(
-                FunctionParam("search"),
-                "position" defaults OpConstant(0)
-            ) {
-                thisRef<List<*>>().indexOf(this, it)
-            }
-            "lastIndexOf".func(
-                FunctionParam("search"),
-                "position" defaults OpArgOmitted
-            ) {
-                thisRef<List<*>>().lastIndexOf(this, it)
-            }
-            "forEach".func("callback") { args ->
-                op(args) { callable ->
-                    thisRef<List<*>>().fastForEach {
-                        callable.invoke(it.listOf(), this)
-                    }
+        "map".func("callback") { args ->
+            op(args) { callable ->
+                thisRef<List<*>>().fastMap {
+                    callable.invoke(it.listOf(), this)
                 }
             }
-
-            "map".func("callback") { args ->
-                op(args) { callable ->
-                    thisRef<List<*>>().fastMap {
-                        callable.invoke(it.listOf(), this)
-                    }
+        }
+        "filter".func("callback") { args ->
+            op(args) { callable ->
+                thisRef<List<*>>().fastFilter {
+                    !isFalse(callable.invoke(it.listOf(), this))
                 }
             }
-            "filter".func("callback") { args ->
-                op(args) { callable ->
-                    thisRef<List<*>>().fastFilter {
-                        !isFalse(callable.invoke(it.listOf(), this))
-                    }
+        }
+        "reduce".func("callback") { args ->
+            val v = if (args.size > 1) {
+                listOf(args[1]) + thisRef<List<*>>()
+            } else {
+                thisRef<List<*>>()
+            }
+            op(args) { callable ->
+                v.reduce { acc, any ->
+                    callable.invoke(listOf(acc, any), this)
                 }
             }
-            "reduce".func("callback") { args ->
-                val v = if (args.size > 1) {
-                    listOf(args[1]) + thisRef<List<*>>()
-                } else {
-                    thisRef<List<*>>()
-                }
-                op(args) { callable ->
-                    v.reduce { acc, any ->
-                        callable.invoke(listOf(acc, any), this)
-                    }
+        }
+        "reduceRight".func("callback") { args ->
+            val v = if (args.size > 1) {
+                thisRef<List<*>>() + args[1]
+            } else {
+                thisRef<List<*>>()
+            }
+            op(args) { callable ->
+                v.reduceRight { acc, any ->
+                    callable.invoke(listOf(acc, any), this)
                 }
             }
-            "reduceRight".func("callback") { args ->
-                val v = if (args.size > 1) {
-                    thisRef<List<*>>() + args[1]
-                } else {
-                    thisRef<List<*>>()
-                }
-                op(args) { callable ->
-                    v.reduceRight { acc, any ->
-                        callable.invoke(listOf(acc, any), this)
-                    }
+        }
+        "some".func("callback") { args ->
+            op(args) { callable ->
+                thisRef<List<*>>().fastAny {
+                    !isFalse(callable.invoke(it.listOf(), this))
                 }
             }
-            "some".func("callback") { args ->
-                op(args) { callable ->
-                    thisRef<List<*>>().fastAny {
-                        !isFalse(callable.invoke(it.listOf(), this))
-                    }
+        }
+        "every".func("callback") { args ->
+            op(args) { callable ->
+                thisRef<List<*>>().fastAll {
+                    !isFalse(callable.invoke(it.listOf(), this))
                 }
             }
-            "every".func("callback") { args ->
-                op(args) { callable ->
-                    thisRef<List<*>>().fastAll {
-                        !isFalse(callable.invoke(it.listOf(), this))
-                    }
-                }
+        }
+        "reverse".func { thisRef<MutableList<*>>().reverse() }
+        "toReversed".func { thisRef<List<*>>().reversed() }
+        "sort".func { thisRef<MutableList<*>>().sortWith(comparator) }
+        "toSorted".func { thisRef<List<*>>().sortedWith(comparator) }
+        "slice".func(
+            "start" defaults OpConstant(0),
+            "end" defaults OpArgOmitted
+        ) { args ->
+            if (args.isEmpty()) {
+                thisRef()
+            } else {
+                val start = args[0].let(this::toNumber).toInt()
+                val list = thisRef<List<*>>()
+                val end = args.argOrElse(1) { list.size }
+                    .let(this::toNumber).toInt()
+                    .coerceIn(0, list.size)
+                list.slice(start until end)
             }
-            "reverse".func { thisRef<MutableList<*>>().reverse() }
-            "toReversed".func { thisRef<List<*>>().reversed() }
-            "sort".func { thisRef<MutableList<*>>().sortWith(comparator) }
-            "toSorted".func { thisRef<List<*>>().sortedWith(comparator) }
-            "slice".func(
-                "start" defaults OpConstant(0),
-                "end" defaults OpArgOmitted
-            ) { args ->
-                if (args.isEmpty()) {
-                    thisRef()
-                } else {
-                    val start = args[0].let(this::toNumber).toInt()
-                    val list = thisRef<List<*>>()
-                    val end = args.argOrElse(1) { list.size }
-                        .let(this::toNumber).toInt()
-                        .coerceIn(0,  list.size)
-                    list.slice(start until end)
-                }
-            }
-            "splice" eq Splice(mutableListOf())
-            "toSpliced" eq ToSpliced(mutableListOf())
-            "at" eq At(mutableListOf())
-            "includes" eq Includes(mutableListOf())
-            "join" eq Join(mutableListOf())
-            "push" eq Push(mutableListOf())
-            "pop" eq Pop(mutableListOf())
-            "shift" eq Shift(mutableListOf())
-            "unshift" eq Unshift(mutableListOf())
-            "concat" eq Concat(mutableListOf())
-            "copyWithin" eq CopyWithin(mutableListOf())
-            "flat" eq Flat(mutableListOf())
-            "flatMap" eq FlatMap(mutableListOf())
-        })
+        }
+        "splice" eq Splice(mutableListOf())
+        "toSpliced" eq ToSpliced(mutableListOf())
+        "at" eq At(mutableListOf())
+        "includes" eq Includes(mutableListOf())
+        "join" eq Join(mutableListOf())
+        "push" eq Push(mutableListOf())
+        "pop" eq Pop(mutableListOf())
+        "shift" eq Shift(mutableListOf())
+        "unshift" eq Unshift(mutableListOf())
+        "concat" eq Concat(mutableListOf())
+        "copyWithin" eq CopyWithin(mutableListOf())
+        "flat" eq Flat(mutableListOf())
+        "flatMap" eq FlatMap(mutableListOf())
     }
-
+) {
     override suspend fun isInstance(obj: Any?, runtime: ScriptRuntime): Boolean {
         return obj is List<*>
     }

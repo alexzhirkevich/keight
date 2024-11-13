@@ -59,7 +59,7 @@ public open class JSFunction(
         if (varargs > 1 || varargs == 1 && !parameters.last().isVararg) {
             throw SyntaxError("Rest parameter must be last formal parameter")
         }
-        setPrototype(prototype)
+        set(PROTOTYPE, prototype)
     }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
@@ -104,7 +104,7 @@ public open class JSFunction(
         }
 
         return JSObjectImpl().also {
-            it.setProto(get(PROTOTYPE, runtime))
+            it.setProto(get(PROTOTYPE, runtime), runtime)
             invoke(args, runtime, superConstructorPropertyMap, it)
         }
     }
@@ -126,9 +126,6 @@ public open class JSFunction(
                     else -> Unit
                 }
             }
-            thisRef?.let {
-                this["this"] = VariableType.Const to it
-            }
             extraArgs.forEach {
                 this[it.key] = it.value
             }
@@ -136,10 +133,10 @@ public open class JSFunction(
 
         return if (isAsync){
             runtime.async {
-                invokeImpl(runtime, arguments)
+                invokeImpl(runtime, arguments, thisRef)
             }
         } else {
-            invokeImpl(runtime, arguments)
+            invokeImpl(runtime, arguments, thisRef)
         }
     }
 
@@ -150,11 +147,13 @@ public open class JSFunction(
 
     private suspend fun invokeImpl(
         runtime: ScriptRuntime,
-        arguments: Map<String, Pair<VariableType,Any?>>
+        arguments: Map<String, Pair<VariableType,Any?>>,
+        thisRef: Any?,
     ) : Any? {
         return try {
             runtime.withScope(
                 extraProperties = arguments,
+                thisRef = thisRef ?: runtime.thisRef,
                 isSuspendAllowed = isAsync,
                 block = body::invoke
             )

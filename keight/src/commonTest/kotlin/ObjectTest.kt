@@ -133,4 +133,13 @@ class ObjectTest {
         "person1.lastName".eval(runtime).assertEqualsTo("Smith")
         "person1.age".eval(runtime).assertEqualsTo(50L)
     }
+
+    @Test
+    fun contextual_increment() = runtimeTest {
+        "let obj = { x : 0 }".eval(it)
+        "obj.x++; obj.x".eval(it).assertEqualsTo(1L)
+        "obj.x+=1; obj.x".eval(it).assertEqualsTo(2L)
+        "obj['x']++; obj.x".eval(it).assertEqualsTo(3L)
+        "obj['x']+=1; obj.x".eval(it).assertEqualsTo(4L)
+    }
 }

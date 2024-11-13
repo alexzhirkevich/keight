@@ -15,14 +15,14 @@ public interface Console {
 
 internal object DefaultConsole : Console {
     override fun verbose(message: Any?) {
-        print(message)
+        println(message)
     }
 
     override fun error(message: Any?) {
         if (message is Throwable){
             message.printStackTrace()
         } else {
-            print(message)
+            println(message)
         }
     }
 }

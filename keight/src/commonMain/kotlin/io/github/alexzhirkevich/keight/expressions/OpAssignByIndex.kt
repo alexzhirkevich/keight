@@ -3,70 +3,61 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsArrayWrapper
+import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 
 internal class OpAssignByIndex(
-    private val variableName : String,
+    private val receiver : Expression,
     private val index : Expression,
     private val assignableValue : Expression,
     private val merge : (ScriptRuntime.(Any?, Any?) -> Any?)?
 ) : Expression() {
 
     override suspend fun execute(runtime: ScriptRuntime): Any? {
+        val rec = receiver.invoke(runtime) as JsAny
+        val idx = index(runtime)
         val v = assignableValue.invoke(runtime)
-        val current = runtime.get(variableName)
 
-        check(merge == null || current != null) {
-            "Cant modify $variableName as it is undefined"
-        }
+        return when (rec) {
+            is MutableList<*> -> {
+                rec as MutableList<Any?>
+                val i = runtime.toNumber(idx)
 
-        if (current == null) {
-            runtime.set(variableName, mutableListOf<Any>(), null)
-            return invoke(runtime)
-        } else {
-
-
-            val idx = index(runtime)
-
-            return when (current) {
-
-                is JsArrayWrapper-> {
-                    val i = runtime.toNumber(idx)
-
-                    check(!i.toDouble().isNaN()) {
-                        "Unexpected index: $i"
-                    }
-                    val index = i.toInt()
-
-                    while (current.value.lastIndex < index) {
-                        current.value.add(Unit)
-                    }
-
-                    val c = current.value[index]
-
-                    current.value[index] = if (current.value[index] !is Unit && merge != null){
-                        merge.invoke(runtime, c,v)
-                    } else {
-                        v
-                    }
-                    current.value[index]
+                check(!i.toDouble().isNaN()) {
+                    "Unexpected index: $i"
                 }
-                is JSObject -> {
-                    
-                    if (current.contains(idx, runtime) && merge != null){
-                        current.set(
-                            idx,
-                            merge.invoke(runtime, current.get(idx, runtime), v),
-                            true,
-                            true,
-                            true
-                        )
-                    } else {
-                        current.set(idx, v)
-                    }
+                val index = i.toInt()
+
+                while (rec.lastIndex < index) {
+                    rec.add(Unit)
                 }
-                else -> error("Can't assign '$current' by index ($index)")
+
+                val c = rec[index]
+
+                rec[index] = if (c !is Unit && merge != null){
+                    merge.invoke(runtime, c, v)
+                } else {
+                    v
+                }
+                rec[index]
             }
+            is JSObject -> {
+                if (rec.contains(idx, runtime) && merge != null){
+                    rec.set(
+                        property = idx,
+                        value = merge.invoke(runtime, rec.get(idx, runtime), v),
+                        runtime = runtime,
+                        enumerable = true,
+                        configurable = true,
+                        writable = true
+                    )
+                } else {
+                    rec.set(idx, v, runtime)
+                }
+                rec.get(idx, runtime)
+            }
+            else -> error("Can't assign '$v' by index ($idx)")
         }
     }
 }

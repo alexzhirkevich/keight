@@ -21,7 +21,7 @@ private fun ListIterator<Char>.tokenize(
         var blockStack = 0
 
         while (hasNext()) {
-            val token = when (val c = next()) {
+            this += when (val c = next()) {
                 '=' -> assign() // +eq, arrow
                 '+' -> plus()
                 '-' -> minus()
@@ -56,15 +56,15 @@ private fun ListIterator<Char>.tokenize(
                 '`' -> templateString(ignoreWhitespaces)
                 in STRING_START -> string(c)
                 in NUMBERS -> number(c)
-                in JAVASCRIPT_WHITESPACE -> if (ignoreWhitespaces) {
-                    continue
-                } else {
-                    Token.Whitespace(c)
+                else -> {
+                    val isWhiteSpace = c.isWhitespace()
+                    when {
+                        isWhiteSpace && ignoreWhitespaces -> continue
+                        isWhiteSpace -> Token.Whitespace(c)
+                        else -> identifier(c)
+                    }
                 }
-                else -> identifier(c)
-//                else -> continue
             }
-            add(token)
         }
     }
 }
@@ -372,12 +372,12 @@ internal fun ListIterator<Char>.string(start : Char) : Token.Str {
             isEscaping = if (n == '\\') !isEscaping else false
             n = next()
         }
-    }.applyEscaping()
+    }
 
-    return Token.Str(str)
+    return Token.Str(str.unescape())
 }
 
-private fun String.applyEscaping() : String {
+private fun String.unescape() : String {
     return replace("\\'", "'")
         .replace("\\\"", "\"")
         .replace("\\n", "\n")
@@ -500,52 +500,56 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
 private fun ListIterator<Char>.templateString(
     ignoreWhitespaces: Boolean
 ) : Token.TemplateString {
+
     val tokens = buildList {
 
         val str = StringBuilder()
 
-        val addStr = {
-            add(TemplateStringToken.Str(str.toString()))
-            str.clear()
+        var isEscaping = false
+
+        fun addStr(){
+            if (str.isNotEmpty()) {
+                add(TemplateStringToken.Str(str.toString().unescape()))
+                str.clear()
+            }
         }
 
-        do {
+        while (true) {
             val next = next()
 
-            if (next == '`') {
+            if (next == '`' && !isEscaping) {
+                addStr()
                 break
             }
 
-            when {
-                next == '$' -> {
-                    when(val nNext = next()){
-                        '{' -> {
-                            addStr()
-                            add(
-                                TemplateStringToken.Template(
-                                    buildList {
-                                        add(Token.Operator.Bracket.CurlyOpen)
-                                        addAll(
-                                            tokenize(
-                                                untilEndOfBlock = true,
-                                                ignoreWhitespaces = ignoreWhitespaces
-                                            )
-                                        )
-                                        add(Token.Operator.Bracket.CurlyClose)
-                                    },
+            if (next == '$' && !isEscaping) {
+                val nNext = next()
+                if (nNext == '{'){
+                    addStr()
+                    add(
+                        TemplateStringToken.Template(
+                            buildList {
+                                add(Token.Operator.Bracket.CurlyOpen)
+                                addAll(
+                                    tokenize(
+                                        untilEndOfBlock = true,
+                                        ignoreWhitespaces = ignoreWhitespaces
+                                    )
                                 )
-                            )
-                        }
-                        else -> {
-                            str.append(next)
-                            str.append(nNext)
-                        }
-                    }
+                                add(Token.Operator.Bracket.CurlyClose)
+                            },
+                        )
+                    )
+                } else {
+                    str.append(next)
+                    str.append(nNext)
                 }
-
-                else -> str.append(next)
+            } else {
+                str.append(next)
             }
-        } while (true)
+
+            isEscaping = if (next == '\\') !isEscaping else false
+        }
     }
 
     return Token.TemplateString(tokens)
@@ -554,29 +558,6 @@ private fun ListIterator<Char>.templateString(
 private val STRING_START = hashSetOf('"', '\'')
 private val NUMBERS = hashSetOf('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 private val NumberFormatIndicators = NumberFormat.entries.mapNotNull { it.prefix }
-
-private val JAVASCRIPT_WHITESPACE = hashSetOf(
-    ' ',
-    '\u2029',  // paragraph separator
-    '\u00a0',  // Latin-1 space
-    '\u1680',  // Ogham space mark
-    '\u180e',  // separator, Mongolian vowel
-    '\u2000',  // en quad
-    '\u2001',  // em quad
-    '\u2002',  // en space
-    '\u2003',  // em space
-    '\u2004',  // three-per-em space
-    '\u2005',  // four-per-em space
-    '\u2006',  // six-per-em space
-    '\u2007',  // figure space
-    '\u2008',  // punctuation space
-    '\u2009',  // thin space
-    '\u200a',  // hair space
-    '\u202f',  // narrow no-break space
-    '\u205f',  // medium mathematical space
-    '\u3000',  // ideographic space
-    '\ufeff'   // byte order mark
-)
 
 private val IDENTIFIER_ALPHABET = (('a'..'z').toList() + ('A'..'Z').toList() + '$' + '_' ).toHashSet()
 private val PROPERTY_ALPHABET_WITH_NUM = (IDENTIFIER_ALPHABET + NUMBERS).toHashSet()

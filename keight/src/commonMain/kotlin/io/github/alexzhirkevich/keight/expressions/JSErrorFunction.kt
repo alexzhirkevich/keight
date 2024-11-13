@@ -4,17 +4,14 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.Object
-import io.github.alexzhirkevich.keight.js.setPrototype
 
-internal class JSErrorFunction : JSFunction("Error") {
-
-    init {
-        setPrototype(Object {
-            "message" eq ""
-            "name" eq "Error"
-        })
+internal class JSErrorFunction : JSFunction(
+    name = "Error",
+    prototype = Object {
+        "message" eq ""
+        "name" eq "Error"
     }
-
+) {
     override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): JSError {
         if (args.isEmpty()) {
             return JSError("Uncaught Error")

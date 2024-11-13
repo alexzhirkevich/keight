@@ -8,78 +8,65 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
-internal fun JSObject.setupNumberMethods() {
-    func("isFinite", "number") {
-        val arg = it.getOrNull(0) ?: return@func false
-        val num = toNumber(arg).toDouble()
-        if (num.isNaN())
-            return@func false
-        num.isFinite()
-    }
+internal fun numberMethods() : List<JSFunction> {
 
-    func("isInteger", "number") {
-        val arg = it.getOrNull(0) ?: return@func false
-        val num = toNumber(arg)
-        num is Long || num is Int || num is Short || num is Byte
-    }
+    return listOf(
+        "isFinite".func("number") {
+            val arg = it.getOrNull(0) ?: return@func false
+            val num = toNumber(arg).toDouble()
+            if (num.isNaN())
+                return@func false
+            num.isFinite()
+        },
+        "isInteger".func("number") {
+            val arg = it.getOrNull(0) ?: return@func false
+            val num = toNumber(arg)
+            num is Long || num is Int || num is Short || num is Byte
+        },
+        "parseInt".func(
+            FunctionParam("number"),
+            "radix" defaults OpConstant(10L)
+        ) {
+            val arg = it.getOrNull(0) ?: return@func false
+            val radix = it.getOrNull(1)?.let(::toNumber)
+                ?.takeIf { !it.toDouble().isNaN() && it.toDouble().isFinite() }
+                ?.toInt() ?: 10
 
-    func(
-        "parseInt",
-        FunctionParam("number"),
-        "radix" defaults OpConstant(10L),
-    ) {
-        val arg = it.getOrNull(0) ?: return@func false
-        val radix = it.getOrNull(1)?.let(::toNumber)
-            ?.takeIf { !it.toDouble().isNaN() && it.toDouble().isFinite() }
-            ?.toInt() ?: 10
+            JSStringFunction.toString(arg, this).trim().trimParseInt(radix)
+        },
+        "isSafeInteger".func("number") {
+            val arg = it.getOrNull(0) ?: return@func false
+            toNumber(arg) is Long
+        },
+        "parseFloat".func("number") {
+            val arg = it.getOrNull(0) ?: return@func false
 
-        JSStringFunction.toString(arg, this).trim().trimParseInt(radix)
-    }
-
-    func(
-        "parseInt",
-        FunctionParam("number"),
-        "radix" defaults OpConstant(10L),
-    ) {
-        val arg = it.getOrNull(0) ?: return@func false
-        val radix = it.getOrNull(1)?.let(::toNumber)
-            ?.takeIf { !it.toDouble().isNaN() && it.toDouble().isFinite() }
-            ?.toInt() ?: 10
-
-        JSStringFunction.toString(arg, this).trim().trimParseInt(radix)
-    }
-
-    func("isSafeInteger", "number") {
-        val arg = it.getOrNull(0) ?: return@func false
-        val num = toNumber(arg)
-        num is Long || num is Int || num is Short || num is Byte
-    }
-
-    func("parseFloat","number") {
-        val arg = it.getOrNull(0) ?: return@func false
-
-        var dotCnt = 0
-        val num = arg.toString().trim().takeWhile { c ->
-            (c.isDigit() || c == '.' && dotCnt == 0).also {
-                if (c == '.') dotCnt++
+            var dotCnt = 0
+            var eCount = 0
+            val num = arg.toString().trim().takeWhile { c ->
+                (c.isDigit() || c == '.' && dotCnt == 0 || c == 'e' && eCount == 0).also {
+                    if (c == '.') dotCnt++
+                    if (c == 'e') eCount++
+                }
             }
-        }
-        num.toDoubleOrNull() ?: 0L
-    }
-    func("isNaN","number") {
-        val arg = it.getOrNull(0) ?: return@func false
-        toNumber(arg).toDouble().isNaN()
-    }
+            num.toDoubleOrNull() ?: 0L
+        },
+        "isNaN".func("number") {
+            val arg = it.getOrNull(0) ?: return@func false
+            toNumber(arg).toDouble().isNaN()
+        },
+    )
 }
 
-internal class JSNumberFunction : JSFunction(name = "Number") {
-
+internal class JSNumberFunction : JSFunction(
+    name = "Number",
+    properties = numberMethods().associateBy { it.name }.toMutableMap(),
+    prototype =  Object {
+        "toFixed" eq ToFixed(0)
+        "toPrecision" eq ToPrecision(0)
+    }
+) {
     init {
-        setPrototype(Object {
-            "toFixed" eq ToFixed(0)
-            "toPrecision" eq ToPrecision(0)
-        })
-
         set("EPSILON", Double.MIN_VALUE)
         set("MAX_SAFE_INTEGER", Long.MAX_VALUE)
         set("MAX_VALUE", Double.MAX_VALUE)
@@ -87,8 +74,6 @@ internal class JSNumberFunction : JSFunction(name = "Number") {
         set("NaN", Double.NaN)
         set("NEGATIVE_INFINITY", Double.NEGATIVE_INFINITY)
         set("POSITIVE_INFINITY", Double.POSITIVE_INFINITY)
-
-        setupNumberMethods()
     }
 
     override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Number {
@@ -105,7 +90,7 @@ internal class JSNumberFunction : JSFunction(name = "Number") {
 
     override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): JsNumberObject {
         return JsNumberObject(JsNumberWrapper(invoke(args, runtime))).apply {
-            setProto(this@JSNumberFunction.get(PROTOTYPE, runtime))
+            setProto(this@JSNumberFunction.get(PROTOTYPE, runtime), runtime)
         }
     }
 

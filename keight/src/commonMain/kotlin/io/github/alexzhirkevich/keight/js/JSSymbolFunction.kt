@@ -2,14 +2,12 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
 
-internal class JSSymbolFunction : JSFunction("Symbol") {
-
-    init {
-        JSSymbol.defaults.forEach {
-            set(it.value, it)
-        }
-    }
-
+internal class JSSymbolFunction : JSFunction(
+    name = "Symbol",
+    properties = JSSymbol.defaults
+        .associateBy { it.value }
+        .toMutableMap()
+) {
     override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): JSSymbol {
         return JSSymbol(args.getOrElse(0) { "" }.toString())
     }

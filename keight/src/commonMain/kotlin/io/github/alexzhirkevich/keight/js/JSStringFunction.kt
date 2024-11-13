@@ -7,39 +7,37 @@ import io.github.alexzhirkevich.keight.checkNotEmpty
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit
 import kotlin.jvm.JvmInline
 
-internal class JSStringFunction : JSFunction(name = "String") {
-
-    init {
-        setPrototype(Object {
-            "length" eq JsNumberWrapper(0)
-            "charAt" eq CharAt("")
-            "at" eq CharAt("")
-            "indexOf" eq IndexOf("")
-            "lastIndexOf" eq LastIndexOf("")
-            "concat" eq Concat("")
-            "charCodeAt" eq CharCodeAt("")
-            "endsWith" eq EndsWith("")
-            "split" eq Split("")
-            "startsWith" eq StartsWith("")
-            "includes" eq Includes("")
-            "padStart" eq PadStart("")
-            "padEnd" eq PadEnd("")
-            "match" eq Match("")
-            "replace" eq Replace("")
-            "replaceAll" eq ReplaceAll("")
-            "repeat" eq Repeat("")
-            "substring" eq Substring("")
-            "substr" eq Substring("")
-            "trim" eq Trim("")
-            "trimStart" eq TrimStart("")
-            "trimEnd" eq TrimEnd("")
-            "toUpperCase" eq ToUpperCase("")
-            "toLocaleUpperCase" eq ToUpperCase("")
-            "toLowerCase" eq ToLowerCase("")
-            "toLocaleLowerCase" eq ToLowerCase("")
-        })
+internal class JSStringFunction : JSFunction(
+    name = "String",
+    prototype = Object {
+        "length" eq JsNumberWrapper(0)
+        "charAt" eq CharAt("")
+        "at" eq CharAt("")
+        "indexOf" eq IndexOf("")
+        "lastIndexOf" eq LastIndexOf("")
+        "concat" eq Concat("")
+        "charCodeAt" eq CharCodeAt("")
+        "endsWith" eq EndsWith("")
+        "split" eq Split("")
+        "startsWith" eq StartsWith("")
+        "includes" eq Includes("")
+        "padStart" eq PadStart("")
+        "padEnd" eq PadEnd("")
+        "match" eq Match("")
+        "replace" eq Replace("")
+        "replaceAll" eq ReplaceAll("")
+        "repeat" eq Repeat("")
+        "substring" eq Substring("")
+        "substr" eq Substring("")
+        "trim" eq Trim("")
+        "trimStart" eq TrimStart("")
+        "trimEnd" eq TrimEnd("")
+        "toUpperCase" eq ToUpperCase("")
+        "toLocaleUpperCase" eq ToUpperCase("")
+        "toLowerCase" eq ToLowerCase("")
+        "toLocaleLowerCase" eq ToLowerCase("")
     }
-
+) {
     companion object {
         suspend fun toString(value: Any?, runtime: ScriptRuntime) : String {
             val toString = (value as? JsAny)?.get("toString", runtime)?.callableOrNull()
@@ -66,7 +64,7 @@ internal class JSStringFunction : JSFunction(name = "String") {
 
     override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
         return JsStringObject(JsStringWrapper(invoke(args, runtime))).apply {
-            setProto(this@JSStringFunction.get(PROTOTYPE, runtime))
+            setProto(this@JSStringFunction.get(PROTOTYPE, runtime), runtime)
         }
     }
 

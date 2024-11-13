@@ -16,6 +16,8 @@ public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
 
     internal val lock: Mutex = Mutex()
 
+    internal abstract val thisRef : Any
+
     public abstract fun isEmpty(): Boolean
 
     public abstract fun delete(property: Any?)
@@ -27,6 +29,7 @@ public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
     public abstract fun set(property: Any?, value: Any?, type: VariableType?)
 
     public abstract suspend fun withScope(
+        thisRef: Any = this.thisRef,
         extraProperties: Map<String, Pair<VariableType, Any?>> = emptyMap(),
         isSuspendAllowed: Boolean = this.isSuspendAllowed,
         block: suspend (ScriptRuntime) -> Any?
@@ -38,56 +41,16 @@ public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
     public abstract fun reset()
 }
 
+
+
 public operator fun ScriptRuntime.set(property: Any?, value: Any?): Unit =
     set(property, fromKotlin(value), null)
 
-private class ScopedRuntime(
-    val parent : ScriptRuntime,
-    override var isSuspendAllowed: Boolean
-) : DefaultRuntime(),
-    ScriptContext by parent ,
-    CoroutineScope by parent {
 
-    override fun fromKotlin(a: Any?): Any? {
-        return parent.fromKotlin(a)
-    }
-
-    override fun toKotlin(a: Any?): Any? {
-       return parent.toKotlin(a)
-    }
-
-    override suspend fun get(property: Any?): Any? {
-        return if (property in variables) {
-            super.get(property)
-        } else {
-            parent.get(property)
-        }
-    }
-
-    override fun contains(property: Any?): Boolean {
-        return super.contains(property) || parent.contains(property)
-    }
-
-    override fun set(property: Any?, value: Any?, type: VariableType?) {
-        when {
-            type == VariableType.Global -> parent.set(property, value, type)
-            type != null || property in variables -> super.set(property, value, type)
-            else -> parent.set(property, value, type)
-        }
-    }
-
-    override fun isEmpty(): Boolean {
-        return variables.isEmpty() && parent.isEmpty()
-    }
-}
 
 public abstract class DefaultRuntime : ScriptRuntime() {
 
     protected val variables: MutableMap<Any?, Pair<VariableType, Any?>> = mutableMapOf()
-
-    private val child by lazy {
-        ScopedRuntime(this, isSuspendAllowed)
-    }
 
     override fun contains(property: Any?): Boolean {
         return property in variables
@@ -114,12 +77,12 @@ public abstract class DefaultRuntime : ScriptRuntime() {
     }
 
     final override suspend fun withScope(
+        thisRef : Any,
         extraProperties: Map<String, Pair<VariableType, Any?>>,
         isSuspendAllowed: Boolean,
         block: suspend (ScriptRuntime) -> Any?
     ): Any? {
-        child.reset()
-        child.isSuspendAllowed = isSuspendAllowed
+        val child = ScopedRuntime(this, thisRef, isSuspendAllowed)
         extraProperties.forEach { (n, v) ->
             child.set(n, v.second, v.first)
         }
@@ -134,6 +97,43 @@ public abstract class DefaultRuntime : ScriptRuntime() {
         variables.clear()
     }
 }
+
+
+
+private class ScopedRuntime(
+    val parent : ScriptRuntime,
+    override val thisRef: Any = parent.thisRef,
+    override val isSuspendAllowed: Boolean = parent.isSuspendAllowed
+) : DefaultRuntime(),
+    ScriptContext by parent,
+    CoroutineScope by parent {
+
+    override suspend fun get(property: Any?): Any? {
+        return if (property in variables) {
+            super.get(property)
+        } else {
+            parent.get(property)
+        }
+    }
+
+    override fun contains(property: Any?): Boolean {
+        return super.contains(property) || parent.contains(property)
+    }
+
+    override fun set(property: Any?, value: Any?, type: VariableType?) {
+        when {
+            type == VariableType.Global -> parent.set(property, value, type)
+            type != null || property in variables -> super.set(property, value, type)
+            else -> parent.set(property, value, type)
+        }
+    }
+
+    override fun isEmpty(): Boolean {
+        return variables.isEmpty() && parent.isEmpty()
+    }
+}
+
+
 
 internal tailrec fun ScriptRuntime.findRoot() : ScriptRuntime {
     return if (this is ScopedRuntime) {

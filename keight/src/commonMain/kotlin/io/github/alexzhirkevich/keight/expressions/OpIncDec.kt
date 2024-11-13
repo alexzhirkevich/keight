@@ -17,12 +17,13 @@ internal fun OpIncDecAssign(
             OpAssign(
                 variableName = variable.name,
                 assignableValue = value,
+                receiver = variable.receiver,
                 merge = null
             )
 
         variable is OpIndex && variable.receiver is OpGetProperty ->
             OpAssignByIndex(
-                variableName = variable.receiver.name,
+                receiver = variable.receiver,
                 index = variable.index,
                 assignableValue = value,
                 merge = null

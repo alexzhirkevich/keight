@@ -18,12 +18,8 @@ internal fun JSON() = Object("JSON") {
     }
 }
 
-private fun ListIterator<Char>.nextSignificant() : Char {
-    var n = next()
-    while (n == '\n'){
-        n =  next()
-    }
-    return n
+private tailrec fun ListIterator<Char>.nextSignificant() : Char {
+    return next().takeUnless(Char::isWhitespace) ?: nextSignificant()
 }
 
 private fun ListIterator<Char>.eat(seq : String) : Boolean {
@@ -41,25 +37,28 @@ private fun ListIterator<Char>.eat(char: Char) : Boolean {
 
 private fun ListIterator<Char>.parseJSON() : Any? {
     syntaxCheck(hasNext()){
-        "Invalid JSON"
+        "Invalid JSON (empty value)"
     }
     return when (nextSignificant()) {
         '{' -> parseObject()
         '[' -> parseArray()
-        else -> parsePrimitive()
+        else -> {
+            previous()
+            parsePrimitive()
+        }
     }
 }
 
 private fun ListIterator<Char>.parseObject() : JSObject {
     return Object {
         while (!eat('}')) {
-            syntaxCheck(eat('"')) { "Invalid JSON" }
+            syntaxCheck(eat('"')) { "Invalid JSON - '\"' was expected at ${nextIndex()}" }
             val key = buildString {
                 while (!eat('"')) {
                     append(next())
                 }
             }
-            syntaxCheck(eat(':')) { "Invalid JSON" }
+            syntaxCheck(eat(':')) { "Invalid JSON - ':' was expected at ${nextIndex()}" }
             key eq parseJSON()
             eat(',')
         }
@@ -83,9 +82,9 @@ private fun ListIterator<Char>.parsePrimitive() : JsAny? {
         eat('"') -> JsStringWrapper(string('"').value)
         eat("null") -> null
         else -> {
-            val n = next()
+            val n = nextSignificant()
             syntaxCheck(n.isDigit()) {
-                "Invalid JSON"
+                "Invalid JSON: number expected but got $n at ${previousIndex()}"
             }
             return JsNumberWrapper(number(n).value)
         }
@@ -94,7 +93,7 @@ private fun ListIterator<Char>.parsePrimitive() : JsAny? {
 
 private tailrec suspend fun Any?.stringify(runtime: ScriptRuntime) : String {
     return when (this) {
-        is JSObject -> stringify(runtime)
+        is JSObjectImpl -> stringify(runtime)
         is List<*> -> stringify(runtime)
         is Number -> toString()
         is JsWrapper<*> -> value.stringify(runtime)
@@ -125,6 +124,3 @@ private suspend fun List<*>.stringify(runtime: ScriptRuntime) : String {
         }
     }.removeSuffix(",") + "]"
 }
-
-
-
