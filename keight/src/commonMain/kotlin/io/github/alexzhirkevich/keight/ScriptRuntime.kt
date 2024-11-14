@@ -50,7 +50,7 @@ public operator fun ScriptRuntime.set(property: Any?, value: Any?): Unit =
 
 public abstract class DefaultRuntime : ScriptRuntime() {
 
-    protected val variables: MutableMap<Any?, Pair<VariableType, Any?>> = mutableMapOf()
+    protected val variables: MutableMap<Any?, Pair<VariableType?, Any?>> = mutableMapOf()
 
     override fun contains(property: Any?): Boolean {
         return property in variables
@@ -61,13 +61,13 @@ public abstract class DefaultRuntime : ScriptRuntime() {
     }
 
     override fun set(property: Any?, value: Any?, type: VariableType?) {
-        if (type != null && property in variables) {
-            throw SyntaxError("Identifier '$property' is already declared")
+        if (type != null && variables[property]?.first != null) {
+            throw SyntaxError("Identifier '$property' ($type) is already declared")
         }
         if (type == null && variables[property]?.first == VariableType.Const) {
             throw TypeError("Assignment to constant variable ('$property')")
         }
-        variables[property] = (type ?: variables[property]?.first ?: VariableType.Global) to value
+        variables[property] = (type ?: variables[property]?.first) to value
     }
 
     override suspend fun get(property: Any?): Any? {

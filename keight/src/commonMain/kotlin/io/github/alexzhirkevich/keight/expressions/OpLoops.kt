@@ -31,7 +31,6 @@ internal class OpForLoop(
 
     private suspend fun block(ctx: ScriptRuntime) {
         while (condition(ctx)) {
-            currentCoroutineContext().ensureActive()
             try {
                 body(ctx)
             } catch (_: BlockContinue) {
@@ -67,7 +66,6 @@ internal class OpForInLoop(
             }
 
             for (k in keys) {
-                currentCoroutineContext().ensureActive()
                 try {
                     assign(it, k)
                     body(it)
@@ -88,7 +86,6 @@ internal fun  OpDoWhileLoop(
     body : OpBlock
 ) = Expression {
     do {
-        currentCoroutineContext().ensureActive()
         try {
             body.invoke(it)
         } catch (_: BlockContinue) {
@@ -105,7 +102,6 @@ internal fun OpWhileLoop(
     body : Expression,
 ) = Expression {
     while (!it.isFalse(condition.invoke(it))) {
-        currentCoroutineContext().ensureActive()
         try {
             body.invoke(it)
         } catch (_: BlockContinue) {

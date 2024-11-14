@@ -14,19 +14,18 @@ public interface JsAny {
 
     public suspend fun proto(runtime: ScriptRuntime) : Any? = Unit
 
-    public suspend fun delete(property: Any?, runtime: ScriptRuntime) {
-    }
+    public suspend fun delete(property: Any?, runtime: ScriptRuntime): Boolean = true
 
     public suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
+
         return when(property){
-            "toString" -> ToString(this)
+//            "toString" -> ToString(this)
             "__proto__" -> proto(runtime)
             else -> {
                 val proto = proto(runtime)
-                if (proto is JsAny){
-                    return proto.get(property, runtime)
-                } else {
-                    Unit
+                return when {
+                    proto is JsAny -> proto.get(property, runtime)
+                    else -> Unit
                 }
             }
         }

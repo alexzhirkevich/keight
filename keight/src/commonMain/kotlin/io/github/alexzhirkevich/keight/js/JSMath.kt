@@ -10,14 +10,14 @@ import kotlin.math.*
 import kotlin.random.Random
 
 internal fun JSMath() : JSObject = Object("Math") {
-    "PI" eq PI
-    "E" eq E
-    "LN10" eq 2.302585092994046
-    "LN2" eq 0.6931471805599453
-    "LOG10E" eq 0.4342944819032518
-    "LOG2E" eq 1.4426950408889634
-    "SQRT1_2" eq 0.7071067811865476
-    "SQRT2" eq 1.4142135623730951
+    "PI".eq(JsNumberWrapper(PI), writable = false, configurable = false)
+    "E".eq(JsNumberWrapper(E), writable = false, configurable = false)
+    "LN10".eq(JsNumberWrapper(2.302585092994046), writable = false, configurable = false)
+    "LN2".eq(JsNumberWrapper(0.6931471805599453), writable = false, configurable = false)
+    "LOG10E".eq(JsNumberWrapper(0.4342944819032518), writable = false, configurable = false)
+    "LOG2E".eq(JsNumberWrapper(1.4426950408889634), writable = false, configurable = false)
+    "SQRT1_2".eq(JsNumberWrapper(0.7071067811865476), writable = false, configurable = false)
+    "SQRT2".eq(JsNumberWrapper(1.4142135623730951), writable = false, configurable = false)
 
     "abs".func("x") { op1(it, ::acos) }
     "asoc".func("x") { op1(it, ::acos) }

@@ -34,9 +34,9 @@ kotlin {
         nodejs()
         browser()
     }
-    wasmWasi {
-        nodejs()
-    }
+//    wasmWasi {
+//        nodejs()
+//    }
 
     iosArm64()
     iosX64()

@@ -42,8 +42,8 @@ internal class JSStringFunction : JSFunction(
         suspend fun toString(value: Any?, runtime: ScriptRuntime) : String {
             val toString = (value as? JsAny)?.get("toString", runtime)?.callableOrNull()
 
-            return if (toString is Callable) {
-                toString.invoke(emptyList(), runtime).toString()
+            return if (toString != null) {
+                toString.call(value, emptyList(), runtime).toString()
             } else {
                 value.toString()
             }

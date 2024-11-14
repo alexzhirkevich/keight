@@ -5,14 +5,14 @@ import io.github.alexzhirkevich.keight.fastMap
 import kotlinx.coroutines.Job
 import kotlin.math.absoluteValue
 
-internal object JSLangContext : ScriptContext {
+    internal object JSLangContext : ScriptContext {
 
     override fun isFalse(a: Any?): Boolean {
         return a == null
                 || a == false
                 || a is Unit
-                || a is Number && a.toDouble().let { it == 0.0 || it.isNaN() }
                 || a is CharSequence && a.isEmpty()
+                || a is Number && a.toDouble().let { it == 0.0 || it.isNaN() }
                 || (a as? JsWrapper<*>)?.value?.let(::isFalse) == true
     }
 
@@ -86,6 +86,7 @@ internal object JSLangContext : ScriptContext {
         return a.numberOrNull(withNaNs = !strict) ?: Double.NaN
     }
 
+
     override fun fromKotlin(a: Any?): Any? {
         return when (a) {
             is JsWrapper<*> -> a
@@ -117,6 +118,8 @@ internal object JSLangContext : ScriptContext {
         }
     }
 }
+
+private val MAX_DENORM = 2.225073858507201E-308
 
 private fun jssum(a : Any?, b : Any?) : Any? {
     val ta = if (a is List<*>)
@@ -175,14 +178,15 @@ private fun jsdiv(a : Any?, b : Any?) : Any {
                 || ((b as? Number)?.toDouble() == 0.0 && a == null)
                 || ((a as? CharSequence)?.toString()?.toDoubleOrNull() == 0.0 && b == null)
                 || ((b as? CharSequence)?.toString()?.toDoubleOrNull() == 0.0 && a == null) -> Double.NaN
-        a == null -> 0L
-        b == null || (b as? Number)?.toDouble() == 0.0 -> Double.POSITIVE_INFINITY
         a is Long && b is Long -> when {
+            b == 0 -> a / b.toDouble()
             a % b == 0L -> a / b
             else -> a.toDouble() / b
         }
-
         a is Number && b is Number -> a.toDouble() / b.toDouble()
+        a == null -> 0L
+        b == null || (b as? Number)?.toDouble() == 0.0 -> Double.POSITIVE_INFINITY
+
         a is List<*> && b is Number -> {
             a as List<Number>
             val bf = b.toDouble()
@@ -228,13 +232,13 @@ private fun jsdec(v : Any?) : Any {
 private fun jsneg(v : Any?) : Any {
     return when (v) {
         null -> -0
+        0, 0L -> -0.0
         is Long -> -v
         is Number -> -v.toDouble()
         is List<*> -> {
             v as List<Number>
             v.fastMap { -it.toDouble() }
         }
-
         else -> Double.NaN
     }
 }
@@ -242,7 +246,8 @@ private fun jsneg(v : Any?) : Any {
 private fun jspos(v : Any?) : Any {
     return when (v) {
         null -> 0
-        is Number -> v
+        is Long -> +v
+        is Number -> +v.toDouble()
         else -> Double.NaN
     }
 }
@@ -252,7 +257,6 @@ private tailrec fun Any?.numberOrNull(withNaNs : Boolean = true) : Number? = whe
     null -> 0L
     true -> 1L
     false -> 0L
-
 
     is CharSequence -> when {
         isBlank() -> 0L

@@ -11,6 +11,8 @@ import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 public class FunctionParam(
     public val name : String,
@@ -59,7 +61,7 @@ public open class JSFunction(
         if (varargs > 1 || varargs == 1 && !parameters.last().isVararg) {
             throw SyntaxError("Rest parameter must be last formal parameter")
         }
-        set(PROTOTYPE, prototype)
+        setPrototype(prototype)
     }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
@@ -126,9 +128,11 @@ public open class JSFunction(
                     else -> Unit
                 }
             }
+
             extraArgs.forEach {
                 this[it.key] = it.value
             }
+            this["arguments"] = VariableType.Local to args
         }
 
         return if (isAsync){

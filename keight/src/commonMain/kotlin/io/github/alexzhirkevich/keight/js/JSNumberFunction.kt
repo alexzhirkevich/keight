@@ -60,20 +60,70 @@ internal fun numberMethods() : List<JSFunction> {
 
 internal class JSNumberFunction : JSFunction(
     name = "Number",
-    properties = numberMethods().associateBy { it.name }.toMutableMap(),
     prototype =  Object {
         "toFixed" eq ToFixed(0)
         "toPrecision" eq ToPrecision(0)
     }
 ) {
     init {
-        set("EPSILON", Double.MIN_VALUE)
-        set("MAX_SAFE_INTEGER", Long.MAX_VALUE)
-        set("MAX_VALUE", Double.MAX_VALUE)
-        set("MIN_SAFE_INTEGER", Long.MIN_VALUE)
-        set("NaN", Double.NaN)
-        set("NEGATIVE_INFINITY", Double.NEGATIVE_INFINITY)
-        set("POSITIVE_INFINITY", Double.POSITIVE_INFINITY)
+        numberMethods().forEach {
+            set(
+                property = it.name,
+                value = it,
+                writable = false,
+                configurable = false,
+                enumerable = false
+            )
+        }
+        set(
+            "EPSILON",
+            JsNumberWrapper(Double.MIN_VALUE),
+            writable = false,
+            configurable = false,
+            enumerable = false
+        )
+        set(
+            "MAX_SAFE_INTEGER",
+            JsNumberWrapper(Long.MAX_VALUE),
+            writable = false,
+            configurable = false,
+            enumerable = false
+        )
+        set(
+            "MAX_VALUE",
+            JsNumberWrapper(Double.MAX_VALUE),
+            writable = false,
+            configurable = false,
+            enumerable = false
+        )
+        set(
+            "MIN_SAFE_INTEGER",
+            JsNumberWrapper(Long.MIN_VALUE),
+            writable = false,
+            configurable = false,
+            enumerable = false
+        )
+        set(
+            "NaN",
+            JsNumberWrapper(Double.NaN),
+            writable = false,
+            configurable = false,
+            enumerable = false
+        )
+        set(
+            "NEGATIVE_INFINITY",
+            JsNumberWrapper(Double.NEGATIVE_INFINITY),
+            writable = false,
+            configurable = false,
+            enumerable = false
+        )
+        set(
+            "POSITIVE_INFINITY",
+            JsNumberWrapper(Double.POSITIVE_INFINITY),
+            writable = false,
+            configurable = false,
+            enumerable = false
+        )
     }
 
     override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Number {

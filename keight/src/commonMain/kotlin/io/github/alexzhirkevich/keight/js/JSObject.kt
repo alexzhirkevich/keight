@@ -28,8 +28,13 @@ internal const val PROTOTYPE = "prototype"
 internal const val PROTO = "__proto__"
 
 
+internal fun JSObjectImpl.setPrototype(prototype : Any?) {
+    set(PROTOTYPE, prototype, configurable = false, writable = false, enumerable = false)
+}
+
+
 internal fun JSObject.setPrototype(prototype : Any?, runtime: ScriptRuntime) {
-    set(PROTOTYPE, prototype, runtime)
+    set(PROTOTYPE, prototype, runtime, configurable = false, writable = false, enumerable = false)
 }
 
 internal fun JSObject.setProto(proto : Any?, runtime: ScriptRuntime) {
@@ -81,12 +86,13 @@ public open class JSObjectImpl(
         get() = map.backedMap
 
     override val keys: List<String>
-        get() = map.keys.map { it.toString() }
+        get() = map.filter { it.value.enumerable != false }.keys.map { it.toString() }
 
-    override val values: List<Any?> get() = map.values.map { it.value }
+    override val values: List<Any?>
+        get() = map.filter { it.value.enumerable != false }.values.map { it.value }
 
     override val entries: List<List<Any?>>
-        get() = map.entries.map { listOf(it.key, it.value.value) }
+        get() = map.entries.mapNotNull { if (it.value.enumerable == false) null else listOf(it.key, it.value.value) }
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return if (PROTO in map) {
@@ -103,11 +109,14 @@ public open class JSObjectImpl(
         return super.get(property, runtime)
     }
 
-    override suspend fun delete(property: Any?, runtime: ScriptRuntime) {
-        if (property in map) {
-            map.remove(property)
-        } else {
-            super.delete(property, runtime)
+    override suspend fun delete(property: Any?, runtime: ScriptRuntime): Boolean {
+        return when {
+            property !in map -> true
+            map[property]?.configurable == false -> false
+            else -> {
+                map.remove(property)
+                true
+            }
         }
     }
 
@@ -131,20 +140,24 @@ public open class JSObjectImpl(
     internal fun set(
         property: Any?,
         value: Any?,
-        enumerable: Boolean? = null,
-        configurable: Boolean? = null,
         writable: Boolean? = null,
+        configurable: Boolean? = null,
+        enumerable: Boolean? = null,
     ) {
         if (property in map) {
-            map[property]?.value = value
-            if (writable != null) {
-                map[property]?.writable = writable
+            if (map[property]?.writable != false) {
+                map[property]?.value = value
             }
-            if (enumerable != null) {
-                map[property]?.writable = enumerable
-            }
-            if (configurable != null) {
-                map[property]?.writable = configurable
+            if (map[property]?.configurable != false) {
+                if (writable != null) {
+                    map[property]?.writable = writable
+                }
+                if (enumerable != null) {
+                    map[property]?.enumerable = enumerable
+                }
+                if (configurable != null) {
+                    map[property]?.configurable = configurable
+                }
             }
         } else {
             map[property] = JSProperty(
@@ -175,7 +188,8 @@ public open class JSObjectImpl(
 
 public sealed interface ObjectScope {
 
-    public infix fun String.eq(value: Any?)
+    public infix fun Any.eq(value: Any?)
+    public  fun Any.eq(value: Any?, writable: Boolean? = null, configurable: Boolean? = false, enumerable: Boolean? = null)
 
     public fun String.func(
         vararg args: FunctionParam,
@@ -200,6 +214,20 @@ internal class ObjectScopeImpl(
     val o : JSObjectImpl = JSObjectImpl(name)
 ) : ObjectScope {
 
+    override fun Any.eq(
+        value: Any?,
+        writable: Boolean?,
+        configurable: Boolean?,
+        enumerable: Boolean?
+    ) {
+        o.set(
+            property = this,
+            value = value,
+            writable = writable,
+            configurable = configurable,
+            enumerable = enumerable
+        )
+    }
     override fun String.func(
         vararg args: FunctionParam,
         body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
@@ -217,7 +245,7 @@ internal class ObjectScopeImpl(
         )
     }
 
-    override fun String.eq(value: Any?) {
+    override fun Any.eq(value: Any?) {
         o.set(this, value,)
     }
 }

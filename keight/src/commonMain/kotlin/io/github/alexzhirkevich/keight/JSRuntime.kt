@@ -2,6 +2,7 @@ package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.expressions.JSErrorFunction
 import io.github.alexzhirkevich.keight.js.JSArrayFunction
+import io.github.alexzhirkevich.keight.js.JSDateFunction
 import io.github.alexzhirkevich.keight.js.JSLangContext
 import io.github.alexzhirkevich.keight.js.JSMapFunction
 import io.github.alexzhirkevich.keight.js.JSMath
@@ -16,6 +17,7 @@ import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JSSymbolFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsConsole
+import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.func
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.numberMethods
@@ -51,6 +53,7 @@ public open class JSRuntime(
     internal lateinit var Promise: JSPromiseFunction
     internal lateinit var Symbol: JSSymbolFunction
     internal lateinit var Error: JSErrorFunction
+    internal lateinit var Date: JSDateFunction
 
     private var jobsCounter = 1L
     private val jobsMap = mutableMapOf<Long, Job>()
@@ -83,16 +86,16 @@ public open class JSRuntime(
         Promise = JSPromiseFunction()
         Symbol = JSSymbolFunction()
         Error = JSErrorFunction()
+        Date = JSDateFunction()
 
         listOf(
-            Number, Object, Array, Map, Set, String, Promise, Symbol, Error
+            Number, Object, Array, Map, Set, String, Promise, Symbol, Error, Date
         ).fastForEach {
             set(it.name, it, VariableType.Global)
         }
-
         set("globalThis", thisRef, VariableType.Global)
-        set("Infinity", Double.POSITIVE_INFINITY, VariableType.Const)
-        set("NaN", Double.NaN, VariableType.Const)
+        set("Infinity", JsNumberWrapper(Double.POSITIVE_INFINITY), null)
+        set("NaN", JsNumberWrapper(Double.NaN), null)
         set("undefined", Unit, VariableType.Const)
         set("console", JsConsole(::console), VariableType.Global)
         set("Math", JSMath(), VariableType.Global)
@@ -209,8 +212,9 @@ private class RuntimeObject : JSObject {
     }
 
 
-    override suspend fun delete(property: Any?, runtime: ScriptRuntime) {
+    override suspend fun delete(property: Any?, runtime: ScriptRuntime): Boolean {
         runtime.delete(property)
+        return true
     }
 }
 

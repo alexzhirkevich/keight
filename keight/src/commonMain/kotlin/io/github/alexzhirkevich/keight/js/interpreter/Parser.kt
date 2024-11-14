@@ -305,7 +305,13 @@ private fun ListIterator<Token>.parseStatement(
                 Token.Operator.Logical.And -> {
                     val a = x
                     val b = parseStatement(blockContext, precedence, ExpectedBlockType.Object)
-                    Expression { !it.isFalse(a(it)) && !it.isFalse(b(it)) }
+                    Expression {
+                        val av = a(it)
+                        if (it.isFalse(av)){
+                            return@Expression av
+                        }
+                        b(it)
+                    }
                 }
                 else -> return x.also { prevSignificant() }
             }
@@ -314,7 +320,13 @@ private fun ListIterator<Token>.parseStatement(
                 Token.Operator.Logical.Or -> {
                     val a = x
                     val b = parseStatement(blockContext, precedence, ExpectedBlockType.Object)
-                    Expression { !it.isFalse(a(it)) || !it.isFalse(b(it)) }
+                    Expression {
+                        val av = a(it)
+                        if (!it.isFalse(av)){
+                            return@Expression av
+                        }
+                        b(it)
+                    }
                 }
                 Token.Operator.NullishCoalescing -> {
                     val replacement = parseStatement(blockContext, precedence, ExpectedBlockType.Object)
@@ -472,7 +484,7 @@ private fun ListIterator<Token>.parseAssignmentValue(
             merge = merge
         )
 
-        else -> throw SyntaxError("Invalid assignment")
+        else -> throw SyntaxError("Invalid left-hand in assignment")
     }
 }
 
@@ -621,8 +633,15 @@ private fun ListIterator<Token>.parseNew() : Expression {
         "Invalid syntax after 'new'"
     }
 
-    val args = parseExpressionGrouping().expressions
+    if (!nextIsInstance<Token.Operator.Bracket.RoundOpen>()) {
+        return OpCall(
+            callable = OpGetProperty(next.identifier, receiver = null),
+            arguments = emptyList(),
+            isOptional = false
+        )
+    }
 
+    val args = parseExpressionGrouping().expressions
     return Expression { runtime ->
         val constructor = runtime.get(next.identifier)
         syntaxCheck(constructor is Constructor) {
@@ -670,16 +689,19 @@ private fun ListIterator<Token>.parseArrayCreation(): Expression {
     check(eat(Token.Operator.Bracket.SquareOpen))
 
     val expressions = buildList {
-        if (nextIsInstance<Token.Operator.Bracket.SquareClose>()) {
-            return@buildList
+        while (!eat(Token.Operator.Bracket.SquareClose)) {
+            if (eat(Token.Operator.Comma)) {
+                add(OpConstant(Unit))
+            } else {
+                add(parseStatement(blockType = ExpectedBlockType.Object))
+                if (!eat(Token.Operator.Comma)) {
+                    syntaxCheck(nextSignificant() is Token.Operator.Bracket.SquareClose) {
+                        "Expected ')'"
+                    }
+                    break
+                }
+            }
         }
-        do {
-            add(parseStatement(blockType = ExpectedBlockType.Object))
-        } while (nextSignificant() is Token.Operator.Comma)
-        prevSignificant()
-    }
-    syntaxCheck(nextSignificant() is Token.Operator.Bracket.SquareClose) {
-        "Expected ')'"
     }
 
     return OpMakeArray(expressions)

@@ -445,7 +445,11 @@ internal fun ListIterator<Char>.number(start : Char) : Token.Num {
         }
         value.append(ch)
         ch = next().lowercaseChar()
-    } while (ch in numberFormat.alphabet || ch in NumberFormatIndicators)
+    } while (
+        ch in numberFormat.alphabet ||
+        ch in NumberFormatIndicators ||
+        ((ch == '-'  || ch == '+') && value.lastOrNull() == 'e')
+    )
 
     previous()
 
@@ -464,7 +468,7 @@ internal fun ListIterator<Char>.number(start : Char) : Token.Num {
                 .toLong()
         }
     } catch (t: NumberFormatException) {
-        throw SyntaxError("Unexpected token '$value'")
+        throw SyntaxError("Unexpected token '$value'", t)
     }
 
     return Token.Num(number, numberFormat, isFloat)
