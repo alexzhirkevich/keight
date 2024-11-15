@@ -6,13 +6,12 @@ import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.Constructor
+import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import kotlinx.coroutines.async
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 
 public class FunctionParam(
     public val name : String,
@@ -100,14 +99,27 @@ public open class JSFunction(
         }
     }
 
+    public open suspend fun constructObject(
+        args: List<Any?>,
+        runtime: ScriptRuntime
+    ) : JSObject = JSObjectImpl()
+
     override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
         syntaxCheck(isMutableThisRef) {
             "Illegal usage of 'new' operator"
         }
 
-        return JSObjectImpl().also {
-            it.setProto(get(PROTOTYPE, runtime), runtime)
-            invoke(args, runtime, superConstructorPropertyMap, it)
+        return constructObject(args, runtime).also { o ->
+            o.setProto(runtime, get(PROTOTYPE, runtime))
+            o.set(
+                "constructor",
+                this,
+                runtime,
+                configurable = false,
+                writable = false,
+                enumerable = false
+            )
+            invoke(args, runtime, superConstructorPropertyMap, o)
         }
     }
 
@@ -157,6 +169,7 @@ public open class JSFunction(
         return try {
             runtime.withScope(
                 extraProperties = arguments,
+                isFunction = true,
                 thisRef = thisRef ?: runtime.thisRef,
                 isSuspendAllowed = isAsync,
                 block = body::invoke

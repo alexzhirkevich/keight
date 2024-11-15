@@ -64,7 +64,7 @@ internal class JSStringFunction : JSFunction(
 
     override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
         return JsStringObject(JsStringWrapper(invoke(args, runtime))).apply {
-            setProto(this@JSStringFunction.get(PROTOTYPE, runtime), runtime)
+            setProto(runtime,this@JSStringFunction.get(PROTOTYPE, runtime))
         }
     }
 

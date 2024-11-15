@@ -9,19 +9,24 @@ public open class JSError(
     cause : Throwable? = null
 ) : Exception("Uncaught $name: $msg", cause),
     JSObject by JSObjectImpl(properties = mapOf("message" to msg, "name" to name)) {
+
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return (runtime as JSRuntime).Error.get(PROTOTYPE, runtime)
     }
 }
 
-public class SyntaxError(message : String? = null, cause : Throwable? = null)
-    : JSError(message, "SyntaxError", cause)
+public class SyntaxError(msg : Any?, cause : Throwable? = null)
+    : JSError(msg, "SyntaxError", cause) {}
 
-public class TypeError(message : String? = null, cause : Throwable? = null)
-    : JSError(message, "TypeError", cause)
+public class TypeError(msg : Any?, cause : Throwable? = null)
+    : JSError(msg, "TypeError", cause) {
+    override suspend fun proto(runtime: ScriptRuntime): Any? {
+        return (runtime as JSRuntime).TypeError.get(PROTOTYPE, runtime)
+    }
+}
 
-public class RangeError(message : String? = null, cause : Throwable? = null)
-    : JSError(message, "RangeError", cause)
+public class RangeError(msg : Any?, cause : Throwable? = null)
+    : JSError(msg, "RangeError", cause)
 
-public class ReferenceError(message : String? = null, cause : Throwable? = null)
-    : JSError(message, "ReferenceError", cause)
+public class ReferenceError(msg : Any?, cause : Throwable? = null)
+    : JSError(msg, "ReferenceError", cause)

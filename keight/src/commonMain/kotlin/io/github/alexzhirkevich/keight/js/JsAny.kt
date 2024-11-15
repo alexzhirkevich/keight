@@ -1,8 +1,11 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
+import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import kotlin.jvm.JvmInline
 
@@ -10,56 +13,37 @@ public interface JsAny {
 
     public val type : String get() = "object"
 
-    public val keys: List<String> get() = emptyList()
+    public suspend fun keys(runtime: ScriptRuntime) : List<String> = emptyList()
 
     public suspend fun proto(runtime: ScriptRuntime) : Any? = Unit
 
     public suspend fun delete(property: Any?, runtime: ScriptRuntime): Boolean = true
 
     public suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
-
-        return when(property){
-//            "toString" -> ToString(this)
+         return when (property) {
             "__proto__" -> proto(runtime)
             else -> {
-                val proto = proto(runtime)
-                return when {
-                    proto is JsAny -> proto.get(property, runtime)
+                when(val proto = proto(runtime)) {
+                    is JsAny -> proto.get(property, runtime)
                     else -> Unit
                 }
             }
-        }
+        }?.get()
     }
 
     public suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
         get(property, runtime) != Unit
+}
 
-    @JvmInline
-    private value class ToString(val value : Any?) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return value.toString()
-        }
+internal suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime) : Boolean {
+    return isPrototypeOf(obj, runtime, true)
+}
 
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return ToString(thisArg)
-        }
+private suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime, isFirst : Boolean = true) : Boolean {
+    return when {
+        !isFirst && obj === this -> true
+        obj !is JsAny -> false
+        else -> isPrototypeOf(obj.proto(runtime), runtime, false)
     }
 }
 
-internal suspend fun JsAny.call(
-    func : Any?,
-    thisRef : Any?,
-    args: List<Any?>,
-    isOptional : Boolean,
-    runtime: ScriptRuntime,
-) : Any? {
-    val v = get(func, runtime)
-    val callable = v?.callableOrNull()
-    if (callable == null && isOptional) {
-        return Unit
-    }
-    typeCheck(callable != null) {
-        "$v is not a function"
-    }
-    return callable.call(thisRef, args, runtime)
-}

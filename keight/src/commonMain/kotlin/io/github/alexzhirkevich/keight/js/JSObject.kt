@@ -3,14 +3,20 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.fastMapTo
 import io.github.alexzhirkevich.keight.findRoot
+import io.github.alexzhirkevich.keight.get
 
 public interface JSObject : JsAny {
 
     public val values: List<Any?>
 
     public val entries: List<List<Any?>>
+
+    public val isExtensible : Boolean  get() = true
+
+    public fun preventExtensions() {}
 
     public fun set(
         property: Any?,
@@ -27,19 +33,27 @@ public interface JSObject : JsAny {
 internal const val PROTOTYPE = "prototype"
 internal const val PROTO = "__proto__"
 
-
 internal fun JSObjectImpl.setPrototype(prototype : Any?) {
-    set(PROTOTYPE, prototype, configurable = false, writable = false, enumerable = false)
+    set(PROTOTYPE, prototype, configurable = false, enumerable = false)
 }
 
 
 internal fun JSObject.setPrototype(prototype : Any?, runtime: ScriptRuntime) {
-    set(PROTOTYPE, prototype, runtime, configurable = false, writable = false, enumerable = false)
+    set(PROTOTYPE, prototype, runtime, configurable = false, enumerable = false)
 }
 
-internal fun JSObject.setProto(proto : Any?, runtime: ScriptRuntime) {
-    set(PROTO, proto, runtime)
+internal fun JSObject.setProto(runtime: ScriptRuntime, proto : Any?) {
+    if (isExtensible) {
+        set(PROTO, proto, runtime)
+    }
 }
+
+internal fun JSObjectImpl.setProto(proto : Any?) {
+    if (isExtensible) {
+        set(PROTO, proto)
+    }
+}
+
 
 internal suspend fun JSObject.getOrElse(property: Any?, runtime: ScriptRuntime, orElse : () -> Any?) : Any? {
     return if (contains(property, runtime)){
@@ -49,15 +63,15 @@ internal suspend fun JSObject.getOrElse(property: Any?, runtime: ScriptRuntime, 
     }
 }
 
-internal class ObjectMap(
-    val backedMap : MutableMap<Any?, JSProperty> = mutableMapOf(),
-) : MutableMap<Any?, JSProperty> by backedMap {
+internal class ObjectMap<V>(
+    val backedMap : MutableMap<Any?, V> = mutableMapOf(),
+) : MutableMap<Any?, V> by backedMap {
 
-    override fun get(key: Any?): JSProperty? {
+    override fun get(key: Any?): V? {
         return backedMap[mapKey(key)]
     }
 
-    override fun put(key: Any?, value: JSProperty): JSProperty? {
+    override fun put(key: Any?, value: V): V? {
         return backedMap.put(mapKey(key), value)
     }
 
@@ -67,16 +81,19 @@ internal class ObjectMap(
 
     private tailrec fun mapKey(key: Any?) : Any? {
         return when (key) {
-            is JsWrapper<*> -> mapKey(key.value)
+            is Wrapper<*> -> mapKey(key.value)
             else -> key
         }
     }
 }
 
 public open class JSObjectImpl(
-    public open val name : String = "",
+    public open val name : String = "Object",
     properties : Map<Any?, Any?> = mutableMapOf()
 ) : JSObject {
+
+    override var isExtensible : Boolean = true
+        internal set
 
     private val map = ObjectMap(
         properties.mapValues { JSProperty(it.value) }.toMutableMap()
@@ -85,8 +102,9 @@ public open class JSObjectImpl(
     protected val properties : Map<Any?, Any?>
         get() = map.backedMap
 
-    override val keys: List<String>
-        get() = map.filter { it.value.enumerable != false }.keys.map { it.toString() }
+    override suspend fun keys(runtime: ScriptRuntime): List<String> {
+        return map.filter { it.value.enumerable != false }.keys.map { it.toString() }
+    }
 
     override val values: List<Any?>
         get() = map.filter { it.value.enumerable != false }.values.map { it.value }
@@ -96,18 +114,19 @@ public open class JSObjectImpl(
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return if (PROTO in map) {
-            map[PROTO]?.value
+            get(PROTO, runtime)
         } else {
             (runtime.findRoot() as JSRuntime).Object.get(PROTOTYPE,runtime)
         }
     }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
-        if (property in map) {
-            return map[property]?.value
+        return when {
+            property in map -> map[property]?.value?.get()
+            else -> super.get(property, runtime)
         }
-        return super.get(property, runtime)
     }
+
 
     override suspend fun delete(property: Any?, runtime: ScriptRuntime): Boolean {
         return when {
@@ -169,12 +188,16 @@ public open class JSObjectImpl(
         }
     }
 
+    override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
+        property in map || super.contains(property, runtime)
+
     override fun descriptor(property: Any?): JSPropertyDescriptor? {
         return map[property]
     }
 
-    override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
-        property in map || super.contains(property, runtime)
+    override fun preventExtensions() {
+        isExtensible = false
+    }
 
     override fun toString(): String {
         return if (name.isNotBlank()){
@@ -254,15 +277,15 @@ public fun Object(name: String, contents : Map<Any?, Any?>) : JSObject {
     return JSObjectImpl(name, contents)
 }
 
-public inline fun Object(name: String = "", builder : ObjectScope.() -> Unit) : JSObject {
+public inline fun Object(name: String = "Object", builder : ObjectScope.() -> Unit) : JSObject {
     return ObjectScopeImpl(name).also(builder).o
 }
 
 
-internal fun JSObjectImpl.init(scope: ObjectScope.() -> Unit) : JSObjectImpl {
-    ObjectScopeImpl("", this).apply(scope)
-    return this
-}
+//internal fun JSObjectImpl.init(scope: ObjectScope.() -> Unit) : JSObjectImpl {
+//    ObjectScopeImpl("", this).apply(scope)
+//    return this
+//}
 
 
 internal fun JSObjectImpl.noArgsFunc(

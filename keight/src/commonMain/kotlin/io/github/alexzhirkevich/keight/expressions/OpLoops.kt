@@ -59,7 +59,7 @@ internal class OpForInLoop(
                 "$o is not iterable"
             }
 
-            val keys = o.keys
+            val keys = o.keys(runtime)
 
             if (keys.isNotEmpty()){
                 prepare(it)

@@ -12,7 +12,11 @@ public abstract class Expression {
 
     public suspend operator fun invoke(runtime: ScriptRuntime): Any? {
         currentCoroutineContext().ensureActive()
-        return runtime.fromKotlin(execute(runtime))
+        return when (val res = execute(runtime)){
+            is Expression -> res.invoke(runtime)
+            is Getter<*> -> runtime.fromKotlin(res.get())
+            else -> runtime.fromKotlin(res)
+        }
     }
 }
 

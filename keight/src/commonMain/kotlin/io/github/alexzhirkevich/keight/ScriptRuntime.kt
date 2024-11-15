@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.js.ObjectMap
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +33,7 @@ public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
         thisRef: Any = this.thisRef,
         extraProperties: Map<String, Pair<VariableType, Any?>> = emptyMap(),
         isSuspendAllowed: Boolean = this.isSuspendAllowed,
+        isFunction: Boolean = false,
         block: suspend (ScriptRuntime) -> Any?
     ): Any?
 
@@ -50,7 +52,7 @@ public operator fun ScriptRuntime.set(property: Any?, value: Any?): Unit =
 
 public abstract class DefaultRuntime : ScriptRuntime() {
 
-    protected val variables: MutableMap<Any?, Pair<VariableType?, Any?>> = mutableMapOf()
+    protected val variables: MutableMap<Any?, Pair<VariableType?, Any?>> = ObjectMap(mutableMapOf())
 
     override fun contains(property: Any?): Boolean {
         return property in variables
@@ -72,7 +74,7 @@ public abstract class DefaultRuntime : ScriptRuntime() {
 
     override suspend fun get(property: Any?): Any? {
         return if (contains(property))
-            variables[property]?.second
+            variables[property]?.second?.get()
         else Unit
     }
 
@@ -80,9 +82,15 @@ public abstract class DefaultRuntime : ScriptRuntime() {
         thisRef : Any,
         extraProperties: Map<String, Pair<VariableType, Any?>>,
         isSuspendAllowed: Boolean,
+        isFunction: Boolean,
         block: suspend (ScriptRuntime) -> Any?
     ): Any? {
-        val child = ScopedRuntime(this, thisRef, isSuspendAllowed)
+        val child = ScopedRuntime(
+            parent = this,
+            isFunction = isFunction,
+            thisRef = thisRef,
+            isSuspendAllowed = isSuspendAllowed
+        )
         extraProperties.forEach { (n, v) ->
             child.set(n, v.second, v.first)
         }
@@ -102,6 +110,7 @@ public abstract class DefaultRuntime : ScriptRuntime() {
 
 private class ScopedRuntime(
     val parent : ScriptRuntime,
+    val isFunction : Boolean = false,
     override val thisRef: Any = parent.thisRef,
     override val isSuspendAllowed: Boolean = parent.isSuspendAllowed
 ) : DefaultRuntime(),
@@ -122,7 +131,7 @@ private class ScopedRuntime(
 
     override fun set(property: Any?, value: Any?, type: VariableType?) {
         when {
-            type == VariableType.Global -> parent.set(property, value, type)
+            type == VariableType.Global && !isFunction -> parent.set(property, value, type)
             type != null || property in variables -> super.set(property, value, type)
             else -> parent.set(property, value, type)
         }

@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.js.interpreter.escape
 import io.github.alexzhirkevich.keight.js.interpreter.number
@@ -96,7 +97,7 @@ private tailrec suspend fun Any?.stringify(runtime: ScriptRuntime) : String {
         is JSObjectImpl -> stringify(runtime)
         is List<*> -> stringify(runtime)
         is Number -> toString()
-        is JsWrapper<*> -> value.stringify(runtime)
+        is Wrapper<*> -> value.stringify(runtime)
         else -> "\"${JSStringFunction.toString(this, runtime).escape()}\""
     }
 }
@@ -104,7 +105,7 @@ private tailrec suspend fun Any?.stringify(runtime: ScriptRuntime) : String {
 private suspend fun JSObject.stringify(runtime: ScriptRuntime) : String {
     return buildString {
         append('{')
-        for (k in keys) {
+        for (k in keys(runtime)) {
             append('"')
             append(k)
             append('"')

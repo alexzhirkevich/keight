@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
@@ -334,11 +335,13 @@ internal class JSArrayFunction : JSFunction(
     @JvmInline
     private value class FlatMap(val value: MutableList<Any?>) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            return op(args) { callable ->
-                value.fastMap {
-                    callable.invoke(listOf(it), runtime)
-                }
-            }.flat(1)
+            return with(runtime) {
+                op(args) { callable ->
+                    value.fastMap {
+                        callable.invoke(listOf(it), runtime)
+                    }
+                }.flat(1)
+            }
         }
         override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
             return FlatMap((thisArg as? MutableList<Any?>) ?: mutableListOf())
@@ -357,13 +360,13 @@ private fun List<*>.flat(depth : Int, collector : MutableList<Any?> = mutableLis
     return collector
 }
 
-private suspend fun <R> op(
+private suspend fun <R> ScriptRuntime.op(
     arguments: List<Any?>,
     op: suspend (Callable) -> R
 ) : R {
     val func = arguments[0]?.callableOrNull()
     typeCheck(func != null){
-        throw TypeError("$func is not a function")
+        "$func is not a function"
     }
     return op(func)
 }

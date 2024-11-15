@@ -1,33 +1,48 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.fastForEach
+import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
+import io.github.alexzhirkevich.keight.js.interpreter.typeError
+import io.github.alexzhirkevich.keight.thisRef
 
 internal class JSObjectFunction : JSFunction(
     name = "Object",
+    parameters = listOf(
+        FunctionParam("obj")
+    ),
+    body = Expression {
+        constructObject(it.get("obj"))
+    },
     prototype = JSObjectImpl(
-        properties = mapOf(
-            "valueOf" to JSFunction("valueOf", body = Expression { it.thisRef })
-        )
+        properties = listOf(
+            "valueOf".func { thisRef },
+            "toString".func { thisRef.toString() },
+            "isPrototypeOf".func("object") {
+                (thisRef as? JsAny)?.isPrototypeOf(it[0],this) == true
+            }
+        ).associateBy { it.name }
     ).apply {
-        this.set(PROTO, null)
+        setProto(null)
     },
     properties = listOf(
         "assign".func("target", "source") {
             val target = it[0] as JSObject
             val source = it[1] as JSObject
 
-            source.keys.forEach { k ->
+            source.keys(this).forEach { k ->
                 target.set(k, source.get(k, this), this)
             }
         },
         "create".func( "object") { args ->
             val obj = args.getOrNull(0) as? JsAny ?: return@func JSObjectImpl()
             Object {
-                obj.keys.fastForEach {
+                obj.keys(this@func).fastForEach {
                     it eq obj.get(it, this@func)
                 }
             }
@@ -41,18 +56,21 @@ internal class JSObjectFunction : JSFunction(
         },
 
         "keys".func("object") {
-            (it.firstOrNull() as? JsAny)?.keys ?: emptySet<String>()
+            (it.firstOrNull() as? JsAny)?.keys(this) ?: emptySet<String>()
         },
         "values".func( "object") {
             (it.firstOrNull() as? JSObject)?.values ?: emptyList<String>()
         },
 
         "groupBy".func( "objects", "callback") { args ->
-            val obj = args.getOrNull(0) as? Iterable<JsAny>
-                ?: throw TypeError("${args.getOrNull(0)} is not iterable")
+            val obj = args.getOrNull(0)
+
+            typeCheck(obj is Iterable<*>) {
+                "$obj is not iterable"
+            }
 
             val callback = args.getOrNull(1)?.callableOrNull()
-                ?: throw TypeError("${args.getOrNull(1)} is not function")
+                ?: typeError { "${args.getOrNull(1)} is not function" }
 
             JSObjectImpl(
                 properties = obj
@@ -62,8 +80,11 @@ internal class JSObjectFunction : JSFunction(
         },
 
         "defineProperty".func( "object", "property", "descriptor") { args ->
-            val obj = (args.getOrNull(0) as? JSObject)
-                ?: throw TypeError("${args.getOrNull(0)} is not an object")
+            val obj = args.getOrNull(0)
+
+            typeCheck(obj is JSObject) {
+                "$obj is not a object"
+            }
 
             val name = args.getOrElse(1) {
                 return@func Unit
@@ -76,14 +97,20 @@ internal class JSObjectFunction : JSFunction(
         },
 
         "defineProperties".func( "object", "descriptors") { args ->
-            val obj = (args.getOrNull(0) as? JSObject)
-                ?: throw TypeError("${args.getOrNull(0)} is not an object")
+            val obj = args.getOrNull(0)
+
+            typeCheck(obj is JSObject) {
+                "$obj is not a object"
+            }
 
             val props = args.getOrNull(1) as? JSObject ?: return@func Unit
 
-            props.keys.forEach { key ->
-                val prop = props.get(key, this) as? JsAny
-                    ?: TypeError("$key property of $obj is not an object")
+            props.keys(this).forEach { key ->
+                val prop = props.get(key, this)
+
+                typeCheck(prop is JsAny){
+                    "$key property of $obj is not an object"
+                }
 
                 obj.define(this, key, prop)
             }
@@ -91,8 +118,11 @@ internal class JSObjectFunction : JSFunction(
         },
 
         "getOwnPropertyDescriptor".func( "object", "property") { args ->
-            val obj = args.getOrNull(0) as? JSObject
-                ?: throw TypeError("${args.getOrNull(0)} is not a object")
+            val obj = args.getOrNull(0)
+
+            typeCheck(obj is JSObject) {
+                "$obj is not a object"
+            }
 
             val name = args.getOrElse(1) { return@func Unit }
 
@@ -100,11 +130,13 @@ internal class JSObjectFunction : JSFunction(
         },
 
         "getOwnPropertyDescriptors".func( "object") { args ->
-            val obj = args.getOrNull(0) as? JSObject
-                ?: throw TypeError("${args.getOrNull(0)} is not a object")
+            val obj = args.getOrNull(0)
+            typeCheck(obj is JSObject) {
+                "$obj is not a object"
+            }
 
             JSObjectImpl(
-                properties = obj.keys.mapNotNull { k ->
+                properties = obj.keys(this).mapNotNull { k ->
                     obj.descriptor(k)?.asObject()?.let { k to it }
                 }.toMap()
             )
@@ -113,19 +145,22 @@ internal class JSObjectFunction : JSFunction(
         "getOwnPropertyNames".func( "object") { args ->
             val obj = args.getOrNull(0)
             typeCheck(obj is JsAny) { "$obj is not an object" }
-            obj.keys
+            obj.keys(this)
         },
 
         "getPrototypeOf".func( "object") {
-            val obj = it.getOrElse(0) {
-                throw TypeError("Cannot convert undefined or null to object")
-            }
+            val obj = it.getOrNull(0)
+
+            typeCheck(obj is JsAny) { "$obj is not an object" }
 
             (obj as? JsAny)?.get(PROTO, this) ?: Unit
         },
 
         "preventExtensions".func( "object") {
-            TODO()
+            val obj = it.getOrNull(0)
+            typeCheck(obj is JSObject) { "$obj is not an object" }
+            obj.preventExtensions()
+            obj
         },
 
         "isExtensible".func( "object") {
@@ -154,17 +189,26 @@ internal class JSObjectFunction : JSFunction(
         return obj is JSObject || super.isInstance(obj, runtime)
     }
 
-    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any {
-        return if (args.isEmpty()) {
-            JSObjectImpl()
-        } else {
-            JSObjectImpl()
-        }
-    }
+//    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any {
+//        return if (args.isEmpty()) {
+//            JSObjectImpl()
+//        } else {
+//            JSObjectImpl()
+//        }
+//    }
+//
+//
+//    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
+//        return invoke(args, runtime)
+//    }
+}
 
-
-    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
-        return invoke(args, runtime)
+private fun constructObject(param : Any?) : JSObjectImpl {
+    return when (param) {
+        is Number -> JsNumberObject(JsNumberWrapper(param))
+        is Wrapper<*> -> constructObject(param)
+        is JSObject -> JSObjectImpl(properties = param.entries.associate { it[0] to it[1] })
+        else -> JSObjectImpl()
     }
 }
 

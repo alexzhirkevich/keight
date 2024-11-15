@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.js.interpreter.typeError
 
 internal class JSSymbolFunction : JSFunction(
     name = "Symbol",
@@ -13,6 +14,6 @@ internal class JSSymbolFunction : JSFunction(
     }
 
     override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
-        throw TypeError("Symbol is not a constructor")
+        runtime.typeError { "Symbol is not a constructor" }
     }
 }

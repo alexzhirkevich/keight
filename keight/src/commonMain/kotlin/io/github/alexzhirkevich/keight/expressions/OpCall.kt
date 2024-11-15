@@ -4,12 +4,11 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.callableOrNull
-import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.fastMap
-import io.github.alexzhirkevich.keight.fastMapTo
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.SyntaxError
-import io.github.alexzhirkevich.keight.js.call
+import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
+import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import kotlinx.coroutines.async
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -21,8 +20,6 @@ internal fun OpCall(
     isOptional : Boolean
 ) : Expression {
 
-    val argsList = MutableList<Any?>(arguments.size) {}
-
     return when {
         callable is OpIndex -> Expression { r ->
             val receiver = callable.receiver.invoke(r)
@@ -33,7 +30,7 @@ internal fun OpCall(
             (receiver as JsAny).call(
                 func = callable.index(r),
                 thisRef = receiver,
-                args = arguments.fastMapTo(argsList) { it(r) },
+                args = arguments.fastMap() { it(r) },
                 isOptional = callable.isOptional,
                 runtime = r
             )
@@ -41,13 +38,14 @@ internal fun OpCall(
 
         callable is OpGetProperty && callable.receiver != null -> Expression { r ->
             val receiver = callable.receiver.invoke(r)
-            if ((receiver == null || receiver == Unit) && callable.isOptional) {
+            if ((receiver !is JsAny) && callable.isOptional) {
                 return@Expression Unit
             }
+
             (receiver as JsAny).call(
                 func = callable.name,
                 thisRef = receiver,
-                args = arguments.fastMapTo(argsList) { it(r) },
+                args = arguments.fastMap { it(r) },
                 isOptional = callable.isOptional,
                 runtime = r
             )
@@ -57,11 +55,28 @@ internal fun OpCall(
             OpCallImpl(
                 runtime = r,
                 callable = callable,
-                arguments = arguments.fastMapTo(argsList) { it(r) },
+                arguments = arguments.fastMap { it(r) },
                 isOptional = isOptional
             )
         }
     }
+}
+internal suspend fun JsAny.call(
+    func : Any?,
+    thisRef : Any?,
+    args: List<Any?>,
+    isOptional : Boolean,
+    runtime: ScriptRuntime,
+) : Any? {
+    val v = get(func, runtime)
+    val callable = v?.callableOrNull()
+    if (callable == null && isOptional) {
+        return Unit
+    }
+    runtime.typeCheck(callable != null) {
+        "$v is not a function $callable $func $this"
+    }
+    return callable.call(thisRef, args, runtime)
 }
 
 private tailrec suspend fun OpCallImpl(
@@ -75,7 +90,7 @@ private tailrec suspend fun OpCallImpl(
         callable is Callable -> callable.invoke(arguments, runtime)
         callable is Function<*> -> execKotlinFunction(runtime, callable, arguments.fastMap(runtime::toKotlin))
         isOptional && (callable == null || callable == Unit) -> Unit
-        else -> throw TypeError("$callable is not a function")
+        else -> runtime.typeError { "$callable is not a function" }
     }
 }
 

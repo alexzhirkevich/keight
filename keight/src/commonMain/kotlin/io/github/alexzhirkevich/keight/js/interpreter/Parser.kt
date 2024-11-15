@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Delegate
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
@@ -41,20 +42,24 @@ import io.github.alexzhirkevich.keight.expressions.OpWhileLoop
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.fastAll
 import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.FunctionParam
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.OpClassInit
+import io.github.alexzhirkevich.keight.js.PROTOTYPE
 import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.joinSuccess
+import io.github.alexzhirkevich.keight.js.listOf
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
+import kotlin.jvm.JvmInline
 import kotlin.math.pow
 
 internal fun List<Token>.parse() : Expression {
@@ -633,18 +638,15 @@ private fun ListIterator<Token>.parseNew() : Expression {
         "Invalid syntax after 'new'"
     }
 
-    if (!nextIsInstance<Token.Operator.Bracket.RoundOpen>()) {
-        return OpCall(
-            callable = OpGetProperty(next.identifier, receiver = null),
-            arguments = emptyList(),
-            isOptional = false
-        )
+    val args = if (nextIsInstance<Token.Operator.Bracket.RoundOpen>()) {
+        parseExpressionGrouping().expressions
+    } else {
+        emptyList()
     }
 
-    val args = parseExpressionGrouping().expressions
     return Expression { runtime ->
         val constructor = runtime.get(next.identifier)
-        syntaxCheck(constructor is Constructor) {
+        runtime.typeCheck(constructor is Constructor) {
             "'${next.identifier}' is not a constructor"
         }
         constructor.construct(args.fastMap { it(runtime) }, runtime)
@@ -725,7 +727,7 @@ private fun ListIterator<Token>.parseExpressionGrouping(): OpTouple {
     return OpTouple(expressions)
 }
 
-private fun ListIterator<Token>.parseMemberOf(receiver: Expression, ): Expression {
+private fun ListIterator<Token>.parseMemberOf(receiver: Expression): Expression {
     return when (nextSignificant()){
 
         is Token.Operator.Period -> {
@@ -1048,7 +1050,7 @@ private fun ListIterator<Token>.parseAwait(): Expression {
         }
 
         val job = it.toKotlin(subject(it))
-        typeCheck(job is Job){
+        it.typeCheck(job is Job){
             "$job is not a Promise"
         }
 
@@ -1253,7 +1255,7 @@ private fun ListIterator<Token>.parseBlock(
         && isSurroundedWithBraces && list.fastAll { it is OpKeyValuePair || it is OpSpread }
     ) {
         Expression { r ->
-            Object("") {
+            Object() {
                 list.forEach { expr ->
                     when (expr) {
                         is OpKeyValuePair -> {
@@ -1262,7 +1264,7 @@ private fun ListIterator<Token>.parseBlock(
 
                         is OpSpread -> {
                             val any = expr.value(r) as JsAny
-                            any.keys.forEach {
+                            any.keys(r).forEach {
                                 it eq any.get(it, r)
                             }
                         }
@@ -1342,15 +1344,17 @@ internal inline fun syntaxCheck(value: Boolean, lazyMessage: () -> Any) {
 }
 
 @OptIn(ExperimentalContracts::class)
-internal inline fun typeCheck(value: Boolean, lazyMessage: () -> Any) {
-    contract {
-        returns() implies value
-    }
+internal suspend inline fun ScriptRuntime.typeCheck(value: Boolean, lazyMessage: () -> Any) {
+    contract { returns() implies value }
 
     if (!value) {
-        val message = lazyMessage()
-        throw TypeError(message.toString())
+        typeError(lazyMessage)
     }
+}
+
+internal suspend inline fun ScriptRuntime.typeError(lazyMessage: () -> Any) : Nothing {
+    throw (findRoot() as JSRuntime).TypeError
+        .construct(fromKotlin(lazyMessage()).listOf(), this) as Throwable
 }
 
 internal fun Expression.isAssignable() : Boolean {

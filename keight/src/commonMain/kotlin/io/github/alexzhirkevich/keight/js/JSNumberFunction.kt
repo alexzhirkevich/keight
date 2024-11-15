@@ -1,15 +1,17 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.thisRef
 import kotlin.jvm.JvmInline
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 internal fun numberMethods() : List<JSFunction> {
-
     return listOf(
         "isFinite".func("number") {
             val arg = it.getOrNull(0) ?: return@func false
@@ -61,9 +63,31 @@ internal fun numberMethods() : List<JSFunction> {
 internal class JSNumberFunction : JSFunction(
     name = "Number",
     prototype =  Object {
-        "toFixed" eq ToFixed(0)
-        "toPrecision" eq ToPrecision(0)
-    }
+        "toFixed".func("digits" defaults OpConstant(0)) { args ->
+            val digits = args.getOrNull(0)?.let(::toNumber)?.toInt() ?: 0
+            toNumber(thisRef).toFixed(digits, this)
+        }
+        "toPrecision".func("digits" defaults OpArgOmitted) { args ->
+            val value = toNumber(thisRef)
+            val digits = args.argOrElse(0) { return@func value }
+            value.toDouble().roundTo(toNumber(digits).toInt() - 1)
+        }
+        "toString".func("radix" defaults OpConstant(10)) { args ->
+
+            val radix = if (args.isEmpty())
+                10
+            else args.getOrNull(0)?.let(::toNumber)?.toInt() ?: 10
+
+            when(val number = toNumber(thisRef)){
+                is Long -> number.toString(radix)
+                else -> number.toString()
+            }
+        }
+    },
+    parameters = listOf(FunctionParam("num")),
+    body = Expression {
+        it.toNumber(it.get("num"))
+    },
 ) {
     init {
         numberMethods().forEach {
@@ -126,62 +150,30 @@ internal class JSNumberFunction : JSFunction(
         )
     }
 
-    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Number {
-        return if (args.isEmpty()){
-            runtime.toNumber(0)
-        } else {
-            runtime.toNumber(args.first())
-        }
-    }
-
     override suspend fun isInstance(obj: Any?, runtime: ScriptRuntime): Boolean {
         return obj !is JsNumberWrapper && super.isInstance(obj, runtime)
     }
 
-    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): JsNumberObject {
-        return JsNumberObject(JsNumberWrapper(invoke(args, runtime))).apply {
-            setProto(this@JSNumberFunction.get(PROTOTYPE, runtime), runtime)
-        }
+    override suspend fun constructObject(args: List<Any?>, runtime: ScriptRuntime): JSObject {
+        return JsNumberObject(JsNumberWrapper(runtime.toNumber(args.getOrNull(0))))
+    }
+}
+
+private fun Number.toFixed(digits: Int, runtime: ScriptRuntime) : String {
+    if (digits == 0) {
+        return toDouble().roundToLong().toString()
     }
 
+    val stringNumber = toDouble().roundTo(digits).toString()
 
-    @JvmInline
-    private value class ToPrecision(val value: Number) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Double {
-            val digits = args.getOrNull(0) ?: return value.toDouble()
-            return value.toDouble().roundTo(runtime.toNumber(digits).toInt() - 1)
-        }
+    val intPart = stringNumber.substringBefore(".")
+    val floatPart = stringNumber.substringAfter(".", "").take(digits)
 
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return ToPrecision(runtime.toNumber(thisArg))
-        }
+    if (floatPart.isBlank()) {
+        return intPart
     }
 
-    @JvmInline
-    private value class ToFixed(val value: Number) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): String {
-            val digits = args.getOrNull(0)?.let(runtime::toNumber)?.toInt() ?: 0
-
-            if (digits == 0) {
-                return value.toDouble().roundToLong().toString()
-            }
-
-            val stringNumber = value.toDouble().roundTo(digits).toString()
-
-            val intPart = stringNumber.substringBefore(".")
-            val floatPart = stringNumber.substringAfter(".", "").take(digits)
-
-            if (floatPart.isBlank()) {
-                return intPart
-            }
-
-            return (intPart + "." + floatPart.padEnd(digits, '0'))
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return ToFixed(runtime.toNumber(thisArg))
-        }
-    }
+    return (intPart + "." + floatPart.padEnd(digits, '0'))
 }
 
 private fun String.trimParseInt(radix : Int) : Long? {

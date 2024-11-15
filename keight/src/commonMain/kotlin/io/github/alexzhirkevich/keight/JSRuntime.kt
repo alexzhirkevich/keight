@@ -1,8 +1,10 @@
 package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.expressions.JSErrorFunction
+import io.github.alexzhirkevich.keight.expressions.JSTypeErrorFunction
 import io.github.alexzhirkevich.keight.js.JSArrayFunction
 import io.github.alexzhirkevich.keight.js.JSDateFunction
+import io.github.alexzhirkevich.keight.js.JSFunctionFunction
 import io.github.alexzhirkevich.keight.js.JSLangContext
 import io.github.alexzhirkevich.keight.js.JSMapFunction
 import io.github.alexzhirkevich.keight.js.JSMath
@@ -46,6 +48,7 @@ public open class JSRuntime(
 
     internal lateinit var Number: JSNumberFunction
     internal lateinit var Object: JSObjectFunction
+    internal lateinit var Function: JSFunctionFunction
     internal lateinit var Array: JSArrayFunction
     internal lateinit var Map: JSMapFunction
     internal lateinit var Set: JSSetFunction
@@ -53,12 +56,13 @@ public open class JSRuntime(
     internal lateinit var Promise: JSPromiseFunction
     internal lateinit var Symbol: JSSymbolFunction
     internal lateinit var Error: JSErrorFunction
+    internal lateinit var TypeError: JSTypeErrorFunction
     internal lateinit var Date: JSDateFunction
 
     private var jobsCounter = 1L
     private val jobsMap = mutableMapOf<Long, Job>()
 
-    final override val thisRef: JSObject = RuntimeObject()
+    final override val thisRef: JSObject = RuntimeObject { this }
 
     init {
         init()
@@ -79,6 +83,7 @@ public open class JSRuntime(
     private fun init() {
         Number = JSNumberFunction()
         Object = JSObjectFunction()
+        Function = JSFunctionFunction()
         Array = JSArrayFunction()
         Map = JSMapFunction()
         Set = JSSetFunction()
@@ -86,20 +91,21 @@ public open class JSRuntime(
         Promise = JSPromiseFunction()
         Symbol = JSSymbolFunction()
         Error = JSErrorFunction()
+        TypeError = JSTypeErrorFunction(Error)
         Date = JSDateFunction()
 
         listOf(
-            Number, Object, Array, Map, Set, String, Promise, Symbol, Error, Date
+            Number, Object, Function, Array, Map, Set, String, Promise, Symbol, Error, TypeError, Date
         ).fastForEach {
             set(it.name, it, VariableType.Global)
         }
-        set("globalThis", thisRef, VariableType.Global)
+        set("globalThis", thisRef, null)
         set("Infinity", JsNumberWrapper(Double.POSITIVE_INFINITY), null)
         set("NaN", JsNumberWrapper(Double.NaN), null)
-        set("undefined", Unit, VariableType.Const)
-        set("console", JsConsole(::console), VariableType.Global)
-        set("Math", JSMath(), VariableType.Global)
-        set("JSON", JSON(), VariableType.Global)
+        set("undefined", Unit, null)
+        set("console", JsConsole(::console), null)
+        set("Math", JSMath(), null)
+        set("JSON", JSON(), null)
 
         numberMethods().forEach {
             thisRef.set(it.name, it, this)
@@ -112,10 +118,9 @@ public open class JSRuntime(
     }
 
     final override suspend fun get(property: Any?): Any? {
-        if (contains(property)) {
-            return super.get(property)
-        }
-        return (super.get("globalThis") as JsAny?)?.get(property, this)
+        return if (contains(property)) {
+            super.get(property)
+        } else thisRef.get(property, this)
     }
 
     private fun JSObject.regSetTimeout() = this.set(
@@ -150,7 +155,7 @@ public open class JSRuntime(
         }, this@JSRuntime
     )
 
-    private fun registerJob(
+    private suspend fun ScriptRuntime.registerJob(
         args: List<Any?>,
         block: suspend CoroutineScope.(Callable, Long) -> Unit
     ): Long {
@@ -175,20 +180,18 @@ public open class JSRuntime(
     }
 }
 
-private class RuntimeObject : JSObject {
+private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JSObject {
 
-    override val keys: List<String>
-        get() = emptyList()
     override val values: List<Any?>
         get() = emptyList()
     override val entries: List<List<Any?>>
         get() = emptyList()
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
-        return if (runtime.contains(property)){
-            runtime.get(property)
+        return if (thisRef().contains(property)){
+            thisRef().get(property)?.get()
         } else {
-            super.get(property, runtime)
+            super.get(property, thisRef())
         }
     }
 
@@ -200,7 +203,7 @@ private class RuntimeObject : JSObject {
         configurable: Boolean?,
         writable: Boolean?
     ) {
-        runtime.set(property, value, null)
+        thisRef().set(property, value, null)
     }
 
     override fun descriptor(property: Any?): JSPropertyDescriptor? {
@@ -208,12 +211,12 @@ private class RuntimeObject : JSObject {
     }
 
     override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean {
-        return runtime.contains(property)
+        return thisRef().contains(property)
     }
 
 
     override suspend fun delete(property: Any?, runtime: ScriptRuntime): Boolean {
-        runtime.delete(property)
+        thisRef().delete(property)
         return true
     }
 }

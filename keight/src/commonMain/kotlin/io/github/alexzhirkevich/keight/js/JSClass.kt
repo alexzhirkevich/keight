@@ -5,6 +5,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
+import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 
 internal sealed interface StaticClassMember : Named {
 
@@ -27,7 +28,7 @@ internal class OpClassInit(
 
         val extendsConstructor = extends?.invoke(runtime)
 
-        syntaxCheck(extendsConstructor is Constructor?) {
+        runtime.typeCheck(extendsConstructor is Constructor?) {
             "$extendsConstructor is not a constructor"
         }
 
@@ -46,10 +47,10 @@ internal class OpClassInit(
             extends = extendsConstructor
         ).apply {
             if (extendsConstructor != null) {
-                setProto(extendsConstructor, runtime)
+                setProto(runtime, extendsConstructor)
                 val prototype = get(PROTOTYPE, runtime)
                 if (prototype is JSObject) {
-                    prototype.setProto(extendsConstructor.get(PROTOTYPE, runtime), runtime)
+                    prototype.setProto(runtime, extendsConstructor.get(PROTOTYPE, runtime))
                 }
             }
         }

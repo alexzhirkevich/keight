@@ -2,7 +2,6 @@ package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.js.interpreter.parse
 import io.github.alexzhirkevich.keight.js.interpreter.tokenize
-import kotlinx.coroutines.Job
 
 public class JavaScriptEngine(
     override val runtime: JSRuntime,

@@ -2,16 +2,18 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
 @JvmInline
 internal value class JsMapWrapper(
     override val value: MutableMap<Any?, Any?>
-) : JsAny, JsWrapper<MutableMap<Any?,Any?>>, Iterable<List<*>> {
+) : JsAny, Wrapper<MutableMap<Any?, Any?>>, Iterable<List<*>> {
 
-    override val keys: List<String>
-        get() = value.keys.map { it.toString() }
+    override suspend fun keys(runtime: ScriptRuntime): List<String> {
+        return value.keys.map { it.toString() }
+    }
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return (runtime.findRoot() as JSRuntime).Map.get(PROTOTYPE, runtime)

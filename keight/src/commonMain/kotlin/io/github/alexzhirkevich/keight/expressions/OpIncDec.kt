@@ -10,7 +10,7 @@ internal fun OpIncDecAssign(
 ) : Expression {
 
     val op = if (isInc) ScriptRuntime::inc else ScriptRuntime::dec
-    val value = Expression { op(it, variable(it)) }
+    val value = Expression { op(it, variable(it))}
 
     val assignment = when {
         variable is OpGetProperty  ->
@@ -37,6 +37,6 @@ internal fun OpIncDecAssign(
     }
 
     return Expression { ctx ->
-        variable(ctx).also { assignment(ctx) }
+        ctx.toNumber(variable(ctx)).also { assignment(ctx) }
     }
 }

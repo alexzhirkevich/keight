@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptContext
+import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.fastMap
 import kotlinx.coroutines.Job
 import kotlin.math.absoluteValue
@@ -13,7 +14,7 @@ import kotlin.math.absoluteValue
                 || a is Unit
                 || a is CharSequence && a.isEmpty()
                 || a is Number && a.toDouble().let { it == 0.0 || it.isNaN() }
-                || (a as? JsWrapper<*>)?.value?.let(::isFalse) == true
+                || (a as? Wrapper<*>)?.value?.let(::isFalse) == true
     }
 
     override tailrec fun isComparable(a: Any?, b: Any?): Boolean {
@@ -89,7 +90,7 @@ import kotlin.math.absoluteValue
 
     override fun fromKotlin(a: Any?): Any? {
         return when (a) {
-            is JsWrapper<*> -> a
+            is Wrapper<*> -> a
             is Number -> JsNumberWrapper(a)
             is UByte -> JsNumberWrapper(a.toLong())
             is UShort -> JsNumberWrapper(a.toLong())
@@ -111,7 +112,7 @@ import kotlin.math.absoluteValue
             is JsMapWrapper -> a.value.map { toKotlin(it.key) to toKotlin(it.value) }.toMap()
             is JsSetWrapper -> a.value.map(::toKotlin).toSet()
             is JsArrayWrapper -> a.value.fastMap(::toKotlin)
-            is JsWrapper<*> -> toKotlin(a.value)
+            is Wrapper<*> -> toKotlin(a.value)
             is Int -> a.toLong()
             is Float -> a.toDouble()
             else -> a
@@ -283,7 +284,7 @@ private tailrec fun Any?.numberOrNull(withNaNs : Boolean = true) : Number? = whe
             null
         }
     }
-    is JsWrapper<*> -> value.numberOrNull()
+    is Wrapper<*> -> value.numberOrNull()
     else -> null
 }
 

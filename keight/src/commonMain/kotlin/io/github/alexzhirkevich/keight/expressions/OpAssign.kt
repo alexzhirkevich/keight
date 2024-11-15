@@ -3,9 +3,9 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JSObject
-import io.github.alexzhirkevich.keight.js.TypeError
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.interpreter.typeError
 
 
 internal class OpAssign(
@@ -46,7 +46,7 @@ internal class OpAssign(
         } else {
             when (r) {
                 is JSObject -> r.set(variableName, value, runtime)
-                else -> throw TypeError("Cannot set properties of ${if (r == Unit) "undefined" else r}")
+                else -> runtime.typeError { "Cannot set properties of ${if (r == Unit) "undefined" else r}" }
             }
         }
 

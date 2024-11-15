@@ -6,6 +6,7 @@ import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
+import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.InternalCoroutinesApi
@@ -47,13 +48,13 @@ internal class JSPromiseFunction : JSFunction(
 ) {
 
     override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any {
-        throw TypeError("Promise constructor cannot be invoked without 'new'")
+        runtime.typeError { "Promise constructor cannot be invoked without 'new'" }
     }
 
     override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
         val resolveReject = args.getOrNull(0)?.callableOrNull()
 
-        typeCheck(resolveReject is Callable) {
+        runtime.typeCheck(resolveReject is Callable) {
             "Promise resolver is not a function"
         }
 
@@ -73,7 +74,7 @@ internal class JSPromiseFunction : JSFunction(
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Deferred<*> {
             val arg = args.getOrNull(0)
             val callable = arg?.callableOrNull()
-            typeCheck(callable is Callable) {
+            runtime.typeCheck(callable is Callable) {
                 "$arg is not a function"
             }
 
@@ -96,7 +97,7 @@ internal class JSPromiseFunction : JSFunction(
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Deferred<*> {
             val arg = args.getOrNull(0)
             val callable = arg?.callableOrNull()
-            typeCheck(callable is Callable) {
+            runtime.typeCheck(callable is Callable) {
                 "$arg is not a function"
             }
 
@@ -133,7 +134,7 @@ internal class JSPromiseFunction : JSFunction(
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Deferred<Unit> {
             val arg = args.getOrNull(0)
             val callable = arg?.callableOrNull()
-            typeCheck(callable is Callable) {
+            runtime.typeCheck(callable is Callable) {
                 "$arg is not a function"
             }
 

@@ -20,7 +20,7 @@ internal class OpIn(
             "Unexpected token 'in'"
         }
         val o = inObject(runtime)
-        typeCheck(o is JsAny) {
+        runtime.typeCheck(o is JsAny) {
             "$o is not an object (can't use with 'in' operator)"
         }
         return o.contains(property(runtime), runtime)

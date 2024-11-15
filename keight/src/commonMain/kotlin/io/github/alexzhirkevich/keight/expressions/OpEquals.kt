@@ -2,8 +2,7 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.js.JsWrapper
-import kotlin.math.sign
+import io.github.alexzhirkevich.keight.Wrapper
 
 internal fun OpEquals(
     a : Expression,
@@ -26,8 +25,8 @@ private val listOfPositiveZero = listOf(0.0)
 internal tailrec fun OpEqualsImpl(a : Any?, b : Any?, typed : Boolean, runtime: ScriptRuntime) : Boolean {
 
     return when {
-        !typed && a is JsWrapper<*> -> OpEqualsImpl(a.value, b, typed, runtime)
-        !typed && b is JsWrapper<*> -> OpEqualsImpl(a, b.value, typed, runtime)
+        !typed && a is Wrapper<*> -> OpEqualsImpl(a.value, b, typed, runtime)
+        !typed && b is Wrapper<*> -> OpEqualsImpl(a, b.value, typed, runtime)
         a == null || b == null -> a == b
         typed -> a::class == b::class && OpEqualsImpl(a, b, false, runtime)
         a is Number && b is Number -> {

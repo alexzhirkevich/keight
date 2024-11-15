@@ -2,6 +2,7 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 import kotlin.math.abs
@@ -9,7 +10,7 @@ import kotlin.math.abs
 @JvmInline
 internal value class JsArrayWrapper(
     override val value : MutableList<Any?>
-) : JSObject, JsWrapper<MutableList<Any?>>, MutableList<Any?> by value {
+) : JSObject, Wrapper<MutableList<Any?>>, MutableList<Any?> by value {
 
     override val values: List<Any?>
         get() = value.toList()
@@ -31,8 +32,9 @@ internal value class JsArrayWrapper(
         TODO("Not yet implemented")
     }
 
-    override val keys: List<String>
-        get() = value.indices.map(Int::toString)
+    override suspend fun keys(runtime: ScriptRuntime): List<String> {
+        return value.indices.map(Int::toString)
+    }
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return (runtime.findRoot() as JSRuntime).Array.get(PROTOTYPE,runtime)

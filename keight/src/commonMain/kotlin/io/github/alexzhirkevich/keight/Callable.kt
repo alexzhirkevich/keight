@@ -29,7 +29,7 @@ public interface Callable : JsAny {
 
         override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
             val callable = thisArg?.callableOrNull()
-            typeCheck(callable != null){
+            runtime.typeCheck(callable != null){
                 "$callable is not a function"
             }
             return Call(callable)
@@ -45,7 +45,7 @@ public interface Callable : JsAny {
 
         override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
             val callable = thisArg?.callableOrNull()
-            typeCheck(callable != null){
+            runtime.typeCheck(callable != null){
                 "$callable is not a function"
             }
             return Bind(callable)
@@ -61,7 +61,7 @@ public interface Callable : JsAny {
 
         override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
             val callable = thisArg?.callableOrNull()
-            typeCheck(callable != null){
+            runtime.typeCheck(callable != null){
                 "$callable is not a function"
             }
             return Apply(callable)

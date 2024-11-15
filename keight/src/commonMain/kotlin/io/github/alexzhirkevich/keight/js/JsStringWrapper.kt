@@ -2,12 +2,13 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
 internal class JsStringObject(
     override val value : JsStringWrapper
-) : JSObjectImpl("Number"), JsWrapper<JsWrapper<String>>, CharSequence by value {
+) : JSObjectImpl("Number"), Wrapper<Wrapper<String>>, CharSequence by value {
 
     override fun toString(): String  = value.value
 }
@@ -16,7 +17,7 @@ internal class JsStringObject(
 @JvmInline
 internal value class JsStringWrapper(
     override val value : String
-) : JsAny, JsWrapper<String>, Comparable<JsStringWrapper>, CharSequence by value {
+) : JsAny, Wrapper<String>, Comparable<JsStringWrapper>, CharSequence by value {
 
     override val type: String
         get() = "string"
