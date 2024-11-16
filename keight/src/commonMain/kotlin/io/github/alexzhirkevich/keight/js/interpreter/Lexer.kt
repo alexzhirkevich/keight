@@ -496,6 +496,7 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
         "in" -> Token.Operator.In
         "instanceof" -> Token.Operator.Instanceof
         "typeof" -> Token.Operator.Typeof
+        "void" -> Token.Operator.Void
         "delete" -> Token.Operator.Delete
         else -> keywords[string] ?: Token.Identifier.Property(string)
     }

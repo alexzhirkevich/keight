@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.expressions.JSErrorFunction
+import io.github.alexzhirkevich.keight.expressions.JSReferenceErrorFunction
 import io.github.alexzhirkevich.keight.expressions.JSTypeErrorFunction
 import io.github.alexzhirkevich.keight.js.JSArrayFunction
 import io.github.alexzhirkevich.keight.js.JSDateFunction
@@ -17,9 +18,11 @@ import io.github.alexzhirkevich.keight.js.JSPropertyDescriptor
 import io.github.alexzhirkevich.keight.js.JSSetFunction
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JSSymbolFunction
-import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsConsole
 import io.github.alexzhirkevich.keight.js.JsNumberWrapper
+import io.github.alexzhirkevich.keight.js.OpArgOmitted
+import io.github.alexzhirkevich.keight.js.argOrElse
+import io.github.alexzhirkevich.keight.js.defaults
 import io.github.alexzhirkevich.keight.js.func
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.numberMethods
@@ -36,6 +39,7 @@ import kotlin.coroutines.CoroutineContext
 public open class JSRuntime(
     context: CoroutineContext,
     override val isSuspendAllowed: Boolean = true,
+    override val isStrict: Boolean = false,
     public var console: Console = DefaultConsole,
 ) : DefaultRuntime(), ScriptContext by JSLangContext {
 
@@ -57,10 +61,11 @@ public open class JSRuntime(
     internal lateinit var Symbol: JSSymbolFunction
     internal lateinit var Error: JSErrorFunction
     internal lateinit var TypeError: JSTypeErrorFunction
+    internal lateinit var ReferenceError: JSReferenceErrorFunction
     internal lateinit var Date: JSDateFunction
 
-    private var jobsCounter = 1L
-    private val jobsMap = mutableMapOf<Long, Job>()
+    internal var jobsCounter = 1L
+    internal val jobsMap = mutableMapOf<Long, Job>()
 
     final override val thisRef: JSObject = RuntimeObject { this }
 
@@ -92,10 +97,23 @@ public open class JSRuntime(
         Symbol = JSSymbolFunction()
         Error = JSErrorFunction()
         TypeError = JSTypeErrorFunction(Error)
+        ReferenceError = JSReferenceErrorFunction(Error)
         Date = JSDateFunction()
 
         listOf(
-            Number, Object, Function, Array, Map, Set, String, Promise, Symbol, Error, TypeError, Date
+            Number,
+            Object,
+            Function,
+            Array,
+            Map,
+            Set,
+            String,
+            Promise,
+            Symbol,
+            Error,
+            TypeError,
+            ReferenceError,
+            Date
         ).fastForEach {
             set(it.name, it, VariableType.Global)
         }
@@ -115,6 +133,14 @@ public open class JSRuntime(
         thisRef.regSetInterval()
         thisRef.regClearJob("Timeout")
         thisRef.regClearJob("Interval")
+        thisRef.set(
+            "eval",
+            "eval".func("script" defaults OpArgOmitted) {
+                val script = toKotlin(it.argOrElse(0) { return@func Unit }).toString()
+                JavaScriptEngine(this).evaluate(script)
+            },
+            this
+        )
     }
 
     final override suspend fun get(property: Any?): Any? {
@@ -123,39 +149,7 @@ public open class JSRuntime(
         } else thisRef.get(property, this)
     }
 
-    private fun JSObject.regSetTimeout() = this.set(
-        "setTimeout",
-        "setTimeout".func("handler", "timeout") {
-            registerJob(it) { handler, timeout ->
-                delay(timeout)
-                handler.invoke(emptyList(), this@func)
-            }
-        },
-        this@JSRuntime
-    )
-
-    private fun JSObject.regSetInterval() = this.set(
-        "setInterval",
-        "setInterval".func("handler", "interval") {
-            registerJob(it) { handler, timeout ->
-                while (isActive) {
-                    handler.invoke(emptyList(), this@func)
-                    delay(timeout)
-                }
-            }
-        },
-        this@JSRuntime
-    )
-
-    private fun JSObject.regClearJob(what: String) = this.set(
-        "clear$what",
-        "clear$what".func("id") {
-            val id = toNumber(it.getOrNull(0)).toLong()
-            jobsMap[id]?.cancel()
-        }, this@JSRuntime
-    )
-
-    private suspend fun ScriptRuntime.registerJob(
+    private suspend fun registerJob(
         args: List<Any?>,
         block: suspend CoroutineScope.(Callable, Long) -> Unit
     ): Long {
@@ -178,6 +172,38 @@ public open class JSRuntime(
 
         return jobId
     }
+
+    private fun JSObject.regSetTimeout() = this.set(
+        "setTimeout",
+        "setTimeout".func("handler", "timeout") {
+            (findRoot() as JSRuntime).registerJob(it) { handler, timeout ->
+                delay(timeout)
+                handler.invoke(emptyList(), this@func)
+            }
+        },
+        this@JSRuntime
+    )
+
+    private fun JSObject.regSetInterval() = this.set(
+        "setInterval",
+        "setInterval".func("handler", "interval") {
+            (findRoot() as JSRuntime).registerJob(it) { handler, timeout ->
+                while (isActive) {
+                    handler.invoke(emptyList(), this@func)
+                    delay(timeout)
+                }
+            }
+        },
+        this@JSRuntime
+    )
+
+    private fun JSObject.regClearJob(what: String) = this.set(
+        "clear$what",
+        "clear$what".func("id") {
+            val id = toNumber(it.getOrNull(0)).toLong()
+            jobsMap[id]?.cancel()
+        }, this@JSRuntime
+    )
 }
 
 private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JSObject {

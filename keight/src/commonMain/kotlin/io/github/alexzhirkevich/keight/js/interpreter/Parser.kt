@@ -49,17 +49,14 @@ import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.OpClassInit
-import io.github.alexzhirkevich.keight.js.PROTOTYPE
 import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
-import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.listOf
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
-import kotlin.jvm.JvmInline
 import kotlin.math.pow
 
 internal fun List<Token>.parse() : Expression {
@@ -403,11 +400,12 @@ private fun ListIterator<Token>.parseFactor(
             OpConstant(num)
         }
 
-        Token.Operator.Spread -> OpSpread(parseFactor(blockContext))
+        Token.Operator.Spread -> OpSpread(parseStatement(blockType = ExpectedBlockType.Object))
         Token.Operator.Arithmetic.Inc,
         Token.Operator.Arithmetic.Dec -> {
             val isInc = next is Token.Operator.Arithmetic.Inc
-            val variable = parseFactor(blockContext)
+            val variable = parseStatement(precedence = 0, blockType = ExpectedBlockType.Object)
+
             require(variable.isAssignable()) {
                 unexpected(if (isInc) "++" else "--")
             }
@@ -420,23 +418,17 @@ private fun ListIterator<Token>.parseFactor(
 
         Token.Operator.Arithmetic.Plus,
         Token.Operator.Arithmetic.Minus -> Delegate(
-            a = parseFactor(blockContext = blockContext),
+            a = parseStatement(precedence = 0, blockType = ExpectedBlockType.Object),
             op = if (next is Token.Operator.Arithmetic.Plus)
                 ScriptRuntime::pos else ScriptRuntime::neg
         )
 
         Token.Operator.Logical.Not -> OpNot(
-            condition = parseStatement(
-                blockContext = blockContext,
-                blockType = ExpectedBlockType.Object
-            )
+            condition = parseStatement(precedence = 0, blockType = ExpectedBlockType.Object)
         )
 
         Token.Operator.Bitwise.Reverse -> {
-            val expr = parseStatement(
-                blockContext = blockContext,
-                blockType = ExpectedBlockType.Object
-            )
+            val expr = parseStatement(precedence = 0, blockType = ExpectedBlockType.Object)
             Expression {
                 it.toNumber(expr(it)).toLong().inv()
             }
@@ -460,6 +452,7 @@ private fun ListIterator<Token>.parseFactor(
         }
         is Token.Operator.New -> parseNew()
         is Token.Operator.Typeof -> parseTypeof()
+        is Token.Operator.Void -> TODO("void operator")
         is Token.Operator.Delete -> parseDelete()
         is Token.Identifier.Keyword -> parseKeyword(next, blockContext)
         is Token.Identifier.Property -> OpGetProperty(next.identifier, receiver = null)
@@ -1354,6 +1347,20 @@ internal suspend inline fun ScriptRuntime.typeCheck(value: Boolean, lazyMessage:
 
 internal suspend inline fun ScriptRuntime.typeError(lazyMessage: () -> Any) : Nothing {
     throw (findRoot() as JSRuntime).TypeError
+        .construct(fromKotlin(lazyMessage()).listOf(), this) as Throwable
+}
+
+@OptIn(ExperimentalContracts::class)
+internal suspend inline fun ScriptRuntime.referenceCheck(value: Boolean, lazyMessage: () -> Any) {
+    contract { returns() implies value }
+
+    if (!value) {
+        referenceError(lazyMessage)
+    }
+}
+
+internal suspend inline fun ScriptRuntime.referenceError(lazyMessage: () -> Any) : Nothing {
+    throw (findRoot() as JSRuntime).ReferenceError
         .construct(fromKotlin(lazyMessage()).listOf(), this) as Throwable
 }
 

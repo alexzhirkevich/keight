@@ -56,6 +56,7 @@ internal sealed interface Token {
         object In : Operator
         object Instanceof : Operator
         object Typeof : Operator
+        object Void : Operator
         object Delete : Operator
         object New : Operator
         object Spread : Operator

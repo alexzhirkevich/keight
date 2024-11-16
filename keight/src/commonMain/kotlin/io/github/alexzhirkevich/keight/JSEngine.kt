@@ -4,7 +4,7 @@ import io.github.alexzhirkevich.keight.js.interpreter.parse
 import io.github.alexzhirkevich.keight.js.interpreter.tokenize
 
 public class JavaScriptEngine(
-    override val runtime: JSRuntime,
+    override val runtime: ScriptRuntime,
     vararg modules : Module
 ) : ScriptEngine() {
 

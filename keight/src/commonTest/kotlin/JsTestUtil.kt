@@ -17,9 +17,12 @@ internal fun Any?.assertEqualsTo(other : Double, tolerance: Double = 0.0001) {
 
 internal fun runtimeTest(
     runtime : (CoroutineContext) -> JSRuntime = {JSRuntime(it)},
+    before : suspend TestScope.(JSRuntime) -> Unit = {},
     test : suspend TestScope.(JSRuntime) -> Unit
 ) = runTest {
-    test(runtime(backgroundScope.coroutineContext))
+    val runtime = runtime(backgroundScope.coroutineContext)
+    before(runtime)
+    test(runtime)
 }
 
 internal suspend fun String.eval(runtime: JSRuntime = JSRuntime(Job())) : Any? {

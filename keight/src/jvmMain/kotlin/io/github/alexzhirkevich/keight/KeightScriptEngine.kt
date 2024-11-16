@@ -75,15 +75,15 @@ internal class KeightScriptEngine(
     }
 
     override fun getContext(): ScriptContext {
-        return KeightScriptContext(factory, engine.runtime)
+        return KeightScriptContext(factory, engine.runtime as JSRuntime)
     }
 
     override fun setContext(context: ScriptContext) {
         engine.reset()
         if (context is KeightScriptContext){
-            engine.runtime.console = context.runtime.console
+            (engine.runtime as JSRuntime).console = context.runtime.console
         } else {
-            engine.runtime.console = ScriptIO(
+            (engine.runtime as JSRuntime).console = ScriptIO(
                 { context.writer },
                 { context.errorWriter }
             )

@@ -9,6 +9,7 @@ import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JSObjectImpl
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.OpArgOmitted
+import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.defaults
 
@@ -34,4 +35,10 @@ internal class JSTypeErrorFunction(errorFunction: JSErrorFunction) : JSErrorFunc
     name = "TypeError",
     prototype = errorFunction,
     make = { TypeError(it) }
+)
+
+internal class JSReferenceErrorFunction(errorFunction: JSErrorFunction) : JSErrorFunction(
+    name = "ReferenceError",
+    prototype = errorFunction,
+    make = { ReferenceError(it) }
 )

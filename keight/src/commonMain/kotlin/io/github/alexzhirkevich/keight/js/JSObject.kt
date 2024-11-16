@@ -44,13 +44,13 @@ internal fun JSObject.setPrototype(prototype : Any?, runtime: ScriptRuntime) {
 
 internal fun JSObject.setProto(runtime: ScriptRuntime, proto : Any?) {
     if (isExtensible) {
-        set(PROTO, proto, runtime)
+        set(PROTO, proto, runtime, enumerable = false, configurable = false)
     }
 }
 
 internal fun JSObjectImpl.setProto(proto : Any?) {
     if (isExtensible) {
-        set(PROTO, proto)
+        set(PROTO, proto, enumerable = false, configurable = false)
     }
 }
 

@@ -13,6 +13,8 @@ public enum class VariableType {
 
 public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
 
+    internal open val isStrict : Boolean get() = false
+
     public open val isSuspendAllowed: Boolean get() = true
 
     internal val lock: Mutex = Mutex()
@@ -34,6 +36,7 @@ public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
         extraProperties: Map<String, Pair<VariableType, Any?>> = emptyMap(),
         isSuspendAllowed: Boolean = this.isSuspendAllowed,
         isFunction: Boolean = false,
+        isStrict : Boolean = false,
         block: suspend (ScriptRuntime) -> Any?
     ): Any?
 
@@ -83,11 +86,13 @@ public abstract class DefaultRuntime : ScriptRuntime() {
         extraProperties: Map<String, Pair<VariableType, Any?>>,
         isSuspendAllowed: Boolean,
         isFunction: Boolean,
+        isStrict : Boolean,
         block: suspend (ScriptRuntime) -> Any?
     ): Any? {
         val child = ScopedRuntime(
             parent = this,
             isFunction = isFunction,
+            isStrict = isStrict,
             thisRef = thisRef,
             isSuspendAllowed = isSuspendAllowed
         )
@@ -111,11 +116,14 @@ public abstract class DefaultRuntime : ScriptRuntime() {
 private class ScopedRuntime(
     val parent : ScriptRuntime,
     val isFunction : Boolean = false,
+    isStrict : Boolean = false,
     override val thisRef: Any = parent.thisRef,
     override val isSuspendAllowed: Boolean = parent.isSuspendAllowed
 ) : DefaultRuntime(),
     ScriptContext by parent,
     CoroutineScope by parent {
+
+    override val isStrict = parent.isStrict || isStrict
 
     override suspend fun get(property: Any?): Any? {
         return if (property in variables) {
