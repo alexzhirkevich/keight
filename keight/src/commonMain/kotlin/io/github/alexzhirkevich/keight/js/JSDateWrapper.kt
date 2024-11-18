@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
+import io.github.alexzhirkevich.keight.findRoot
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -20,7 +21,7 @@ internal class JSDateWrapper(
     } else toInstant().toLocalDateTime(TimeZone.UTC)
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {
-        return (runtime as JSRuntime).Date.get(PROTOTYPE, runtime)
+        return (runtime.findRoot() as JSRuntime).Date.get(PROTOTYPE, runtime)
     }
 
     fun set(

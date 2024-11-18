@@ -94,15 +94,24 @@ private fun ListIterator<Char>.nullishCoalescing() : Token {
 
 
 private fun ListIterator<Char>.period() : Token {
-    val pos = nextIndex()
+    if (!hasNext()){
+        return Token.Operator.Period
+    }
 
-    return if (hasNext() && next() == '.' && hasNext() && next() == '.'){
-        Token.Operator.Spread
-    } else {
-        while (nextIndex() != pos) {
-            previous()
-        }
-        Token.Operator.Period
+    return when(next()){
+        '.' -> doublePeriod()
+        else -> Token.Operator.Period.also { previous() }
+    }
+}
+
+private fun ListIterator<Char>.doublePeriod() : Token {
+    if (!hasNext()){
+        return Token.Operator.DoublePeriod
+    }
+
+    return when(next()){
+        '.' -> Token.Operator.Spread
+        else -> Token.Operator.DoublePeriod.also { previous() }
     }
 }
 

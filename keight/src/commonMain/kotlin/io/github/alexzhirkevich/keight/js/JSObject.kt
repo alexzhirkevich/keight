@@ -7,25 +7,36 @@ import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.fastMapTo
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.get
+import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
+import io.github.alexzhirkevich.keight.js.interpreter.typeError
+
 
 public interface JSObject : JsAny {
-
-    public val values: List<Any?>
-
-    public val entries: List<List<Any?>>
 
     public val isExtensible : Boolean  get() = true
 
     public fun preventExtensions() {}
 
-    public fun set(
+    public suspend fun values(runtime: ScriptRuntime) :List<Any?> = emptyList()
+
+    public suspend fun entries(runtime: ScriptRuntime) : List<List<Any?>> = emptyList()
+
+    public suspend fun set(
         property: Any?,
         value: Any?,
+        runtime: ScriptRuntime,
+    )
+
+    public suspend fun defineOwnProperty(
+        property: Any?,
+        value: JSPropertyAccessor,
         runtime: ScriptRuntime,
         enumerable: Boolean? = null,
         configurable: Boolean? = null,
         writable: Boolean? = null,
-    )
+    ) {
+        set(property, value.get(runtime), runtime)
+    }
 
     public fun descriptor(property: Any?) : JSPropertyDescriptor?
 }
@@ -34,23 +45,40 @@ internal const val PROTOTYPE = "prototype"
 internal const val PROTO = "__proto__"
 
 internal fun JSObjectImpl.setPrototype(prototype : Any?) {
-    set(PROTOTYPE, prototype, configurable = false, enumerable = false)
+    defineOwnProperty(
+        property = PROTOTYPE,
+        value = prototype,
+        configurable = false,
+        enumerable = false
+    )
 }
 
 
-internal fun JSObject.setPrototype(prototype : Any?, runtime: ScriptRuntime) {
-    set(PROTOTYPE, prototype, runtime, configurable = false, enumerable = false)
+internal suspend fun JSObject.setPrototype(prototype : Any?, runtime: ScriptRuntime) {
+    defineOwnProperty(
+        property = PROTOTYPE,
+        value = JSPropertyAccessor.Value(prototype),
+        runtime = runtime,
+        configurable = false,
+        enumerable = false
+    )
 }
 
-internal fun JSObject.setProto(runtime: ScriptRuntime, proto : Any?) {
+internal suspend fun JSObject.setProto(runtime: ScriptRuntime, proto : Any?) {
     if (isExtensible) {
-        set(PROTO, proto, runtime, enumerable = false, configurable = false)
+        defineOwnProperty(
+            property = PROTO,
+            value = JSPropertyAccessor.Value(proto),
+            runtime = runtime,
+            enumerable = false,
+            configurable = false
+        )
     }
 }
 
 internal fun JSObjectImpl.setProto(proto : Any?) {
     if (isExtensible) {
-        set(PROTO, proto, enumerable = false, configurable = false)
+        defineOwnProperty(PROTO, JSPropertyAccessor.Value(proto), enumerable = false, configurable = false)
     }
 }
 
@@ -96,7 +124,11 @@ public open class JSObjectImpl(
         internal set
 
     private val map = ObjectMap(
-        properties.mapValues { JSProperty(it.value) }.toMutableMap()
+        properties.mapValues {
+            JSProperty(
+                it.value as? JSPropertyAccessor? ?: JSPropertyAccessor.Value(it.value)
+            )
+        }.toMutableMap()
     )
 
     protected val properties : Map<Any?, Any?>
@@ -106,11 +138,20 @@ public open class JSObjectImpl(
         return map.filter { it.value.enumerable != false }.keys.map { it.toString() }
     }
 
-    override val values: List<Any?>
-        get() = map.filter { it.value.enumerable != false }.values.map { it.value }
 
-    override val entries: List<List<Any?>>
-        get() = map.entries.mapNotNull { if (it.value.enumerable == false) null else listOf(it.key, it.value.value) }
+    override suspend fun values(runtime: ScriptRuntime): List<Any?> {
+        return map.filter { it.value.enumerable != false }.values.map { it.value?.get(runtime) }
+    }
+
+    override suspend fun entries(runtime: ScriptRuntime): List<List<Any?>> {
+        return map.entries
+            .mapNotNull {
+                if (it.value.enumerable == false) null else listOf(
+                    it.key,
+                    it.value.value.get(runtime)
+                )
+            }
+    }
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {
         return if (PROTO in map) {
@@ -122,7 +163,7 @@ public open class JSObjectImpl(
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         return when {
-            property in map -> map[property]?.value?.get()
+            property in map -> map[property]?.value?.get(runtime)?.get(runtime)
             else -> super.get(property, runtime)
         }
     }
@@ -139,15 +180,62 @@ public open class JSObjectImpl(
         }
     }
 
-    override fun set(
+    override suspend fun set(
         property: Any?,
         value: Any?,
+        runtime: ScriptRuntime,
+    ) {
+        runtime.typeCheck(map[property]?.writable != false || !runtime.isStrict) {
+            "Cannot assign to read only property '$property' of object $this"
+        }
+
+        runtime.typeCheck(isExtensible || contains(property, runtime)) {
+            "Cannot add property $property, object is not extensible"
+        }
+
+        val current = map[property]
+
+        if (current != null) {
+            if (current.writable != false) {
+                current.value.set(value, runtime)
+            }
+        } else {
+            map[property] = JSProperty(
+                value = value as? JSPropertyAccessor ?: JSPropertyAccessor.Value(value),
+                writable = null,
+                enumerable = null,
+                configurable = null
+            )
+        }
+    }
+
+    internal fun set(
+        property: Any?,
+        value: Any?,
+    ) {
+        val v = value as? JSPropertyAccessor ?: JSPropertyAccessor.Value(value)
+        map[property] = JSProperty(
+            value = v,
+            writable = null,
+            enumerable = null,
+            configurable = null
+        )
+    }
+
+    override suspend fun defineOwnProperty(
+        property: Any?,
+        value: JSPropertyAccessor,
         runtime: ScriptRuntime,
         enumerable: Boolean?,
         configurable: Boolean?,
         writable: Boolean?
     ) {
-        set(
+
+        if (map[property]?.writable == false && runtime.isStrict){
+            throw TypeError("Cannot assign to read only property '$property' of object $this")
+        }
+
+        defineOwnProperty(
             property = property,
             value = value,
             enumerable = enumerable,
@@ -155,17 +243,18 @@ public open class JSObjectImpl(
             writable = writable
         )
     }
-
-    internal fun set(
+    internal fun defineOwnProperty(
         property: Any?,
         value: Any?,
-        writable: Boolean? = null,
-        configurable: Boolean? = null,
         enumerable: Boolean? = null,
+        configurable: Boolean? = null,
+        writable: Boolean? = null
     ) {
+        val v = value as? JSPropertyAccessor? ?: JSPropertyAccessor.Value(value)
+
         if (property in map) {
-            if (map[property]?.writable != false) {
-                map[property]?.value = value
+            if (map[property]?.writable != false ) {
+                map[property]?.value = v
             }
             if (map[property]?.configurable != false) {
                 if (writable != null) {
@@ -180,13 +269,14 @@ public open class JSObjectImpl(
             }
         } else {
             map[property] = JSProperty(
-                value = value,
+                value = v,
                 writable = writable,
                 enumerable = enumerable,
                 configurable = configurable
             )
         }
     }
+
 
     override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
         property in map || super.contains(property, runtime)
@@ -207,7 +297,6 @@ public open class JSObjectImpl(
         }
     }
 }
-
 
 public sealed interface ObjectScope {
 
@@ -231,6 +320,7 @@ public sealed interface ObjectScope {
     }
 }
 
+
 @PublishedApi
 internal class ObjectScopeImpl(
     name: String,
@@ -243,7 +333,7 @@ internal class ObjectScopeImpl(
         configurable: Boolean?,
         enumerable: Boolean?
     ) {
-        o.set(
+        o.defineOwnProperty(
             property = this,
             value = value,
             writable = writable,
@@ -346,7 +436,6 @@ internal fun JSObjectImpl.func(
     params: (String) -> FunctionParam = { FunctionParam(it) },
     body: ScriptRuntime.(args: List<Any?>) -> Any?
 ) : JSFunction {
-
     return name.func(
         params = params,
         body = body

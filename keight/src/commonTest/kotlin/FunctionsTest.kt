@@ -235,11 +235,17 @@ class FunctionsTest {
             5.toFixed()
         """.eval().assertEqualsTo(25L)
 
+
         // arrow function should not receive binding
         """
             Number.prototype.toFixed = () => this * this
             5.toFixed()
         """.eval().assertEqualsTo(Double.NaN)
+
+        """
+            Number.prototype.test = 'abc'
+            5..test
+        """.eval().assertEqualsTo("abc")
     }
 
     @Test

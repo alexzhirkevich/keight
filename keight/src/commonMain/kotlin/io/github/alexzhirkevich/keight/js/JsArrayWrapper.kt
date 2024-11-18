@@ -12,20 +12,20 @@ internal value class JsArrayWrapper(
     override val value : MutableList<Any?>
 ) : JSObject, Wrapper<MutableList<Any?>>, MutableList<Any?> by value {
 
-    override val values: List<Any?>
-        get() = value.toList()
+    override suspend fun values(runtime: ScriptRuntime): List<Any?> {
+        return value.toList()
+    }
 
-    override val entries: List<List<Any?>>
-        get() = value.mapIndexed { index, v ->  kotlin.collections.listOf(index,v) }
+    override suspend fun entries(runtime: ScriptRuntime): List<List<Any?>> {
+        return value.mapIndexed { index, v ->  listOf(index,v) }
+    }
 
-    override fun set(
+    override suspend fun set(
         property: Any?,
         value: Any?,
-        runtime: ScriptRuntime,
-        enumerable: Boolean?,
-        configurable: Boolean?,
-        writable: Boolean?
+        runtime: ScriptRuntime
     ) {
+        this.value[runtime.toNumber(value).toInt()] = property
     }
 
     override fun descriptor(property: Any?): JSPropertyDescriptor? {

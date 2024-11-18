@@ -48,9 +48,6 @@ internal class OpAssignByIndex(
                         property = idx,
                         value = merge.invoke(runtime, rec.get(idx, runtime), v),
                         runtime = runtime,
-                        enumerable = true,
-                        configurable = true,
-                        writable = true
                     )
                 } else {
                     rec.set(idx, v, runtime)

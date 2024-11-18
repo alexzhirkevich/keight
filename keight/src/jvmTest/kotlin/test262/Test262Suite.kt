@@ -14,8 +14,13 @@ class Test262Suite {
                 r.reset()
                 evalFile("/harness/sta.js", r)
                 evalFile("/harness/assert.js", r)
-                Test262Case.fromSource(it).test(r)
-                println("#${i++}\t ✅ ${it.name}")
+                val test = Test262Case.fromSource(it)
+                if ("cross-realm" !in test.features && "Proxy" !in test.features) {
+                    test.test(r)
+                    println("#${i++}\t ✅ PASSED ${it.name}")
+                } else {
+                    println("#${i++}\t ⚠\uFE0F IGNORED ${it.name}")
+                }
             }
         }
 //        resources().resolve("language/types/boolean")

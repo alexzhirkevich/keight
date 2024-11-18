@@ -9,14 +9,18 @@ internal data class OpBlock(
     val expressions: List<Expression>,
     val isScoped : Boolean,
     val isExpressible : Boolean = true,
+    val isStrict : Boolean = false,
     val isSurroundedWithBraces : Boolean
 ) : Expression() {
 
     override suspend fun execute(runtime: ScriptRuntime): Any? {
-        return if (isScoped) {
-            runtime.withScope(block = ::invokeInternal)
-        } else {
-            invokeInternal(runtime)
+        return when {
+            isScoped -> runtime.withScope(
+                block = ::invokeInternal,
+                isStrict = isStrict
+            )
+            isStrict -> runtime.useStrict(::invokeInternal)
+            else -> invokeInternal(runtime)
         }
     }
 
@@ -27,17 +31,13 @@ internal data class OpBlock(
 
         if (expressions.size > 1) {
             repeat(expressions.size - 1) {
-                invoke(expressions[it], context)
+                expressions[it].invoke(context)
             }
         }
 
-        return invoke(expressions.last(), context).let {
+        return expressions.last().invoke(context).let {
             if (isExpressible) it else Unit
         }
-    }
-
-    private suspend fun invoke(expression: Expression, context: ScriptRuntime) : Any? {
-        return expression.invoke(context)
     }
 }
 

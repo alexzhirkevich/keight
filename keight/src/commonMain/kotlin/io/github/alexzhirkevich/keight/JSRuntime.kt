@@ -14,6 +14,7 @@ import io.github.alexzhirkevich.keight.js.JSON
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JSObjectFunction
 import io.github.alexzhirkevich.keight.js.JSPromiseFunction
+import io.github.alexzhirkevich.keight.js.JSPropertyAccessor
 import io.github.alexzhirkevich.keight.js.JSPropertyDescriptor
 import io.github.alexzhirkevich.keight.js.JSSetFunction
 import io.github.alexzhirkevich.keight.js.JSStringFunction
@@ -125,8 +126,10 @@ public open class JSRuntime(
         set("Math", JSMath(), null)
         set("JSON", JSON(), null)
 
+        thisRef as RuntimeObject
+
         numberMethods().forEach {
-            thisRef.set(it.name, it, this)
+            thisRef.set(it.name, it)
         }
 
         thisRef.regSetTimeout()
@@ -139,7 +142,6 @@ public open class JSRuntime(
                 val script = toKotlin(it.argOrElse(0) { return@func Unit }).toString()
                 JavaScriptEngine(this).evaluate(script)
             },
-            this
         )
     }
 
@@ -173,18 +175,17 @@ public open class JSRuntime(
         return jobId
     }
 
-    private fun JSObject.regSetTimeout() = this.set(
+    private fun RuntimeObject.regSetTimeout() = this.set(
         "setTimeout",
         "setTimeout".func("handler", "timeout") {
             (findRoot() as JSRuntime).registerJob(it) { handler, timeout ->
                 delay(timeout)
                 handler.invoke(emptyList(), this@func)
             }
-        },
-        this@JSRuntime
+        }
     )
 
-    private fun JSObject.regSetInterval() = this.set(
+    private fun RuntimeObject.regSetInterval() = this.set(
         "setInterval",
         "setInterval".func("handler", "interval") {
             (findRoot() as JSRuntime).registerJob(it) { handler, timeout ->
@@ -193,43 +194,52 @@ public open class JSRuntime(
                     delay(timeout)
                 }
             }
-        },
-        this@JSRuntime
+        }
     )
 
-    private fun JSObject.regClearJob(what: String) = this.set(
+    private fun RuntimeObject.regClearJob(what: String) = this.set(
         "clear$what",
         "clear$what".func("id") {
             val id = toNumber(it.getOrNull(0)).toLong()
             jobsMap[id]?.cancel()
-        }, this@JSRuntime
+        }
     )
 }
 
 private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JSObject {
 
-    override val values: List<Any?>
-        get() = emptyList()
-    override val entries: List<List<Any?>>
-        get() = emptyList()
-
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         return if (thisRef().contains(property)){
-            thisRef().get(property)?.get()
+            thisRef().get(property)?.get(runtime)
         } else {
             super.get(property, thisRef())
         }
     }
 
-    override fun set(
+    override suspend fun set(
         property: Any?,
         value: Any?,
+        runtime: ScriptRuntime
+    ) {
+        thisRef().set(property, value, null)
+    }
+
+    fun set(
+        property: Any?,
+        value: Any?,
+    ) {
+        thisRef().set(property, value, null)
+    }
+
+    override suspend fun defineOwnProperty(
+        property: Any?,
+        value: JSPropertyAccessor,
         runtime: ScriptRuntime,
         enumerable: Boolean?,
         configurable: Boolean?,
         writable: Boolean?
     ) {
-        thisRef().set(property, value, null)
+        set(property, value.get(runtime), runtime)
     }
 
     override fun descriptor(property: Any?): JSPropertyDescriptor? {

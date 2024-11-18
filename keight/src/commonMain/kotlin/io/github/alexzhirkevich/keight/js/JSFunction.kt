@@ -6,7 +6,6 @@ import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.Constructor
-import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastForEachIndexed
@@ -111,9 +110,9 @@ public open class JSFunction(
 
         return constructObject(args, runtime).also { o ->
             o.setProto(runtime, get(PROTOTYPE, runtime))
-            o.set(
+            o.defineOwnProperty(
                 "constructor",
-                this,
+                JSPropertyAccessor.Value(this),
                 runtime,
                 configurable = false,
                 writable = false,

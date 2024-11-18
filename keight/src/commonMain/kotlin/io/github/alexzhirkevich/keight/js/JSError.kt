@@ -2,6 +2,7 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.findRoot
 
 public open class JSError(
     msg : Any?,
@@ -11,7 +12,7 @@ public open class JSError(
     JSObject by JSObjectImpl(properties = mapOf("message" to msg, "name" to name)) {
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {
-        return (runtime as JSRuntime).Error.get(PROTOTYPE, runtime)
+        return (runtime.findRoot() as JSRuntime).Error.get(PROTOTYPE, runtime)
     }
 }
 
@@ -21,7 +22,7 @@ public class SyntaxError(msg : Any?, cause : Throwable? = null)
 public class TypeError(msg : Any?, cause : Throwable? = null)
     : JSError(msg, "TypeError", cause) {
     override suspend fun proto(runtime: ScriptRuntime): Any? {
-        return (runtime as JSRuntime).TypeError.get(PROTOTYPE, runtime)
+        return (runtime.findRoot() as JSRuntime).TypeError.get(PROTOTYPE, runtime)
     }
 }
 

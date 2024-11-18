@@ -10,7 +10,7 @@ public class JavaScriptEngine(
 
     init {
         modules.forEach {
-            it.importInto(runtime)
+            it.importInto(runtime.findRoot())
         }
     }
 

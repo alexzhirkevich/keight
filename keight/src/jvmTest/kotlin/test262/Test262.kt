@@ -50,12 +50,17 @@ suspend fun evalFiles(dir : String, runtime: JSRuntime) {
     private val expectedError: String?,
     private val hasEarlyError: Boolean,
     private val flags: Set<String>,
-    private val features: Set<String>
+    val features: Set<String>
 ) {
 
     suspend fun test(runtime: JSRuntime) {
         val result = try {
-            ("use strict;\n$source").eval(runtime)
+            val s = if (hasFlag("onlyStrict")){
+                "'use strict';\n$source"
+            } else {
+                source
+            }
+            s.eval(runtime)
             null
         } catch (t: Throwable) {
             t

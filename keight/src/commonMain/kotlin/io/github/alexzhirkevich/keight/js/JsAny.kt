@@ -1,13 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.Callable
-import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.get
-import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
-import kotlin.jvm.JvmInline
 
 public interface JsAny {
 
@@ -28,7 +22,7 @@ public interface JsAny {
                     else -> Unit
                 }
             }
-        }?.get()
+        }?.get(runtime)
     }
 
     public suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =

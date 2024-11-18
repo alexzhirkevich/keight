@@ -47,6 +47,7 @@ internal sealed interface Token {
 
         object Comma : Operator
         object Period : Operator
+        object DoublePeriod : Operator
         object Colon  : Operator
         object SemiColon : Operator
         object Arrow : Operator

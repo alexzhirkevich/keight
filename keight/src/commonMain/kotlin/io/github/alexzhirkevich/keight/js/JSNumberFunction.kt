@@ -1,12 +1,8 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.expressions.OpConstant
-import io.github.alexzhirkevich.keight.thisRef
-import kotlin.jvm.JvmInline
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -91,7 +87,7 @@ internal class JSNumberFunction : JSFunction(
 ) {
     init {
         numberMethods().forEach {
-            set(
+            defineOwnProperty(
                 property = it.name,
                 value = it,
                 writable = false,
@@ -99,49 +95,49 @@ internal class JSNumberFunction : JSFunction(
                 enumerable = false
             )
         }
-        set(
+        defineOwnProperty(
             "EPSILON",
             JsNumberWrapper(Double.MIN_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
-        set(
+        defineOwnProperty(
             "MAX_SAFE_INTEGER",
             JsNumberWrapper(Long.MAX_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
-        set(
+        defineOwnProperty(
             "MAX_VALUE",
             JsNumberWrapper(Double.MAX_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
-        set(
+        defineOwnProperty(
             "MIN_SAFE_INTEGER",
             JsNumberWrapper(Long.MIN_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
-        set(
+        defineOwnProperty(
             "NaN",
             JsNumberWrapper(Double.NaN),
             writable = false,
             configurable = false,
             enumerable = false
         )
-        set(
+        defineOwnProperty(
             "NEGATIVE_INFINITY",
             JsNumberWrapper(Double.NEGATIVE_INFINITY),
             writable = false,
             configurable = false,
             enumerable = false
         )
-        set(
+        defineOwnProperty(
             "POSITIVE_INFINITY",
             JsNumberWrapper(Double.POSITIVE_INFINITY),
             writable = false,

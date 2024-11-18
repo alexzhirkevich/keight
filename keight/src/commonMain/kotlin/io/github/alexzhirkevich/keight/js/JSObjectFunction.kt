@@ -1,7 +1,6 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.callableOrNull
@@ -9,7 +8,6 @@ import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
-import io.github.alexzhirkevich.keight.thisRef
 
 internal class JSObjectFunction : JSFunction(
     name = "Object",
@@ -17,7 +15,9 @@ internal class JSObjectFunction : JSFunction(
         FunctionParam("obj")
     ),
     body = Expression {
-        constructObject(it.get("obj"))
+        with(it) {
+            constructObject(it.get("obj"))
+        }
     },
     prototype = JSObjectImpl(
         properties = listOf(
@@ -48,7 +48,7 @@ internal class JSObjectFunction : JSFunction(
             }
         },
         "entries".func( "object") {
-            (it.firstOrNull() as? JSObject)?.entries ?: emptyList<String>()
+            (it.firstOrNull() as? JSObject)?.entries(this) ?: emptyList<String>()
         },
         "fromEntries".func("object") { args ->
             val entries = (args.getOrNull(0) as? List<List<*>>).orEmpty()
@@ -59,7 +59,7 @@ internal class JSObjectFunction : JSFunction(
             (it.firstOrNull() as? JsAny)?.keys(this) ?: emptySet<String>()
         },
         "values".func( "object") {
-            (it.firstOrNull() as? JSObject)?.values ?: emptyList<String>()
+            (it.firstOrNull() as? JSObject)?.values(this) ?: emptyList<String>()
         },
 
         "groupBy".func( "objects", "callback") { args ->
@@ -203,23 +203,31 @@ internal class JSObjectFunction : JSFunction(
 //    }
 }
 
-private fun constructObject(param : Any?) : JSObjectImpl {
+private suspend fun ScriptRuntime.constructObject(param : Any?) : JSObjectImpl {
     return when (param) {
         is Number -> JsNumberObject(JsNumberWrapper(param))
         is Wrapper<*> -> constructObject(param)
-        is JSObject -> JSObjectImpl(properties = param.entries.associate { it[0] to it[1] })
+        is JSObject -> JSObjectImpl(properties = param.entries(this).associate { it[0] to it[1] })
         else -> JSObjectImpl()
     }
 }
 
 private suspend fun JSObject.define(runtime: ScriptRuntime, name : String, property : JsAny) {
-    set(
+    val p = when {
+        property.contains("value", runtime) ->
+            JSPropertyAccessor.Value(property.get("value", runtime))
+
+        property.contains("get", runtime) -> JSPropertyAccessor.BackedField(
+            property.get("get", runtime)?.callableOrNull(),
+            property.get("set", runtime)?.callableOrNull()
+        )
+
+        else -> JSPropertyAccessor.Value(get(name, runtime))
+    }
+
+    defineOwnProperty(
         property = name,
-        value = if (property.contains(name, runtime)) {
-            property.get("value", runtime)
-        } else {
-            get(name, runtime)
-        },
+        value = p,
         runtime = runtime,
         enumerable = if (property.contains("enumerable", runtime)) {
             !runtime.isFalse(property.get("enumerable", runtime))

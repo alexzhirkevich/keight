@@ -4,6 +4,12 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.JSError
+import io.github.alexzhirkevich.keight.js.PROTOTYPE
+import io.github.alexzhirkevich.keight.js.ReferenceError
+import io.github.alexzhirkevich.keight.js.TypeError
+import io.github.alexzhirkevich.keight.js.interpreter.makeReferenceError
+import io.github.alexzhirkevich.keight.js.interpreter.makeTypeError
+import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 
 internal class ThrowableValue(val value : Any?) : JSError(value) {
     override fun toString(): String {
@@ -43,6 +49,13 @@ private fun TryCatchFinally(
     } catch (x: ScopeException) {
         throw x
     } catch (t: Throwable) {
+        val t = when  {
+            t is ReferenceError && t.get("constructor", it) == Unit ->
+                it.makeReferenceError { t.message.orEmpty()  }
+            t is TypeError && t.get("constructor", it) == Unit ->
+                it.makeTypeError { t.message.orEmpty()  }
+            else -> t
+        }
         if (catchVariableName != null) {
             val throwable = if (t is ThrowableValue) t.value else t
             it.withScope(

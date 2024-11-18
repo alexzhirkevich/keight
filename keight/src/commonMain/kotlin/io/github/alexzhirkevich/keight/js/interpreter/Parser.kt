@@ -144,6 +144,7 @@ private fun ListIterator<Token>.parseStatement(
                     parseFunctionCall(x)
                 }
                 Token.Operator.Period,
+                Token.Operator.DoublePeriod,
                 Token.Operator.Bracket.SquareOpen -> {
                     prevSignificant()
                     parseMemberOf(x)
@@ -372,7 +373,6 @@ private fun ListIterator<Token>.parseFactor(
                     is TemplateStringToken.Str -> OpConstant(it.value)
                     is TemplateStringToken.Template -> it.value.sanitize().listIterator()
                         .parseBlock(
-                            scoped = true,
                             type = ExpectedBlockType.Block,
                             isExpressible = true,
                             blockContext = emptyList()
@@ -723,7 +723,7 @@ private fun ListIterator<Token>.parseExpressionGrouping(): OpTouple {
 private fun ListIterator<Token>.parseMemberOf(receiver: Expression): Expression {
     return when (nextSignificant()){
 
-        is Token.Operator.Period -> {
+        is Token.Operator.Period, is Token.Operator.DoublePeriod -> {
             val next = nextSignificant()
             syntaxCheck(next is Token.Identifier) {
                 "Illegal symbol after '.'"
@@ -920,6 +920,7 @@ private fun ListIterator<Token>.parseSwitch(blockContext: List<BlockContext>) : 
         type = ExpectedBlockType.Block,
         blockContext = blockContext + BlockContext.Switch
     ) as OpBlock
+
     return OpSwitch(
         value = value.expressions.single(),
         cases = body.expressions
@@ -932,9 +933,12 @@ private fun ListIterator<Token>.parseForLoop(parentBlockContext: List<BlockConte
         "For loop must be followed by '('"
     }
 
-    val assign = if (eat(Token.Operator.SemiColon))
+    val assign = if (eat(Token.Operator.SemiColon)) {
         null
-    else parseBlock(scoped = false, blockContext = emptyList())
+    }
+    else {
+        parseBlock(scoped = false, blockContext = emptyList())
+    }
 
     // for (x in y)
     if (assign is OpBlock) {
@@ -959,8 +963,11 @@ private fun ListIterator<Token>.parseForLoop(parentBlockContext: List<BlockConte
         }
     }
 
-    val increment = if (eat(Token.Operator.Bracket.RoundClose))
-        null else parseBlock(scoped = false, blockContext = emptyList())
+    val increment = if (eat(Token.Operator.Bracket.RoundClose)) {
+        null
+    } else {
+        parseBlock(scoped = false, blockContext = emptyList())
+    }
 
     if (increment != null) {
         syntaxCheck(nextSignificant() is Token.Operator.Bracket.RoundClose) {
@@ -1060,17 +1067,16 @@ private fun ListIterator<Token>.parseTryCatch(blockContext: List<BlockContext>):
     val catchBlock = if (eat(Token.Identifier.Keyword.Catch)) {
         if (eat(Token.Operator.Bracket.RoundOpen)) {
             val next = nextSignificant()
-            syntaxCheck(next is Token.Identifier && eat(Token.Operator.Bracket.RoundClose)){
+            syntaxCheck(next is Token.Identifier && eat(Token.Operator.Bracket.RoundClose)) {
                 "Invalid syntax after 'catch'"
             }
-            next.identifier to parseBlock(
-                scoped = false,
-                type = ExpectedBlockType.Block,
-                blockContext = blockContext
-            )
+            next.identifier
         } else {
-            null to parseBlock(type = ExpectedBlockType.Block, blockContext = blockContext)
-        }
+            null
+        } to parseBlock(
+            type = ExpectedBlockType.Block,
+            blockContext = blockContext
+        )
     } else null
 
     val finallyBlock = if (eat(Token.Identifier.Keyword.Finally)) {
@@ -1266,9 +1272,17 @@ private fun ListIterator<Token>.parseBlock(
             }
         }
     } else {
+
+        val (isStrict, exprs) = if ((list.firstOrNull() as? OpConstant)?.value as? CharSequence == "use strict") {
+            true to list.drop(1)
+        } else {
+            false to list
+        }
+
         OpBlock(
-            expressions = list,
+            expressions = exprs,
             isScoped = scoped,
+            isStrict = isStrict,
             isExpressible = isExpressible,
             isSurroundedWithBraces = isSurroundedWithBraces
         )
@@ -1346,8 +1360,7 @@ internal suspend inline fun ScriptRuntime.typeCheck(value: Boolean, lazyMessage:
 }
 
 internal suspend inline fun ScriptRuntime.typeError(lazyMessage: () -> Any) : Nothing {
-    throw (findRoot() as JSRuntime).TypeError
-        .construct(fromKotlin(lazyMessage()).listOf(), this) as Throwable
+    throw makeTypeError(lazyMessage)
 }
 
 @OptIn(ExperimentalContracts::class)
@@ -1360,9 +1373,19 @@ internal suspend inline fun ScriptRuntime.referenceCheck(value: Boolean, lazyMes
 }
 
 internal suspend inline fun ScriptRuntime.referenceError(lazyMessage: () -> Any) : Nothing {
-    throw (findRoot() as JSRuntime).ReferenceError
+    throw makeReferenceError(lazyMessage)
+}
+
+internal suspend inline fun ScriptRuntime.makeReferenceError(lazyMessage: () -> Any) : Throwable {
+    return (findRoot() as JSRuntime).ReferenceError
         .construct(fromKotlin(lazyMessage()).listOf(), this) as Throwable
 }
+
+internal suspend inline fun ScriptRuntime.makeTypeError(lazyMessage: () -> Any) : Throwable {
+    return (findRoot() as JSRuntime).TypeError
+        .construct(fromKotlin(lazyMessage()).listOf(), this) as Throwable
+}
+
 
 internal fun Expression.isAssignable() : Boolean {
     return this is OpGetProperty ||
