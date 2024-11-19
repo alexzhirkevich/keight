@@ -1,9 +1,13 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.checkNotEmpty
+import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.js.interpreter.LSEP
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit
 import kotlin.jvm.JvmInline
 
@@ -11,11 +15,23 @@ internal class JSStringFunction : JSFunction(
     name = "String",
     prototype = Object {
         "length" eq JsNumberWrapper(0)
-        "charAt" eq CharAt("")
-        "at" eq CharAt("")
-        "indexOf" eq IndexOf("")
-        "lastIndexOf" eq LastIndexOf("")
-        "concat" eq Concat("")
+        "charAt".func("index") { args ->
+            valueAtIndexOrUnit(args[0].let(::toNumber).toInt())
+        }
+        "charAt".func("index") { args ->
+            valueAtIndexOrUnit(args[0].let(::toNumber).toInt())
+        }
+        "indexOf".func("char") { args ->
+            val search = checkNotEmpty(toString(args[0], this)[0])
+            thisRef.toString().indexOf(search)
+        }
+        "last".func("char") { args ->
+            val search = checkNotEmpty(toString(args[0], this)[0])
+            thisRef.toString().lastIndexOf(search)
+        }
+        "concat".func(FunctionParam("strings", isVararg = true)) { args ->
+            thisRef.toString() + (args[0] as List<*>).joinToString("")
+        }
         "charCodeAt" eq CharCodeAt("")
         "endsWith" eq EndsWith("")
         "split" eq Split("")
@@ -36,6 +52,18 @@ internal class JSStringFunction : JSFunction(
         "toLocaleUpperCase" eq ToUpperCase("")
         "toLowerCase" eq ToLowerCase("")
         "toLocaleLowerCase" eq ToLowerCase("")
+    },
+    properties = mutableMapOf(
+        "fromCharCode" to "fromCharCode".func(FunctionParam("codes", isVararg = true)) {
+            (it[0] as List<*>).joinToString {
+                val c = toNumber(it).toInt()
+                if (c in LSEP) "\n" else Char(c).toString()
+            }
+        }
+    ),
+    parameters = listOf("str" defaults OpConstant("")),
+    body = Expression {
+        toString(it.get("str"), it)
     }
 ) {
     companion object {
@@ -54,42 +82,8 @@ internal class JSStringFunction : JSFunction(
         return obj !is JsStringWrapper && super.isInstance(obj, runtime)
     }
 
-    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): String {
-        return if (args.isEmpty()) {
-            ""
-        } else {
-            return toString(args[0], runtime)
-        }
-    }
-
-    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
-        return JsStringObject(JsStringWrapper(invoke(args, runtime))).apply {
-            setProto(runtime,this@JSStringFunction.get(PROTOTYPE, runtime))
-        }
-    }
-
-    @JvmInline
-    private value class CharAt(val value: String) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            val idx = args[0].let(runtime::toNumber).toInt()
-            return valueAtIndexOrUnit(idx)
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return CharAt(toString(thisArg, runtime))
-        }
-    }
-
-    @JvmInline
-    private value class IndexOf(val value: String) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Int {
-            val search = checkNotEmpty(toString(args[0], runtime)[0])
-            return value.indexOf(search)
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return IndexOf(toString(thisArg, runtime))
-        }
+    override suspend fun constructObject(args: List<Any?>, runtime: ScriptRuntime): JSObject {
+        return JsStringObject(JsStringWrapper(invoke(args, runtime).toString()))
     }
 
     @JvmInline

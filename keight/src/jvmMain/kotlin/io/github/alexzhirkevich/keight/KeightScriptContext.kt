@@ -55,10 +55,12 @@ internal class KeightScriptContext(
     }
 
     override fun removeAttribute(name: String?, scope: Int): Any? {
-        return if (scope == ScriptContext.GLOBAL_SCOPE){
-            factory.globalRuntime.delete(name)
-        } else {
-            runtime.delete(name)
+        return runBlocking {
+            if (scope == ScriptContext.GLOBAL_SCOPE) {
+                factory.globalRuntime.delete(name)
+            } else {
+                runtime.delete(name)
+            }
         }
     }
 

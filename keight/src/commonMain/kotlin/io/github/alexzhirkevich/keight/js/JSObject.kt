@@ -95,6 +95,10 @@ internal class ObjectMap<V>(
     val backedMap : MutableMap<Any?, V> = mutableMapOf(),
 ) : MutableMap<Any?, V> by backedMap {
 
+    override fun remove(key: Any?): V? {
+        return backedMap.remove(mapKey(key))
+    }
+
     override fun get(key: Any?): V? {
         return backedMap[mapKey(key)]
     }

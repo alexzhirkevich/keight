@@ -74,7 +74,7 @@ internal suspend fun JsAny.call(
         return Unit
     }
     runtime.typeCheck(callable != null) {
-        "$v is not a function $callable $func $this"
+        "$v is not a function"
     }
     return callable.call(thisRef, args, runtime)
 }

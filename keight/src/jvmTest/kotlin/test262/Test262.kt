@@ -6,6 +6,7 @@ import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.JavaScriptEngine
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.js.JSError
+import io.github.alexzhirkevich.keight.js.JSObjectImpl
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import kotlinx.coroutines.test.TestScope
@@ -15,6 +16,7 @@ import java.io.File
 import java.io.FileFilter
 import java.io.IOException
 import kotlin.coroutines.CoroutineContext
+import kotlin.test.assertEquals
 
 
 fun runtimeTest262(
@@ -36,6 +38,12 @@ suspend fun evalFile(name : String, runtime: JSRuntime) {
     object {}.javaClass.getResource(name).readText().eval(runtime)
 }
 
+fun compileFile(name : String, runtime: JSRuntime)=
+    JavaScriptEngine(runtime).compile(
+        object {}.javaClass.getResource(name).readText()
+    )
+
+
 suspend fun evalFiles(dir : String, runtime: JSRuntime) {
     File(object {}.javaClass.getResource(dir).file).listFiles (FileFilter { it.isFile }).forEach {
         it.readText().eval(runtime)
@@ -46,7 +54,7 @@ suspend fun evalFiles(dir : String, runtime: JSRuntime) {
  class Test262Case(
     private val file: File,
     private val source: String,
-    private val harnessFiles: List<String>,
+    val harnessFiles: List<String>,
     private val expectedError: String?,
     private val hasEarlyError: Boolean,
     private val flags: Set<String>,
@@ -68,8 +76,13 @@ suspend fun evalFiles(dir : String, runtime: JSRuntime) {
 
         if (isNegative && result != null) {
             if (expectedError != null) {
-                result as JSError
-                result.get("name", runtime).assertEqualsTo(expectedError)
+                if (result is JSError) {
+                    val name = result.get("name", runtime)
+
+                    assertEquals(expectedError, name,result.stackTraceToString())
+                } else {
+                    throw result
+                }
             }
         } else {
             if (result != null) {

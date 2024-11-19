@@ -23,22 +23,15 @@ internal fun Expression.asScript(runtime: ScriptRuntime): Script = object : Scri
 
     override suspend fun invoke(): Any? {
         return withContext(runtime.coroutineContext) {
-            check(!runtime.lock.isLocked || runtime.isSuspendAllowed) {
-                "Simultaneous script launching is not allowed for runtimes with " +
-                        "prohibited suspension (ScriptRuntime.isSuspendAllowed = false)"
-            }
-
-            runtime.lock.withLock {
-                try {
-                    runtime.toKotlin(invoke(runtime))
-                } catch (c: CancellationException) {
-                    throw c
-                } catch (t: Throwable) {
-                    if (t is JSError) {
-                        throw t
-                    } else {
-                        throw JSError(t.message, cause = t)
-                    }
+            try {
+                runtime.toKotlin(invoke(runtime))
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                if (t is JSError) {
+                    throw t
+                } else {
+                    throw JSError(t.message, cause = t)
                 }
             }
         }

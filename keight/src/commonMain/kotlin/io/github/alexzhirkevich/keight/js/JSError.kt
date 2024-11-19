@@ -16,6 +16,8 @@ public open class JSError(
     }
 }
 
+public class JSKotlinError(t : Throwable) : JSError(t.message, t::class.simpleName ?: t::class.toString(), t.cause)
+
 public class SyntaxError(msg : Any?, cause : Throwable? = null)
     : JSError(msg, "SyntaxError", cause) {}
 

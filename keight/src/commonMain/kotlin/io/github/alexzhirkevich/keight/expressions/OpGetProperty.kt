@@ -2,6 +2,8 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.get
+import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.interpreter.referenceError
@@ -29,7 +31,7 @@ internal class OpGetProperty(
             receiver == null -> if (name in runtime) {
                 runtime.get(name)
             } else {
-                runtime.referenceError {  "$name is not defined" }
+                runtime.referenceError { "$name is not defined" }
             }
             res is Expression -> getImpl(res(runtime), runtime)
             res is JsAny -> res.get(name, runtime)

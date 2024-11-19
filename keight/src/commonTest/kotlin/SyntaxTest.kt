@@ -1,6 +1,7 @@
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -47,6 +48,21 @@ class SyntaxTest {
         }
     }
 
+    @Test
+    fun unicode_cr()= runTest{
+        assertFailsWith<ReferenceError> {
+            "eval('var x = asdf\\u000Dghjk')".eval()
+        }
+        assertFailsWith<ReferenceError> {
+            "eval('var x = asdf\\u2029ghjk')".eval()
+        }
+        assertFailsWith<ReferenceError> {
+            "eval('var x = asdf\\u2028ghjk')".eval()
+        }
+        assertFailsWith<ReferenceError> {
+            "eval('var x = asdf\\u000Aghjk')".eval()
+        }
+    }
 
     @Test
     fun typeOf() = runTest {
@@ -76,6 +92,7 @@ class SyntaxTest {
     @Test
     fun tryCatch()= runTest  {
         """
+            
             let error = undefined
             try {
                 let x = null
@@ -198,6 +215,11 @@ class SyntaxTest {
             it as JSObject
             it.get("name",runtime).toString().assertEqualsTo("test")
         }
+
+        """
+            ''/*
+            */''
+        """.trimIndent().eval()
     }
 
     @Test

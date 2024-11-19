@@ -35,8 +35,10 @@ internal sealed interface Token {
         val isFloat : Boolean
     ) : Token
 
-    @JvmInline
-    value class Comment(val value : String) : Token
+    data class Comment(
+        val value : String,
+        val isSingleLine : Boolean
+    ) : Token
 
     @JvmInline
     value class Whitespace(val value : Char) : Token

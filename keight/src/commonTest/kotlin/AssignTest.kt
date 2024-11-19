@@ -7,7 +7,6 @@ class AssignTest {
 
     @Test
     fun add_sub_mull_div_assign() = runTest{
-//
         "var x = 13; x += 17".eval().assertEqualsTo(30L)
         "var x = 56; x -=17".eval().assertEqualsTo(39L)
         "var x = 5; x *=2".eval().assertEqualsTo(10L)

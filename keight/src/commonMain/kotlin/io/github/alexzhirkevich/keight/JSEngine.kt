@@ -15,7 +15,7 @@ public class JavaScriptEngine(
     }
 
     override fun compile(script: String): Script {
-        return "{$script}"
+        return "{\n$script\n}"
             .tokenize()
             .parse()
             .asScript(runtime)

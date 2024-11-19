@@ -9,5 +9,8 @@ class StrictModeTest {
         assertFailsWith<ReferenceError> {
             "'use strict'; x = 1;".eval(it)
         }
+        assertFailsWith<ReferenceError> {
+            "'use strict';{b = 11}".eval()
+        }
     }
 }

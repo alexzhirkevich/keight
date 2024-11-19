@@ -88,6 +88,7 @@ class LoopsTest {
             var x = 0
             for(let i = 0; i<3;i++){
                 let y = 1 // redeclare
+                "test" /**/
                 x+=1
             }
             x

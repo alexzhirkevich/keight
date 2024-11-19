@@ -1,10 +1,10 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.ObjectMap
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
-import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.sync.Mutex
 
@@ -25,7 +25,7 @@ public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
 
     public abstract fun isEmpty(): Boolean
 
-    public abstract fun delete(property: Any?)
+    public abstract suspend fun delete(property: Any?, ignoreConstraints: Boolean = false): Boolean
 
     public abstract operator fun contains(property: Any?): Boolean
 
@@ -67,31 +67,44 @@ public abstract class DefaultRuntime : ScriptRuntime() {
         return property in variables
     }
 
-    override fun delete(property: Any?) {
-        if (isStrict) {
-            throw SyntaxError("Delete of an unqualified identifier in strict mode.")
-        } else {
-            variables.remove(property)
+    override suspend fun delete(property: Any?, ignoreConstraints: Boolean): Boolean {
+        val p = variables[property]
+        return when {
+            ignoreConstraints || (p != null && p.first == null) -> {
+                variables.remove(property)
+                true
+            }
+
+            p == null -> true
+            isStrict -> throw SyntaxError("Delete of an unqualified identifier in strict mode.")
+            else -> false
         }
     }
 
     override fun set(property: Any?, value: Any?, type: VariableType?) {
-        if (type != null && variables[property]?.first != null) {
+
+        val current = variables[property]
+        if (
+            ((type == VariableType.Const || type == VariableType.Local) && current?.first != null) ||
+            (type == VariableType.Global && (current?.first == VariableType.Local || current?.first == VariableType.Const))
+        ){
             throw SyntaxError("Identifier '$property' ($type) is already declared")
         }
-        if (type == null && variables[property]?.first == VariableType.Const) {
+
+        if (current?.first == VariableType.Const) {
             throw TypeError("Assignment to constant variable ('$property')")
         }
-        if (type == null && isStrict && property !in variables){
+        if (type == null && isStrict && !contains(property)){
             throw ReferenceError("Unresolved reference $property")
         }
-        variables[property] = (type ?: variables[property]?.first) to value
+        variables[property] = (type ?: current?.first) to value
     }
 
     override suspend fun get(property: Any?): Any? {
-        return if (contains(property))
-            variables[property]?.second?.get(this)
-        else Unit
+        return when {
+            contains(property) -> variables[property]?.second?.get(this)
+            else -> Unit
+        }
     }
 
     final override suspend fun <T> withScope(
@@ -142,9 +155,11 @@ private class StrictRuntime(
     override val isStrict: Boolean get() = true
     override val isSuspendAllowed: Boolean get() = delegate.isSuspendAllowed
     override fun isEmpty(): Boolean = delegate.isEmpty()
-    override fun delete(property: Any?) {
+
+    override suspend fun delete(property: Any?, ignoreConstraints: Boolean) : Boolean {
         throw SyntaxError("Delete of an unqualified identifier in strict mode.")
     }
+
     override fun contains(property: Any?): Boolean = delegate.contains(property)
     override suspend fun get(property: Any?): Any? = delegate.get(property)
     override fun set(property: Any?, value: Any?, type: VariableType?) {
@@ -186,10 +201,23 @@ private class ScopedRuntime(
     override val isStrict get() = strict || parent.isStrict
 
     override suspend fun get(property: Any?): Any? {
-        return if (property in variables) {
-            super.get(property)
-        } else {
-            parent.get(property)
+        return when {
+            property in variables -> super.get(property)
+            else -> parent.get(property)
+        }
+    }
+
+    override suspend fun delete(property: Any?, ignoreConstraints: Boolean): Boolean {
+        val p = variables[property]
+        return when {
+            p != null && (ignoreConstraints || p.first == null) -> {
+                variables.remove(property)
+                true
+            }
+
+            p == null -> parent.delete(property, ignoreConstraints)
+            isStrict -> throw SyntaxError("Delete of an unqualified identifier in strict mode.")
+            else -> false
         }
     }
 
@@ -208,7 +236,7 @@ private class ScopedRuntime(
                 }
             }
             type != null || property in variables -> super.set(property, value, type)
-            isStrict && !parent.contains(property) -> throw ReferenceError("Unresolved reference $property")
+            isStrict && !contains(property) -> throw ReferenceError("Unresolved reference $property")
             else -> parent.set(property, value, type)
         }
     }

@@ -71,10 +71,12 @@ class VariablesTest {
         assertFailsWith<SyntaxError> { "const x = 1; var x = 2".eval() }
         assertFailsWith<SyntaxError> { "var x = 1; const x = 2".eval() }
         assertFailsWith<SyntaxError> { "var x = 1; let x = 2".eval() }
-        assertFailsWith<SyntaxError> { "var x = 1; var x = 2".eval() }
         assertFailsWith<SyntaxError> { "let x = 1; const x = 2".eval() }
         assertFailsWith<SyntaxError> { "let x = 1; var x = 2".eval() }
         assertFailsWith<SyntaxError> { "let x = 1; let x = 2".eval() }
+
+        "var x = 1; var x = 2; x".eval().assertEqualsTo(2L)
+
 
         "const x = 1; { const x = 2 }; x".eval().assertEqualsTo(1L)
         "const x = 1; { let x = 2 }; x".eval().assertEqualsTo(1L)
@@ -83,9 +85,7 @@ class VariablesTest {
         }
         "var x = 1; { const x = 2 }; x".eval().assertEqualsTo(1L)
         "var x = 1; { let x = 2 }; x".eval().assertEqualsTo(1L)
-        assertFailsWith<SyntaxError> {
-            "var x = 1; { var x = 2 }; x".eval().assertEqualsTo(1L)
-        }
+        "var x = 1; { var x = 2 }; x".eval().assertEqualsTo(2L)
         "let x = 1; { const x = 2 }; x".eval().assertEqualsTo(1L)
         assertFailsWith<SyntaxError> {
             "let x = 1; { var x = 2 }; x".eval().assertEqualsTo(1L)

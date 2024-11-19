@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.expressions.JSErrorFunction
 import io.github.alexzhirkevich.keight.expressions.JSReferenceErrorFunction
 import io.github.alexzhirkevich.keight.expressions.JSTypeErrorFunction
 import io.github.alexzhirkevich.keight.js.JSArrayFunction
+import io.github.alexzhirkevich.keight.js.JSBooleanFunction
 import io.github.alexzhirkevich.keight.js.JSDateFunction
 import io.github.alexzhirkevich.keight.js.JSFunctionFunction
 import io.github.alexzhirkevich.keight.js.JSLangContext
@@ -58,6 +59,7 @@ public open class JSRuntime(
     internal lateinit var Map: JSMapFunction
     internal lateinit var Set: JSSetFunction
     internal lateinit var String: JSStringFunction
+    internal lateinit var Boolean: JSBooleanFunction
     internal lateinit var Promise: JSPromiseFunction
     internal lateinit var Symbol: JSSymbolFunction
     internal lateinit var Error: JSErrorFunction
@@ -94,6 +96,7 @@ public open class JSRuntime(
         Map = JSMapFunction()
         Set = JSSetFunction()
         String = JSStringFunction()
+        Boolean = JSBooleanFunction()
         Promise = JSPromiseFunction()
         Symbol = JSSymbolFunction()
         Error = JSErrorFunction()
@@ -109,6 +112,7 @@ public open class JSRuntime(
             Map,
             Set,
             String,
+            Boolean,
             Promise,
             Symbol,
             Error,
@@ -118,6 +122,7 @@ public open class JSRuntime(
         ).fastForEach {
             set(it.name, it, VariableType.Global)
         }
+
         set("globalThis", thisRef, null)
         set("Infinity", JsNumberWrapper(Double.POSITIVE_INFINITY), null)
         set("NaN", JsNumberWrapper(Double.NaN), null)
@@ -145,11 +150,20 @@ public open class JSRuntime(
         )
     }
 
-    final override suspend fun get(property: Any?): Any? {
-        return if (contains(property)) {
-            super.get(property)
-        } else thisRef.get(property, this)
+    override suspend fun get(property: Any?): Any? {
+        return when (property) {
+            "Infinity" -> Double.POSITIVE_INFINITY
+            "NaN" -> Double.NaN
+            "undefined" -> Unit
+            else -> super.get(property)
+        }
     }
+
+//    final override suspend fun get(property: Any?): Any? {
+//        return if (contains(property)) {
+//            super.get(property)
+//        } else thisRef.get(property, this)
+//    }
 
     private suspend fun registerJob(
         args: List<Any?>,
@@ -252,9 +266,12 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JSObject {
 
 
     override suspend fun delete(property: Any?, runtime: ScriptRuntime): Boolean {
-        thisRef().delete(property)
+
+        thisRef().delete(property, true)
         return true
     }
+
+
 }
 
 internal inline fun <reified T> ScriptRuntime.thisRef() : T {

@@ -29,6 +29,8 @@ internal tailrec fun OpEqualsImpl(a : Any?, b : Any?, typed : Boolean, runtime: 
         !typed && b is Wrapper<*> -> OpEqualsImpl(a, b.value, typed, runtime)
         a == null || b == null -> a == b
         typed -> a::class == b::class && OpEqualsImpl(a, b, false, runtime)
+        a is String && a.isEmpty() && b == false -> true
+        b is String && b.isEmpty() && a == false -> true
         a is Number && b is Number -> {
             val ad = a.toDouble()
             val bd = b.toDouble()

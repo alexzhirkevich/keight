@@ -17,54 +17,65 @@ private fun ListIterator<Char>.tokenize(
     ignoreWhitespaces : Boolean = false
 ) : List<Token> {
     return buildList {
+        try {
+            var blockStack = 0
 
-        var blockStack = 0
-
-        while (hasNext()) {
-            this += when (val c = next()) {
-                '=' -> assign() // +eq, arrow
-                '+' -> plus()
-                '-' -> minus()
-                '*' -> mul() // +exp
-                '/' -> div() // +comment
-                '%' -> mod()
-                '&' -> and()
-                '|' -> or()
-                '^' -> xor()
-                '<' -> less() // +shl
-                '>' -> greater() // +shr, ushr
-                '!' -> not() // + neq
-                '.' -> period() // + spread
-                '?' -> questionMark() // for ternary + nullish coalescing, optional chaining
-                '~' -> Token.Operator.Bitwise.Reverse
-                '{' -> Token.Operator.Bracket.CurlyOpen.also {
-                    blockStack++
-                }
-                '}' -> Token.Operator.Bracket.CurlyClose.also {
-                    if (--blockStack < 0 && untilEndOfBlock) {
-                        return@buildList
+            while (hasNext()) {
+                this += when (val c = next()) {
+                    '=' -> assign() // +eq, arrow
+                    '+' -> plus()
+                    '-' -> minus()
+                    '*' -> mul() // +exp
+                    '/' -> div().also { // +comment
+                        if (it is Token.Comment && (it.isSingleLine || it.value.any { it.code in LSEP })) {
+                            add(Token.NewLine)
+                        }
                     }
-                }
-                '(' -> Token.Operator.Bracket.RoundOpen
-                ')' -> Token.Operator.Bracket.RoundClose
-                '[' -> Token.Operator.Bracket.SquareOpen
-                ']' -> Token.Operator.Bracket.SquareClose
-                ':' -> Token.Operator.Colon
-                ';' -> Token.Operator.SemiColon
-                ',' -> Token.Operator.Comma
-                '\n' -> Token.NewLine
-                '`' -> templateString(ignoreWhitespaces)
-                in STRING_START -> string(c)
-                in NUMBERS -> number(c)
-                else -> {
-                    val isWhiteSpace = c.isWhitespace()
-                    when {
-                        isWhiteSpace && ignoreWhitespaces -> continue
-                        isWhiteSpace -> Token.Whitespace(c)
-                        else -> identifier(c)
+
+                    '#' -> hashbangComment().also { println(it) }
+                    '%' -> mod()
+                    '&' -> and()
+                    '|' -> or()
+                    '^' -> xor()
+                    '<' -> less() // +shl
+                    '>' -> greater() // +shr, ushr
+                    '!' -> not() // + neq
+                    '.' -> period() // + spread
+                    '?' -> questionMark() // for ternary + nullish coalescing, optional chaining
+                    '~' -> Token.Operator.Bitwise.Reverse
+                    '{' -> Token.Operator.Bracket.CurlyOpen.also {
+                        blockStack++
+                    }
+
+                    '}' -> Token.Operator.Bracket.CurlyClose.also {
+                        if (--blockStack < 0 && untilEndOfBlock) {
+                            return@buildList
+                        }
+                    }
+
+                    '(' -> Token.Operator.Bracket.RoundOpen
+                    ')' -> Token.Operator.Bracket.RoundClose
+                    '[' -> Token.Operator.Bracket.SquareOpen
+                    ']' -> Token.Operator.Bracket.SquareClose
+                    ':' -> Token.Operator.Colon
+                    ';' -> Token.Operator.SemiColon
+                    ',' -> Token.Operator.Comma
+                    '\n', ' ' -> Token.NewLine
+                    '`' -> templateString(ignoreWhitespaces)
+                    in STRING_START -> string(c)
+                    in NUMBERS -> number(c)
+                    else -> {
+                        val isWhiteSpace = c.isWhitespace()
+                        when {
+                            isWhiteSpace && ignoreWhitespaces -> continue
+                            isWhiteSpace -> Token.Whitespace(c)
+                            else -> identifier(c)
+                        }
                     }
                 }
             }
+        } catch (_: NoSuchElementException) {
+            throw SyntaxError("Invalid or unexpected token")
         }
     }
 }
@@ -345,13 +356,19 @@ private fun ListIterator<Char>.neq() : Token {
         else -> Token.Operator.Compare.Neq.also { previous() }
     }
 }
+private fun ListIterator<Char>.hashbangComment() : Token.Comment {
+    syntaxCheck(hasNext() && next() == '!'){
+        "Unexpected #"
+    }
 
+    return comment(isSingleLine = true)
+}
 private fun ListIterator<Char>.comment(isSingleLine : Boolean) : Token.Comment {
     val value = buildString {
         if (isSingleLine) {
             while (hasNext()) {
                 val n = next()
-                if (n == '\n')
+                if (n.code in LSEP)
                     break
                 append(n)
             }
@@ -359,7 +376,7 @@ private fun ListIterator<Char>.comment(isSingleLine : Boolean) : Token.Comment {
             var a = next()
             var b = next()
 
-            while (a.toString() + b != "*/") {
+            while (a != '*' || b != '/') {
                 append(a)
                 a = b
                 b = next()
@@ -367,24 +384,30 @@ private fun ListIterator<Char>.comment(isSingleLine : Boolean) : Token.Comment {
         }
     }
 
-    return Token.Comment(value)
+    return Token.Comment(value, isSingleLine)
 }
 
 internal fun ListIterator<Char>.string(start : Char) : Token.Str {
-    val str = buildString {
-        var isEscaping = false
+    val str = try {
+        buildString {
+            var isEscaping = false
 
-        var n = next()
+            var n = next()
 
-        while (isEscaping || n != start) {
-            append(n)
-            isEscaping = if (n == '\\') !isEscaping else false
-            n = next()
+            while (isEscaping || n != start) {
+                append(n)
+                isEscaping = if (n == '\\') !isEscaping else false
+                n = next()
+            }
         }
+    } catch (t: NoSuchElementException) {
+        throw SyntaxError("Unexpected string")
     }
 
     return Token.Str(str.unescape())
 }
+
+private val UNICODE_REGEX = "\\\\u[0-9a-fA-F]{4}".toRegex()
 
 private fun String.unescape() : String {
     return replace("\\'", "'")
@@ -394,6 +417,12 @@ private fun String.unescape() : String {
         .replace("\\t", "\t")
         .replace("\\b", "\b")
         .replace("\\\\", "\"")
+        .replace(UNICODE_REGEX) {
+            when (val unicode = it.value.drop(2).toInt(16)) {
+                in LSEP -> '\n'
+                else -> Char(unicode)
+            }.toString()
+        }
 }
 
 internal fun String.escape() : String {
@@ -507,7 +536,8 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
         "typeof" -> Token.Operator.Typeof
         "void" -> Token.Operator.Void
         "delete" -> Token.Operator.Delete
-        else -> keywords[string] ?: Token.Identifier.Property(string)
+        in keywords -> keywords[string]!!
+        else ->Token.Identifier.Property(string)
     }
 }
 
@@ -570,6 +600,7 @@ private fun ListIterator<Char>.templateString(
 }
 
 private val STRING_START = hashSetOf('"', '\'')
+internal val LSEP = hashSetOf(13, 10, 8232, 8233)
 private val NUMBERS = hashSetOf('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 private val NumberFormatIndicators = NumberFormat.entries.mapNotNull { it.prefix }
 

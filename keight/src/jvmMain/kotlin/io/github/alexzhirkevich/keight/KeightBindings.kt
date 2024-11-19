@@ -21,7 +21,7 @@ internal class KeightBindings(
     }
 
     override fun remove(k: String?): Any? {
-        return runtime.delete(k)
+        return runBlocking { runtime.delete(k) }
     }
 
     override fun containsKey(k: String?): Boolean {

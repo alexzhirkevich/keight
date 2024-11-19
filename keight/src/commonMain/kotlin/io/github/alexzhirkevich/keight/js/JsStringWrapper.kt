@@ -8,11 +8,10 @@ import kotlin.jvm.JvmInline
 
 internal class JsStringObject(
     override val value : JsStringWrapper
-) : JSObjectImpl("Number"), Wrapper<Wrapper<String>>, CharSequence by value {
+) : JSObjectImpl("String"), Wrapper<Wrapper<String>> {
 
-    override fun toString(): String  = value.value
+    override fun toString(): String = value.toString()
 }
-
 
 @JvmInline
 internal value class JsStringWrapper(
@@ -33,6 +32,7 @@ internal value class JsStringWrapper(
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         return when(property){
             "length" -> value.length.toLong()
+            "constructor" -> (runtime.findRoot() as JSRuntime).String
             else -> super.get(property, runtime)
         }
     }

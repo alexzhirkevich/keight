@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.ScriptContext
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.js.interpreter.NumberFormat
 import kotlinx.coroutines.Job
 import kotlin.math.absoluteValue
 
@@ -91,6 +92,7 @@ import kotlin.math.absoluteValue
     override fun fromKotlin(a: Any?): Any? {
         return when (a) {
             is Wrapper<*> -> a
+            is Boolean -> JSBooleanWrapper(a)
             is Number -> JsNumberWrapper(a)
             is UByte -> JsNumberWrapper(a.toLong())
             is UShort -> JsNumberWrapper(a.toLong())
@@ -103,6 +105,7 @@ import kotlin.math.absoluteValue
             is List<*> -> JsArrayWrapper(a.map(::fromKotlin).toMutableList())
             is CharSequence -> JsStringWrapper(a.toString())
             is Job -> JSPromiseWrapper(a)
+            is Throwable -> if (a is JSError) a else JSKotlinError(a)
             else -> a
         }
     }
@@ -119,8 +122,6 @@ import kotlin.math.absoluteValue
         }
     }
 }
-
-private val MAX_DENORM = 2.225073858507201E-308
 
 private fun jssum(a : Any?, b : Any?) : Any? {
     val ta = if (a is List<*>)
@@ -262,7 +263,19 @@ private tailrec fun Any?.numberOrNull(withNaNs : Boolean = true) : Number? = whe
     is CharSequence -> when {
         isBlank() -> 0L
         withNaNs -> {
-            val s = trim().toString().trimStart('\n','+').trimEnd('\n')
+
+            val s = trim().toString()
+                .trimStart('\n','+')
+                .trimEnd('\n')
+                .lowercase()
+
+            NumberFormat.entries.forEach {
+                val p = "0${it.prefix}"
+                if(it.prefix != null && s.startsWith(p)){
+                    return s.removePrefix(p).toLong(it.radix)
+                }
+            }
+
             s.toLongOrNull() ?: s.toDoubleOrNull()
         }
         else -> null

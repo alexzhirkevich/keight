@@ -2,6 +2,7 @@ import io.github.alexzhirkevich.keight.DefaultConsole
 import io.github.alexzhirkevich.keight.Console
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.JavaScriptEngine
+import io.github.alexzhirkevich.keight.ScriptRuntime
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -25,7 +26,7 @@ internal fun runtimeTest(
     test(runtime)
 }
 
-internal suspend fun String.eval(runtime: JSRuntime = JSRuntime(Job())) : Any? {
+internal suspend fun String.eval(runtime: ScriptRuntime = JSRuntime(Job())) : Any? {
     return JavaScriptEngine(runtime).evaluate(this)
 }
 
@@ -33,7 +34,7 @@ internal suspend fun String.eval2() : Any? {
     return JavaScriptEngine(JSRuntime(Job())).evaluate(this)
 }
 
-internal suspend fun String.eval(io : Console = DefaultConsole, runtime: JSRuntime =
+internal suspend fun String.eval(io : Console = DefaultConsole, runtime: ScriptRuntime =
     JSRuntime(context = Job(), console = io)) : Any? {
     return JavaScriptEngine(runtime).evaluate(this)
 }
