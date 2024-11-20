@@ -8,6 +8,7 @@ import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
+import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.expressions.OpAssign
 import io.github.alexzhirkevich.keight.expressions.OpAssignByIndex
 import io.github.alexzhirkevich.keight.expressions.OpBlock
@@ -23,6 +24,7 @@ import io.github.alexzhirkevich.keight.expressions.OpExp
 import io.github.alexzhirkevich.keight.expressions.OpForInLoop
 import io.github.alexzhirkevich.keight.expressions.OpForLoop
 import io.github.alexzhirkevich.keight.expressions.OpGetProperty
+import io.github.alexzhirkevich.keight.expressions.OpGetter
 import io.github.alexzhirkevich.keight.expressions.OpIfCondition
 import io.github.alexzhirkevich.keight.expressions.OpIn
 import io.github.alexzhirkevich.keight.expressions.OpIncDecAssign
@@ -34,20 +36,25 @@ import io.github.alexzhirkevich.keight.expressions.OpMakeArray
 import io.github.alexzhirkevich.keight.expressions.OpNot
 import io.github.alexzhirkevich.keight.expressions.OpNotEquals
 import io.github.alexzhirkevich.keight.expressions.OpReturn
+import io.github.alexzhirkevich.keight.expressions.OpSetter
 import io.github.alexzhirkevich.keight.expressions.OpSpread
 import io.github.alexzhirkevich.keight.expressions.OpSwitch
 import io.github.alexzhirkevich.keight.expressions.OpTouple
 import io.github.alexzhirkevich.keight.expressions.OpTryCatch
 import io.github.alexzhirkevich.keight.expressions.OpWhileLoop
+import io.github.alexzhirkevich.keight.expressions.PropertyAccessorFactory
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.fastAll
+import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.FunctionParam
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
+import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.JSObjectImpl
+import io.github.alexzhirkevich.keight.js.JSPropertyAccessor
 import io.github.alexzhirkevich.keight.js.JsAny
-import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.OpClassInit
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.StaticClassMember
@@ -76,7 +83,7 @@ internal enum class ExpectedBlockType {
 }
 
 internal enum class BlockContext {
-    None, Loop, Switch, Function, Class
+    None, Loop, Switch, Function, Class, Object
 }
 
 private fun unexpected(expr : String) : String = "Unexpected token '$expr'"
@@ -138,33 +145,40 @@ private fun ListIterator<Token>.prevSignificant() : Token {
 
 private fun ListIterator<Token>.parseStatement(
     blockContext: List<BlockContext> = emptyList(),
-    precedence: Int = 15,
+    precedence: Int = 14,
     blockType: ExpectedBlockType,
+    isBlockAnchor : Boolean = false,
 ) : Expression {
+
     var x = if (precedence == 0) {
         parseFactor(blockContext, blockType)
     } else {
-        parseStatement(blockContext, precedence - 1, blockType)
+        parseStatement(blockContext, precedence - 1, blockType, isBlockAnchor)
+    }
+
+    if (x is OpConstant && (x.value is JSFunction || x.value is OpClassInit) && isBlockAnchor){
+        return x
     }
 
     while (true) {
         x = when (precedence) {
             0 -> {
                 val i = nextIndex()
-                when (nextSignificant()) {
-                    Token.Operator.Bracket.RoundOpen -> {
+                val next = nextSignificant()
+                when  {
+                    next is Token.Operator.Bracket.RoundOpen -> {
                         prevSignificant()
                         parseFunctionCall(x)
                     }
 
-                    Token.Operator.Period,
-                    Token.Operator.DoublePeriod,
-                    Token.Operator.Bracket.SquareOpen -> {
+                    next is Token.Operator.Period ||
+                    next is Token.Operator.DoublePeriod ||
+                    next is Token.Operator.Bracket.SquareOpen -> {
                         prevSignificant()
                         parseMemberOf(x)
                     }
 
-                    Token.Operator.OptionalChaining -> parseOptionalChaining(x)
+                    next is Token.Operator.OptionalChaining -> parseOptionalChaining(x)
 
                     else -> return x.also { returnToIndex(i) }
                 }
@@ -400,20 +414,24 @@ private fun ListIterator<Token>.parseStatement(
 
             14 -> {
                 val i = nextIndex()
-                when (nextSignificant()) {
+                when (val next = nextSignificant()) {
                     Token.Operator.QuestionMark -> parseTernary(
                         condition = x,
+                        precedence = precedence,
                         blockContext = blockContext
                     )
+
+                    is Token.Operator.Colon -> OpKeyValuePair(
+                        key = when (x) {
+                            is OpGetProperty -> x.name
+                            is OpConstant -> x.value.toString()
+                            else -> throw SyntaxError("Invalid ussage of : operator")
+                        },
+                        value = parseStatement(blockContext, precedence, ExpectedBlockType.Object)
+                    )
+
                     Token.Operator.Arrow -> OpConstant(parseArrowFunction(blockContext, x))
 
-                    else -> return x.also { returnToIndex(i) }
-                }
-            }
-
-            15 -> {
-                val i = nextIndex()
-                when (val next = nextSignificant()) {
                     is Token.Operator.Assign -> parseAssignmentValue(
                         x, getMergeForAssignment(next)
                     )
@@ -421,6 +439,7 @@ private fun ListIterator<Token>.parseStatement(
                     else -> return x.also { returnToIndex(i) }
                 }
             }
+
             else -> error("Invalid operator priority - $precedence")
         }
     }
@@ -520,12 +539,25 @@ private fun ListIterator<Token>.parseFactor(
         is Token.Operator.Void -> parseVoid()
         is Token.Operator.Delete -> parseDelete()
         is Token.Identifier.Keyword -> parseKeyword(next, blockContext)
-        is Token.Identifier.Property -> OpGetProperty(next.identifier, receiver = null)
+        is Token.Identifier.Property -> {
+            val isObject = blockContext.lastOrNull() == BlockContext.Object
+            var i = nextIndex()
+            val n = nextSignificant()
+            when {
+                isObject && next.identifier == "get" && n is Token.Identifier ->
+                    OpGetter(parseFunction(name = n.identifier, blockContext = emptyList()))
+                isObject && next.identifier == "set" && n is Token.Identifier ->
+                    OpSetter(parseFunction(name = n.identifier, blockContext = emptyList()))
+                else -> {
+                    returnToIndex(i)
+                    OpGetProperty(next.identifier, receiver = null)
+                }
+            }
+        }
         else -> throw SyntaxError(unexpected(next::class.simpleName.orEmpty()))
     }
 
     return expr
-
 }
 
 private fun ListIterator<Token>.parseAssignmentValue(
@@ -638,15 +670,21 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
         Token.Identifier.Keyword.For -> parseForLoop(blockContext)
         Token.Identifier.Keyword.While -> parseWhileLoop(blockContext)
         Token.Identifier.Keyword.Do -> parseDoWhileLoop(blockContext)
-        Token.Identifier.Keyword.Continue -> OpContinue.also {
-            syntaxCheck(blockContext.lastOrNull() == BlockContext.Loop) {
-                unexpected("continue")
+        Token.Identifier.Keyword.Continue -> {
+            val label = (next() as? Token.Identifier)?.identifier ?: null.also { previous() }
+            OpContinue(label).also {
+                syntaxCheck(blockContext.lastOrNull() == BlockContext.Loop) {
+                    unexpected("continue")
+                }
             }
         }
-        Token.Identifier.Keyword.Break -> OpBreak.also {
-            val context = blockContext.lastOrNull()
-            syntaxCheck(context == BlockContext.Loop || context == BlockContext.Switch){
-                unexpected("break")
+        Token.Identifier.Keyword.Break -> {
+            val label = (next() as? Token.Identifier)?.identifier ?: null.also { previous() }
+            OpBreak(label).also {
+                val context = blockContext.lastOrNull()
+                syntaxCheck(context == BlockContext.Loop || context == BlockContext.Switch || label != null) {
+                    unexpected("break")
+                }
             }
         }
 
@@ -740,7 +778,7 @@ private fun ListIterator<Token>.parseTypeof() : Expression {
                 is CharSequence -> "string"
                 is JsAny -> v.type
                 is Callable, is Function<*> -> "function"
-                else -> v::class.simpleName
+                else -> "object"
             }
         } catch (r: ReferenceError) {
             "undefined"
@@ -794,6 +832,9 @@ private fun ListIterator<Token>.parseExpressionGrouping(): OpTouple {
         emptyList()
     } else buildList {
         do {
+            if (nextIsInstance<Token.Operator.Bracket.RoundClose>()){
+                return@buildList
+            }
             add(parseStatement(emptyList(),blockType = ExpectedBlockType.Object))
         } while (nextSignificant() is Token.Operator.Comma)
         prevSignificant()
@@ -887,10 +928,15 @@ private fun ListIterator<Token>.parseInstanceOfOperator(subject : Expression, pr
 
 private fun ListIterator<Token>.parseTernary(
     condition : Expression,
+    precedence: Int,
     blockContext: List<BlockContext>
 ) : Expression {
     val bContext = blockContext.dropLastWhile { it == BlockContext.Class }
-    val onTrue = parseStatement(bContext, blockType = ExpectedBlockType.Block)
+    val onTrue = parseStatement(
+        precedence = precedence - 1,
+        blockContext = bContext,
+        blockType = ExpectedBlockType.Block
+    )
 
     syntaxCheck(nextSignificant() is Token.Operator.Colon) {
         "Unexpected end of input"
@@ -899,7 +945,11 @@ private fun ListIterator<Token>.parseTernary(
     return OpIfCondition(
         condition = condition,
         onTrue = onTrue,
-        onFalse = parseStatement(bContext, blockType = ExpectedBlockType.Block),
+        onFalse = parseStatement(
+            precedence = precedence - 1,
+            blockContext = bContext,
+            blockType = ExpectedBlockType.Block
+        ),
         expressible = true
     )
 }
@@ -1103,7 +1153,11 @@ private fun ListIterator<Token>.parseWhileLoop(parentBlockContext: List<BlockCon
 }
 
 private fun ListIterator<Token>.parseDoWhileLoop(blockContext: List<BlockContext>) : Expression {
-    val body = parseBlock(type = ExpectedBlockType.Block, blockContext = blockContext + BlockContext.Loop)
+    val body = parseBlock(
+        type = ExpectedBlockType.Block,
+        blockContext = blockContext + BlockContext.Loop,
+        scoped = false // while condition should have the same scope with body
+    )
 
     syntaxCheck(eat(Token.Identifier.Keyword.While)) {
         "Missing while condition in do/while block"
@@ -1212,11 +1266,13 @@ private fun ListIterator<Token>.parseFunction(
             ""
         }
     }
+
     val touple = parseStatement(blockType = ExpectedBlockType.None)
 
     syntaxCheck (touple is OpTouple) {
         "Invalid function declaration"
     }
+
     val args = touple.expressions.map(Expression::toFunctionParam)
 
     val block = parseBlock(
@@ -1265,52 +1321,51 @@ private fun ListIterator<Token>.parseBlock(
     val list = buildList {
         if (eat(Token.Operator.Bracket.CurlyOpen)) {
             isSurroundedWithBraces = true
+            val context =  if (type == ExpectedBlockType.Object)
+                blockContext + BlockContext.Object
+            else blockContext
             while (!nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
-                val expr = parseStatement(blockContext, blockType = ExpectedBlockType.None)
-
-                if (type != ExpectedBlockType.Block
-                    && (expr is OpGetProperty && expr.receiver == null || expr is OpConstant && expr.value is CharSequence)
-                    && eat(Token.Operator.Colon)
-                ) {
-                    val value = parseStatement(blockContext, blockType = ExpectedBlockType.Object)
-                    val name = when (expr) {
-                        is OpConstant -> expr.value.toString()
-                        is OpGetProperty -> expr.name
-                        else -> error("Should never happen")
+                val expr = parseStatement(
+                    blockContext = context,
+                    blockType = ExpectedBlockType.None,
+                    isBlockAnchor = true
+                )
+                when {
+                    expr is OpClassInit -> {
+                        val assign = OpAssign(
+                            type = VariableType.Local,
+                            variableName = expr.name,
+                            receiver = null,
+                            assignableValue = expr,
+                            merge = null
+                        )
+                        add(
+                            index = funcIndex++,
+                            element = Expression { assign(it); Unit }
+                        )
                     }
-                    add(OpKeyValuePair(name, value))
-                } else {
-                    when {
-                        expr is OpClassInit -> {
-                            add(
-                                index = funcIndex++,
-                                element = OpAssign(
-                                    type = VariableType.Local,
-                                    variableName = expr.name,
-                                    receiver = null,
-                                    assignableValue = expr,
-                                    merge = null
-                                )
-                            )
+
+                    expr is OpConstant && expr.value is JSFunction -> {
+                        val name = (expr.value as Named).name
+
+                        syntaxCheck(name.isNotBlank()){
+                            "Function statements require a function name"
                         }
 
-                        expr is OpConstant && expr.value is JSFunction -> {
-                            val name = (expr.value as Named).name
-
-                            add(
-                                index = funcIndex++,
-                                element = OpAssign(
-                                    type = VariableType.Local,
-                                    variableName = name,
-                                    receiver = null,
-                                    assignableValue = expr,
-                                    merge = null
-                                )
-                            )
-                        }
-
-                        else -> add(expr)
+                        val assign =  OpAssign(
+                            type = VariableType.Local,
+                            variableName = name,
+                            receiver = null,
+                            assignableValue = expr,
+                            merge = null
+                        )
+                        add(
+                            index = funcIndex++,
+                            element = Expression { assign(it); Unit }
+                        )
                     }
+
+                    else -> add(expr)
                 }
                 var hasSeparator = false
                 while (hasNext()) {
@@ -1342,20 +1397,56 @@ private fun ListIterator<Token>.parseBlock(
 
     return if (
         type != ExpectedBlockType.Block
-        && isSurroundedWithBraces && list.fastAll { it is OpKeyValuePair || it is OpSpread }
+        && isSurroundedWithBraces && list.fastAll { it is OpKeyValuePair || it is OpSpread || it is PropertyAccessorFactory }
     ) {
         Expression { r ->
-            Object {
+            JSObjectImpl().apply {
+                val getters = list.filterIsInstance<OpGetter>().associateBy { it.value.name }
+                val setters = list.filterIsInstance<OpSetter>().associateBy { it.value.name }
+
+                (getters.keys + setters.keys).forEach {
+                    set(it, JSPropertyAccessor.BackedField(getters[it]?.value, setters[it]?.value))
+                }
+
                 list.forEach { expr ->
                     when (expr) {
                         is OpKeyValuePair -> {
-                            expr.key eq expr.value(r)
+                            set(expr.key, expr.value(r))
                         }
+
+                        is PropertyAccessorFactory -> Unit
 
                         is OpSpread -> {
                             val any = expr.value(r) as JsAny
-                            any.keys(r).forEach {
-                                it eq any.get(it, r)
+
+                            if (any is JSObject) {
+                                any.keys(r).fastForEach {
+                                    val descriptor = any.descriptor(it) ?: return@fastForEach
+
+                                    defineOwnProperty(
+                                        property = it,
+                                        value = if (
+                                            descriptor.contains("get", r) ||
+                                            descriptor.contains("set", r)
+                                        ) {
+                                            JSPropertyAccessor.BackedField(
+                                                descriptor.get("get", r)?.callableOrNull(),
+                                                descriptor.get("set", r)?.callableOrNull()
+                                            )
+                                        } else {
+                                            JSPropertyAccessor.Value(
+                                                descriptor.get("value", r)
+                                            )
+                                        },
+                                        writable = !r.isFalse(descriptor.get("writable", r)),
+                                        enumerable = !r.isFalse(descriptor.get("enumerable", r)),
+                                        configurable = !r.isFalse(descriptor.get("configurable", r))
+                                    )
+                                }
+                            } else {
+                                any.keys(r).fastForEach {
+                                    set(it, any.get(it, r))
+                                }
                             }
                         }
                     }

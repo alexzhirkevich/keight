@@ -33,7 +33,7 @@ internal suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime) : B
     return isPrototypeOf(obj, runtime, true)
 }
 
-private suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime, isFirst : Boolean = true) : Boolean {
+private suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime, isFirst : Boolean) : Boolean {
     return when {
         !isFirst && obj === this -> true
         obj !is JsAny -> false

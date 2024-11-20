@@ -529,7 +529,7 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
         value.append(next)
     }
 
-    return when (val string = value.toString()){
+    return when (val string = value.toString().unescape()){
         "new" -> Token.Operator.New
         "in" -> Token.Operator.In
         "instanceof" -> Token.Operator.Instanceof

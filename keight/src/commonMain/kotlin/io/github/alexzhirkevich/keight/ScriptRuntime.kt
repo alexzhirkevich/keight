@@ -1,10 +1,10 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.ObjectMap
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
+import io.github.alexzhirkevich.keight.js.mapThisArg
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.sync.Mutex
 
@@ -15,12 +15,14 @@ public enum class VariableType {
 
 public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
 
+    @PublishedApi
     internal open val isStrict : Boolean get() = false
 
     public open val isSuspendAllowed: Boolean get() = true
 
     internal val lock: Mutex = Mutex()
 
+    @PublishedApi
     internal abstract val thisRef : Any
 
     public abstract fun isEmpty(): Boolean
@@ -94,6 +96,7 @@ public abstract class DefaultRuntime : ScriptRuntime() {
         if (current?.first == VariableType.Const) {
             throw TypeError("Assignment to constant variable ('$property')")
         }
+
         if (type == null && isStrict && !contains(property)){
             throw ReferenceError("Unresolved reference $property")
         }
@@ -119,7 +122,7 @@ public abstract class DefaultRuntime : ScriptRuntime() {
             parent = this,
             isFunction = isFunction,
             strict = isStrict,
-            thisRef = thisRef,
+            mThisRef = thisRef,
             isSuspendAllowed = isSuspendAllowed
         )
         extraProperties.forEach { (n, v) ->
@@ -151,7 +154,8 @@ private class StrictRuntime(
 ) : ScriptRuntime(),
     ScriptContext by delegate,
     CoroutineScope by delegate {
-    override val thisRef: Any get() = delegate.thisRef
+
+    override val thisRef: Any get() = mapThisArg(delegate.thisRef, true)
     override val isStrict: Boolean get() = true
     override val isSuspendAllowed: Boolean get() = delegate.isSuspendAllowed
     override fun isEmpty(): Boolean = delegate.isEmpty()
@@ -189,16 +193,19 @@ private class StrictRuntime(
 }
 
 private class ScopedRuntime(
-    val parent : ScriptRuntime,
-    val isFunction : Boolean = false,
-    private val strict : Boolean = false,
-    override val thisRef: Any = parent.thisRef,
+    val parent: ScriptRuntime,
+    val isFunction: Boolean,
+    private val strict: Boolean,
+    mThisRef: Any = parent.thisRef,
     override val isSuspendAllowed: Boolean = parent.isSuspendAllowed
 ) : DefaultRuntime(),
     ScriptContext by parent,
     CoroutineScope by parent {
 
     override val isStrict get() = strict || parent.isStrict
+
+    override val thisRef: Any = mThisRef
+        get() = mapThisArg(field, isStrict)
 
     override suspend fun get(property: Any?): Any? {
         return when {

@@ -38,7 +38,7 @@ public interface JSObject : JsAny {
         set(property, value.get(runtime), runtime)
     }
 
-    public fun descriptor(property: Any?) : JSPropertyDescriptor?
+    public fun descriptor(property: Any?) : JSObject?
 }
 
 internal const val PROTOTYPE = "prototype"
@@ -285,8 +285,8 @@ public open class JSObjectImpl(
     override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
         property in map || super.contains(property, runtime)
 
-    override fun descriptor(property: Any?): JSPropertyDescriptor? {
-        return map[property]
+    override fun descriptor(property: Any?): JSObject? {
+        return map[property]?.descriptor()
     }
 
     override fun preventExtensions() {
@@ -305,7 +305,8 @@ public open class JSObjectImpl(
 public sealed interface ObjectScope {
 
     public infix fun Any.eq(value: Any?)
-    public  fun Any.eq(value: Any?, writable: Boolean? = null, configurable: Boolean? = false, enumerable: Boolean? = null)
+
+    public fun Any.eq(value: Any?, writable: Boolean? = null, configurable: Boolean? = false, enumerable: Boolean? = null)
 
     public fun String.func(
         vararg args: FunctionParam,

@@ -34,6 +34,12 @@ class PromiseTest {
             let promise = new Promise((resolve) => resolve(5)).then(x => x * x).then(x => x + 1)
             await promise
         """.eval().assertEqualsTo(26L)
+
+        """
+            let promise = new Promise((resolve) => { throw "test" }).then(_ =>{}, e => e)
+            await promise
+        """.eval().assertEqualsTo("test")
+
     }
 
     @Test

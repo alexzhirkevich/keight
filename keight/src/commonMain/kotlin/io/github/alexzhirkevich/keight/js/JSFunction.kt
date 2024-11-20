@@ -6,9 +6,13 @@ import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.Constructor
+import io.github.alexzhirkevich.keight.Getter
+import io.github.alexzhirkevich.keight.LazyGetter
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastForEachIndexed
+import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.js.interpreter.Token
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import kotlinx.coroutines.async
 
@@ -59,7 +63,22 @@ public open class JSFunction(
         if (varargs > 1 || varargs == 1 && !parameters.last().isVararg) {
             throw SyntaxError("Rest parameter must be last formal parameter")
         }
+
+        if (parameters.lastOrNull().let { it?.isVararg == true && it.default != null }){
+            throw SyntaxError("Rest parameter may not have a default initializer")
+        }
+
+        if (parameters.fastMap { it.name }.toSet().count() != parameters.size){
+            throw SyntaxError("Duplicate parameter name not allowed in this context")
+        }
         setPrototype(prototype)
+        defineOwnProperty(
+            property = "length",
+            value = parameters.count { it.default != null && !it.isVararg },
+            writable = false,
+            enumerable = false,
+            configurable = true
+        )
     }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
@@ -135,7 +154,7 @@ public open class JSFunction(
                 this[p.name] = VariableType.Local to when {
                     p.isVararg -> allArgs.drop(i)
                     i in allArgs.indices -> allArgs[i]
-                    p.default != null -> p.default.invoke(runtime)
+                    p.default != null -> LazyGetter {  p.default.invoke(runtime) }
                     else -> Unit
                 }
             }
@@ -180,5 +199,17 @@ public open class JSFunction(
 
     override fun toString(): String {
         return "[function $name]"
+    }
+}
+
+internal fun mapThisArg(arg : Any, strict : Boolean) : Any {
+    return if (strict) {
+        arg
+    } else {
+        when (arg) {
+            is JsNumberWrapper -> JsNumberObject(arg)
+            is Number -> JsNumberObject(JsNumberWrapper(arg))
+            else -> arg
+        }
     }
 }

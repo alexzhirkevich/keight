@@ -4,11 +4,11 @@ import io.github.alexzhirkevich.keight.Console
 import io.github.alexzhirkevich.keight.ScriptRuntime
 
 internal fun JsConsole(io: () -> Console) = Object("console") {
-    "log".func(FunctionParam("data", isVararg = true)) { out(it, io()::verbose) }
-    "info".func(FunctionParam("data", isVararg = true)) { out(it, io()::info) }
-    "debug".func(FunctionParam("data", isVararg = true)) { out(it, io()::debug) }
-    "warn".func(FunctionParam("data", isVararg = true)) { out(it, io()::warn) }
-    "error".func(FunctionParam("data", isVararg = true)) { out(it, io()::error) }
+    "log".func(FunctionParam("msg", isVararg = true)) { out(it, io()::verbose) }
+    "info".func(FunctionParam("msg", isVararg = true)) { out(it, io()::info) }
+    "debug".func(FunctionParam("msg", isVararg = true)) { out(it, io()::debug) }
+    "warn".func(FunctionParam("msg", isVararg = true)) { out(it, io()::warn) }
+    "error".func(FunctionParam("msg", isVararg = true)) { out(it, io()::error) }
 }
 
 private fun ScriptRuntime.out(message : List<Any?>, out : (Any?) -> Unit){

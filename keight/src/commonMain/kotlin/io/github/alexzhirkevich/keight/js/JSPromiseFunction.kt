@@ -13,14 +13,72 @@ import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.jvm.JvmInline
 
 internal class JSPromiseFunction : JSFunction(
     name = "Promise",
     prototype = Object {
-        "catch" eq Catch(Job())
-        "then" eq Then(Job())
-        "finally" eq Finally(Job())
+        "catch".func("onrejected") { args ->
+            val value = toKotlin(thisRef) as Job
+            val arg = args.getOrNull(0)
+            val callable = arg?.callableOrNull()
+            typeCheck(callable is Callable) {
+                "$arg is not a function"
+            }
+
+            val job = toKotlin(value) as Job
+
+            async {
+                try {
+                    if (job is Deferred<*>) {
+                        job.await()
+                    } else {
+                        job.joinSuccess()
+                    }
+                } catch (t: CancellationException) {
+                    throw t
+                } catch (t: Throwable) {
+                    callable.invoke(t.toJS().listOf(), this@func)
+                }
+            }
+        }
+        "then".func(
+            FunctionParam("onfulfilled"),
+            FunctionParam("onrejected", default = OpArgOmitted),
+        ) { args ->
+            val onFulfilled = args.getOrNull(0)
+            val job = toKotlin(thisRef) as Job
+
+            async {
+                try {
+                    val res = if (job is Deferred<*>) job.await() else job.joinSuccess()
+                    val fulfilled = onFulfilled?.callableOrNull()
+                    typeCheck(fulfilled is Callable) { "$onFulfilled is not a function" }
+                    fulfilled.invoke(res.listOf(), this@func)
+                } catch (t: CancellationException) {
+                    throw t
+                } catch (t: Throwable) {
+                    val rejected = args.argOrElse(1) { throw t }?.callableOrNull()
+                    typeCheck(rejected is Callable) { "$onFulfilled is not a function" }
+                    rejected.invoke(t.toJS().listOf(), this@func)
+                }
+            }
+        }
+        "finally".func("handle") { args ->
+            val arg = args.getOrNull(0)
+            val callable = arg?.callableOrNull()
+            val value = fromKotlin(thisRef) as Job
+            typeCheck(callable is Callable) {
+                "$arg is not a function"
+            }
+
+            async {
+                try {
+                    value.joinSuccess()
+                } finally {
+                    callable.invoke(emptyList(), this@func)
+                }
+            }
+        }
     },
     properties = listOf(
         "resolve".func( FunctionParam("value", default = OpConstant(Unit))) {
@@ -68,89 +126,12 @@ internal class JSPromiseFunction : JSFunction(
             deferred.await()
         }
     }
+}
 
-    @JvmInline
-    private value class Then(val value: Job) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Deferred<*> {
-            val arg = args.getOrNull(0)
-            val callable = arg?.callableOrNull()
-            runtime.typeCheck(callable is Callable) {
-                "$arg is not a function"
-            }
-
-            val job = runtime.toKotlin(value) as Job
-            val res = if (job is Deferred<*>) job::await else job::join
-
-            return runtime.async {
-                callable.invoke(res().listOf(), runtime)
-            }
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Then((thisArg as? Job) ?: Job())
-        }
-    }
-
-    @JvmInline
-    private value class Catch(val value: Job) : Callable {
-
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Deferred<*> {
-            val arg = args.getOrNull(0)
-            val callable = arg?.callableOrNull()
-            runtime.typeCheck(callable is Callable) {
-                "$arg is not a function"
-            }
-
-            val job = runtime.toKotlin(value) as Job
-
-            return runtime.async {
-                try {
-                    if (job is Deferred<*>) {
-                        job.await()
-                    } else {
-                        job.joinSuccess()
-                    }
-                } catch (t: CancellationException) {
-                    throw t
-                } catch (t: Throwable) {
-                    val value = when (t){
-                        is ThrowableValue -> t.value
-                        is JSError -> t
-                        else -> JSError(t.message, cause = t)
-                    }
-                    callable.invoke(value.listOf(), runtime)
-                }
-            }
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Catch((thisArg as? Job) ?: Job())
-        }
-    }
-
-    @JvmInline
-    private value class Finally(val value: Job) : Callable {
-
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Deferred<Unit> {
-            val arg = args.getOrNull(0)
-            val callable = arg?.callableOrNull()
-            runtime.typeCheck(callable is Callable) {
-                "$arg is not a function"
-            }
-
-            return runtime.async {
-                try {
-                    value.joinSuccess()
-                } finally {
-                    callable.invoke(emptyList(), runtime)
-                }
-            }
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Finally((thisArg as? Job) ?: Job())
-        }
-    }
+private fun Throwable.toJS()  = when (this) {
+    is ThrowableValue -> value
+    is JSError -> this
+    else -> JSError(message, cause = this)
 }
 
 internal suspend fun Job.joinSuccess(){

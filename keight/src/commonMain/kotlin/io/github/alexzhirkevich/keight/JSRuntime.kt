@@ -16,7 +16,6 @@ import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JSObjectFunction
 import io.github.alexzhirkevich.keight.js.JSPromiseFunction
 import io.github.alexzhirkevich.keight.js.JSPropertyAccessor
-import io.github.alexzhirkevich.keight.js.JSPropertyDescriptor
 import io.github.alexzhirkevich.keight.js.JSSetFunction
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JSSymbolFunction
@@ -256,7 +255,7 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JSObject {
         set(property, value.get(runtime), runtime)
     }
 
-    override fun descriptor(property: Any?): JSPropertyDescriptor? {
+    override fun descriptor(property: Any?): JSObject? {
         return null
     }
 

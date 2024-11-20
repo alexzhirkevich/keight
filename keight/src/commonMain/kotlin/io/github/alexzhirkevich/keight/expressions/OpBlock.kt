@@ -10,17 +10,27 @@ internal data class OpBlock(
     val isScoped : Boolean,
     val isExpressible : Boolean = true,
     val isStrict : Boolean = false,
-    val isSurroundedWithBraces : Boolean
-) : Expression() {
+    override var label: String? = null,
+    val isSurroundedWithBraces : Boolean,
+) : Expression(), Labeled {
 
     override suspend fun execute(runtime: ScriptRuntime): Any? {
-        return when {
-            isScoped -> runtime.withScope(
-                block = ::invokeInternal,
-                isStrict = isStrict
-            )
-            isStrict -> runtime.useStrict(::invokeInternal)
-            else -> invokeInternal(runtime)
+        return try {
+            when {
+                isScoped -> runtime.withScope(
+                    block = ::invokeInternal,
+                    isStrict = isStrict
+                )
+
+                isStrict -> runtime.useStrict(::invokeInternal)
+                else -> invokeInternal(runtime)
+            }
+        } catch (t: BlockBreak) {
+            if (label != null && t.label == label) {
+                return Unit
+            } else {
+                throw t
+            }
         }
     }
 
@@ -43,8 +53,8 @@ internal data class OpBlock(
 
 
 internal sealed class ScopeException : Throwable()
-internal data object BlockContinue : ScopeException()
-internal data object BlockBreak : ScopeException()
+internal class BlockContinue(val label : String? = null) : ScopeException()
+internal class BlockBreak(val label : String? = null) : ScopeException()
 internal class BlockReturn(val value: Any?) : ScopeException()
 
 internal class OpReturn(
@@ -55,14 +65,14 @@ internal class OpReturn(
     }
 }
 
-internal object OpContinue : Expression() {
+internal class OpContinue(private val label: String? = null) : Expression() {
     override suspend fun execute(runtime: ScriptRuntime): Any? {
-        throw BlockContinue
+        throw BlockContinue(label)
     }
 }
-internal object OpBreak : Expression() {
+internal class OpBreak(private val label: String? = null) : Expression() {
     override suspend fun execute(runtime: ScriptRuntime): Any? {
-        throw BlockBreak
+        throw BlockBreak(label)
     }
 }
 

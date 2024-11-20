@@ -158,6 +158,7 @@ suspend fun evalFiles(dir : String, runtime: JSRuntime) {
                 // present by default harness files
                 harnessFiles.add("assert.js")
                 harnessFiles.add("sta.js")
+                harnessFiles.add("doneprintHandle.js")
 
                 if (metadata.containsKey("includes")) {
                     harnessFiles.addAll((metadata["includes"] as List<String>?)!!)

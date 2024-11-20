@@ -126,7 +126,7 @@ internal class JSObjectFunction : JSFunction(
 
             val name = args.getOrElse(1) { return@func Unit }
 
-            obj.descriptor(name)?.asObject() ?: Unit
+            obj.descriptor(name) ?: Unit
         },
 
         "getOwnPropertyDescriptors".func( "object") { args ->
@@ -137,7 +137,7 @@ internal class JSObjectFunction : JSFunction(
 
             JSObjectImpl(
                 properties = obj.keys(this).mapNotNull { k ->
-                    obj.descriptor(k)?.asObject()?.let { k to it }
+                    obj.descriptor(k)?.let { k to it }
                 }.toMap()
             )
         },
