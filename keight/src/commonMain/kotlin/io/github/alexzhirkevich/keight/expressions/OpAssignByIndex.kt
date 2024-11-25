@@ -11,7 +11,7 @@ internal class OpAssignByIndex(
     private val receiver : Expression,
     private val index : Expression,
     private val assignableValue : Expression,
-    private val merge : (ScriptRuntime.(Any?, Any?) -> Any?)?
+    private val merge : (suspend ScriptRuntime.(Any?, Any?) -> Any?)?
 ) : Expression() {
 
     override suspend fun execute(runtime: ScriptRuntime): Any? {

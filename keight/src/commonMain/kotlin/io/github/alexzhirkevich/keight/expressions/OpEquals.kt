@@ -20,10 +20,7 @@ internal fun OpNotEquals(
     !OpEqualsImpl(a(it), b(it), isTyped, it)
 }
 
-private val listOfPositiveZero = listOf(0.0)
-
-internal tailrec fun OpEqualsImpl(a : Any?, b : Any?, typed : Boolean, runtime: ScriptRuntime) : Boolean {
-
+internal tailrec suspend fun OpEqualsImpl(a : Any?, b : Any?, typed : Boolean, runtime: ScriptRuntime) : Boolean {
     return when {
         !typed && a is Wrapper<*> -> OpEqualsImpl(a.value, b, typed, runtime)
         !typed && b is Wrapper<*> -> OpEqualsImpl(a, b.value, typed, runtime)

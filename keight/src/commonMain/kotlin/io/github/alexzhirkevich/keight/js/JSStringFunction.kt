@@ -15,26 +15,46 @@ internal class JSStringFunction : JSFunction(
     name = "String",
     prototype = Object {
         "length" eq JsNumberWrapper(0)
-        "charAt".func("index") { args ->
-            valueAtIndexOrUnit(args[0].let(::toNumber).toInt())
+        "charAt".func("index") {
+            valueAtIndexOrUnit(toNumber(it[0]).toInt())
         }
-        "charAt".func("index") { args ->
-            valueAtIndexOrUnit(args[0].let(::toNumber).toInt())
+        "charAt".func("index") {
+            valueAtIndexOrUnit(toNumber(it[0]).toInt())
         }
-        "indexOf".func("char") { args ->
-            val search = checkNotEmpty(toString(args[0], this)[0])
-            thisRef.toString().indexOf(search)
+        "indexOf".func("char") {
+            val search = checkNotEmpty(toString(it[0], this)[0])
+            toString(thisRef, this).indexOf(search)
         }
-        "last".func("char") { args ->
-            val search = checkNotEmpty(toString(args[0], this)[0])
-            thisRef.toString().lastIndexOf(search)
+        "last".func("char") {
+            val search = checkNotEmpty(toString(it[0], this)[0])
+            toString(thisRef, this).lastIndexOf(search)
         }
-        "concat".func(FunctionParam("strings", isVararg = true)) { args ->
-            thisRef.toString() + (args[0] as List<*>).joinToString("")
+        "concat".func(FunctionParam("strings", isVararg = true)) {
+            toString(thisRef, this) + (it[0] as List<*>).joinToString("")
         }
-        "charCodeAt" eq CharCodeAt("")
-        "endsWith" eq EndsWith("")
-        "split" eq Split("")
+        "charCodeAt".func("index") {
+            val ind = toNumber(it[0]).toInt()
+            toString(thisRef, this)[ind].code
+        }
+        "endsWith".func(FunctionParam("search"), "pos" defaults OpArgOmitted) {
+            val searchString = toString(it[0], this)
+            val position = it.argOrNull(1)?.let { toNumber(it) }?.toInt()
+            val value = thisRef.toString()
+            if (position == null) {
+                value.endsWith(searchString)
+            } else {
+                value.take(position.toInt()).endsWith(searchString)
+            }
+        }
+        "split".func("delim") {
+            val delimiters = toString(it[0], this)
+            toString(thisRef, this).split(delimiters).let {
+                it
+                if (delimiters.isEmpty()) {
+                    it.subList(1, it.size - 1)
+                } else it
+            }
+        }
         "startsWith" eq StartsWith("")
         "includes" eq Includes("")
         "padStart" eq PadStart("")
@@ -55,10 +75,10 @@ internal class JSStringFunction : JSFunction(
     },
     properties = mutableMapOf(
         "fromCharCode" to "fromCharCode".func(FunctionParam("codes", isVararg = true)) {
-            (it[0] as List<*>).joinToString {
+            (it[0] as List<*>).fastMap {
                 val c = toNumber(it).toInt()
                 if (c in LSEP) "\n" else Char(c).toString()
-            }
+            }.joinToString("")
         }
     ),
     parameters = listOf("str" defaults OpConstant("")),
@@ -68,13 +88,10 @@ internal class JSStringFunction : JSFunction(
 ) {
     companion object {
         suspend fun toString(value: Any?, runtime: ScriptRuntime) : String {
-            val toString = (value as? JsAny)?.get("toString", runtime)?.callableOrNull()
-
-            return if (toString != null) {
-                toString.call(value, emptyList(), runtime).toString()
-            } else {
-                value.toString()
-            }
+            return (value as? JsAny)?.get("toString", runtime)
+                ?.callableOrNull()
+                ?.call(value, emptyList(), runtime)?.toString()
+                ?: value.toString()
         }
     }
 
@@ -87,78 +104,10 @@ internal class JSStringFunction : JSFunction(
     }
 
     @JvmInline
-    private value class LastIndexOf(val value: String) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Int {
-            val search = checkNotEmpty(toString(args[0],runtime)[0])
-            return value.lastIndexOf(search)
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return LastIndexOf(toString(thisArg, runtime))
-        }
-    }
-
-    @JvmInline
-    private value class Concat(val value: String) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): String {
-            return value + args.joinToString("")
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Concat(toString(thisArg, runtime))
-        }
-    }
-
-    @JvmInline
-    private value class CharCodeAt(val value: String) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Int {
-            val ind = args[0].let(runtime::toNumber).toInt()
-            return value[ind].code
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return CharCodeAt(toString(thisArg, runtime))
-        }
-    }
-
-    @JvmInline
-    private value class EndsWith(val value: String) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Boolean {
-            val searchString = toString(args[0], runtime)
-            val position = args.getOrNull(1)?.let(runtime::toNumber)?.toInt()
-            return if (position == null) {
-                value.endsWith(searchString)
-            } else {
-                value.take(position.toInt()).endsWith(searchString)
-            }
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return EndsWith(toString(thisArg, runtime))
-        }
-    }
-
-    @JvmInline
-    private value class Split(val value: String) : Callable {
-        override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): List<String> {
-            val delimiters = toString(args[0], runtime)
-            return value.split(delimiters).let { it
-                if (delimiters.isEmpty()) {
-                    it.subList(1, it.size - 1)
-                } else it
-            }
-        }
-
-        override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
-            return Split(toString(thisArg, runtime))
-        }
-    }
-
-    @JvmInline
     private value class StartsWith(val value: String) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Boolean {
             val searchString = toString(args[0], runtime)
-            val position = args.getOrNull(1)?.let(runtime::toNumber)?.toInt()
+            val position = args.getOrNull(1)?.let { runtime.toNumber(it) }?.toInt()
 
             return if (position == null) {
                 value.startsWith(searchString)
@@ -176,7 +125,7 @@ internal class JSStringFunction : JSFunction(
     private value class Includes(val value: String) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Boolean {
             val searchString = toString(args[0], runtime)
-            val position = args.getOrNull(1)?.let(runtime::toNumber)?.toInt()
+            val position = args.getOrNull(1)?.let { runtime.toNumber(it) }?.toInt()
 
             return value.indexOf(searchString, startIndex = position ?: 0) >=0
         }
@@ -189,7 +138,7 @@ internal class JSStringFunction : JSFunction(
     @JvmInline
     private value class PadStart(val value: String) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): String {
-            val targetLength = args[0].let(runtime::toNumber).toInt()
+            val targetLength = runtime.toNumber(args[0]).toInt()
             val padString = toString(args.getOrNull(1) ?: " ", runtime)
             val toAppend = targetLength - value.length
 
@@ -209,7 +158,7 @@ internal class JSStringFunction : JSFunction(
     @JvmInline
     private value class PadEnd(val value: String) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): String {
-            val targetLength = args[0].let(runtime::toNumber).toInt()
+            val targetLength = runtime.toNumber(args[0]).toInt()
             val padString = toString(args.getOrNull(1) ?: " ", runtime)
 
             return buildString(targetLength) {
@@ -261,7 +210,7 @@ internal class JSStringFunction : JSFunction(
     @JvmInline
     private value class Repeat(val value: String) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): String {
-            val count = args[0].let(runtime::toNumber).toInt()
+            val count = runtime.toNumber(args[0]).toInt()
             return value.repeat(count)
         }
 
@@ -273,9 +222,9 @@ internal class JSStringFunction : JSFunction(
     @JvmInline
     private value class Substring(val value: String) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): String {
-            val start = args[0].let(runtime::toNumber).toInt()
+            val start = runtime.toNumber(args[0]).toInt()
             val end = args.getOrNull(1)
-                ?.let(runtime::toNumber)?.toInt()?.coerceAtMost(value.length) ?: value.length
+                ?.let { runtime.toNumber(it) }?.toInt()?.coerceAtMost(value.length) ?: value.length
             return value.substring(start, end)
         }
 

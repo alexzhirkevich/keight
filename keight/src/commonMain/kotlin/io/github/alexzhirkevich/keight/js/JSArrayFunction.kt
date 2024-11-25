@@ -1,11 +1,9 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
-import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
-import io.github.alexzhirkevich.keight.comparator
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastAll
 import io.github.alexzhirkevich.keight.fastAny
@@ -103,8 +101,18 @@ internal class JSArrayFunction : JSFunction(
         }
         "reverse".func { thisRef<MutableList<*>>().reverse() }
         "toReversed".func { thisRef<List<*>>().reversed() }
-        "sort".func { thisRef<MutableList<*>>().sortWith(comparator) }
-        "toSorted".func { thisRef<List<*>>().sortedWith(comparator) }
+
+//        "sort".func {
+//            thisRef<MutableList<Any?>>().quickSort { a, b ->
+//                if (isComparable(a, b)) compare(a, b) else 0
+//            }
+//        }
+//
+//        "toSorted".func {
+//            thisRef<List<*>>().toMutableList().quickSort { a, b ->
+//                if (isComparable(a, b)) compare(a, b) else 0
+//            }
+//        }
         "slice".func(
             "start" defaults OpConstant(0),
             "end" defaults OpArgOmitted
@@ -112,10 +120,10 @@ internal class JSArrayFunction : JSFunction(
             if (args.isEmpty()) {
                 thisRef()
             } else {
-                val start = args[0].let(this::toNumber).toInt()
+                val start = toNumber(args[0]).toInt()
                 val list = thisRef<List<*>>()
-                val end = args.argOrElse(1) { list.size }
-                    .let(this::toNumber).toInt()
+                val end = toNumber(args.argOrElse(1) { list.size })
+                    .toInt()
                     .coerceIn(0, list.size)
                 list.slice(start until end)
             }
@@ -162,8 +170,8 @@ internal class JSArrayFunction : JSFunction(
     @JvmInline
     private value class Splice(val value: MutableList<Any?>) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            val pos = args[0].let(runtime::toNumber).toInt()
-            val remove = args[1].let(runtime::toNumber).toInt()
+            val pos = runtime.toNumber(args[0]).toInt()
+            val remove = runtime.toNumber(args[1]).toInt()
             val rest = args.drop(2)
 
             val deleted = buildList {
@@ -196,7 +204,7 @@ internal class JSArrayFunction : JSFunction(
     @JvmInline
     private value class At(val value: MutableList<Any?>) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
-            val idx = args[0].let(runtime::toNumber).toInt()
+            val idx = runtime.toNumber(args[0]).toInt()
             return value.valueAtIndexOrUnit(idx)
         }
         override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
@@ -208,7 +216,7 @@ internal class JSArrayFunction : JSFunction(
     private value class Includes(val value: MutableList<Any?>) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             val v = args[0]
-            val fromIndex = args.getOrNull(1)?.let(runtime::toNumber)?.toInt() ?: 0
+            val fromIndex = args.getOrNull(1)?.let { runtime.toNumber(it) }?.toInt() ?: 0
             return value.indexOf(v) > fromIndex
         }
         override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
@@ -321,7 +329,7 @@ internal class JSArrayFunction : JSFunction(
     private value class Flat(val value: MutableList<Any?>) : Callable {
         override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
             val depth = args.getOrNull(0)
-                ?.let(runtime::toNumber)
+                ?.let { runtime.toNumber(it) }
                 ?.toInt()
                 ?.coerceAtLeast(0)
                 ?: 1
@@ -371,7 +379,7 @@ private suspend fun <R> ScriptRuntime.op(
     return op(func)
 }
 
-private fun List<*>.indexOf(
+private suspend fun List<*>.indexOf(
     context: ScriptRuntime,
     arguments: List<Any?>
 ): Any {
@@ -401,7 +409,7 @@ private fun List<*>.indexOf(
     return -1
 }
 
-private fun List<*>.lastIndexOf(
+private suspend fun List<*>.lastIndexOf(
     context: ScriptRuntime,
     arguments: List<Any?>
 ): Any {
@@ -429,4 +437,37 @@ private fun List<*>.lastIndexOf(
     }
 
     return -1
+}
+
+private suspend fun MutableList<Any?>.quickSort(
+    left: Int = 0,
+    right: Int = lastIndex,
+    compare : suspend (Any?, Any?) -> Int
+){
+    var start = left
+    var end = right
+    val pivot = this[(left + right) / 2]
+
+    while (start <= end) {
+        while (compare(this[start], pivot) < 0){
+            start++
+        }
+        while (compare(this[start], pivot) > 0){
+            end--
+        }
+        if (start <= end) {
+            val temp = this[start]
+            this[start] = this[end]
+            this[end] = temp
+            start++
+            end--
+        }
+    }
+
+    if (left < end) {
+        quickSort(left, end, compare)
+    }
+    if (start < right) {
+        quickSort( start, right, compare)
+    }
 }

@@ -3,11 +3,10 @@ package test262
 import kotlinx.coroutines.delay
 import runtimeTest
 import kotlin.test.Test
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private val UNSUPPORTED_FEATURES = listOf(
-    "cross-realm", "Proxy", "hashbang", "u180e","generators"
+    "cross-realm", "Proxy", "hashbang", "u180e","generators", "BigInt"
 )
 
 class Test262Suite {
@@ -18,14 +17,14 @@ class Test262Suite {
 
         var failed = 0
         var ignored = 0
-        resources().resolve("language/statements").walk().forEach {
+        test262().resolve("language/expressions").walk().forEach {
             if (it.isFile) {
                 try {
                     val test = Test262Case.fromSource(it)
                     if (!test.features.any { it in UNSUPPORTED_FEATURES }) {
                         r.reset()
                         test.harnessFiles.forEach {
-                            evalFile("/harness/$it", r)
+                            harness(it, r)
                         }
                         test.test(r)
                         println("✅ #${(i++).toString().padEnd(8, ' ')} PASSED     ${it.name}")
@@ -41,7 +40,7 @@ class Test262Suite {
                     println("❌ #${(i++).toString().padEnd(8, ' ')} FAILED     ${it.name}",)
                     failed++
 //                    println(it.path)
-//                    throw t
+                    throw t
                 }
                 if (i % 1000 == 0) {
                     System.gc()

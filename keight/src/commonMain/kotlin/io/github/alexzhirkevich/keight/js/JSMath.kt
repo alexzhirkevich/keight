@@ -65,14 +65,14 @@ internal fun JSMath() : JSObject = Object("Math") {
     "trunc".func("x") { op1(it, ::truncate) }
 }
 
-private fun ScriptRuntime.op1(
+private suspend fun ScriptRuntime.op1(
     args: List<Any?>,
     func: (Double) -> Number
 ): Any? {
     return func(toNumber(args.getOrNull(0) ?: 0).toDouble())
 }
 
-private fun  ScriptRuntime.op2(
+private suspend fun  ScriptRuntime.op2(
     args: List<Any?>,
     func: (Double, Double) -> Number,
 ): Any? {
@@ -83,7 +83,7 @@ private fun  ScriptRuntime.op2(
     return func(a, b)
 }
 
-private fun ScriptRuntime.opVararg(
+private suspend fun ScriptRuntime.opVararg(
     args: List<Any?>,
     onEmpty : () -> Number,
     func: (List<Double>) -> Number,

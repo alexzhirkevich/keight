@@ -26,7 +26,7 @@ internal fun numberMethods() : List<JSFunction> {
             "radix" defaults OpConstant(10L)
         ) {
             val arg = it.getOrNull(0) ?: return@func false
-            val radix = it.getOrNull(1)?.let(::toNumber)
+            val radix = it.getOrNull(1)?.let { toNumber(it) }
                 ?.takeIf { !it.toDouble().isNaN() && it.toDouble().isFinite() }
                 ?.toInt() ?: 10
 
@@ -60,7 +60,7 @@ internal class JSNumberFunction : JSFunction(
     name = "Number",
     prototype =  Object {
         "toFixed".func("digits" defaults OpConstant(0)) { args ->
-            val digits = args.getOrNull(0)?.let(::toNumber)?.toInt() ?: 0
+            val digits = args.getOrNull(0)?.let { toNumber(it) }?.toInt() ?: 0
             toNumber(thisRef).toFixed(digits, this)
         }
         "toPrecision".func("digits" defaults OpArgOmitted) { args ->
@@ -72,7 +72,7 @@ internal class JSNumberFunction : JSFunction(
 
             val radix = if (args.isEmpty())
                 10
-            else args.getOrNull(0)?.let(::toNumber)?.toInt() ?: 10
+            else args.getOrNull(0)?.let { toNumber(it) }?.toInt() ?: 10
 
             when(val number = toNumber(thisRef)){
                 is Long -> number.toString(radix)
@@ -112,6 +112,13 @@ internal class JSNumberFunction : JSFunction(
         defineOwnProperty(
             "MAX_VALUE",
             JsNumberWrapper(Double.MAX_VALUE),
+            writable = false,
+            configurable = false,
+            enumerable = false
+        )
+        defineOwnProperty(
+            "MIN_VALUE",
+            JsNumberWrapper(Double.MIN_VALUE),
             writable = false,
             configurable = false,
             enumerable = false

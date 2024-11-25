@@ -13,7 +13,7 @@ public enum class VariableType {
     Global, Local, Const
 }
 
-public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
+public abstract class ScriptRuntime : CoroutineScope {
 
     @PublishedApi
     internal open val isStrict : Boolean get() = false
@@ -52,6 +52,43 @@ public abstract class ScriptRuntime : ScriptContext, CoroutineScope {
      * Restore runtime to its initial state, cancel all running jobs
      * */
     public abstract fun reset()
+
+
+
+    public abstract suspend fun isFalse(a: Any?): Boolean
+
+    /**
+     * Returns true if [a] and [b] can be compared and false when
+     * the comparison result for such types is always false
+     **/
+    public abstract suspend fun isComparable(a: Any?, b: Any?): Boolean
+
+    /**
+     * Should return negative value if [a] < [b],
+     * positive if [a] > b and 0 if [a] equals to [b]
+     *
+     * Engine can call this function only in case [isComparable] result is true
+     *
+     * @see [Comparator]
+     * */
+    public abstract suspend fun compare(a: Any?, b: Any?): Int
+
+    public abstract suspend fun sum(a: Any?, b: Any?): Any?
+    public abstract suspend fun sub(a: Any?, b: Any?): Any?
+    public abstract suspend fun mul(a: Any?, b: Any?): Any?
+    public abstract suspend fun div(a: Any?, b: Any?): Any?
+    public abstract suspend fun mod(a: Any?, b: Any?): Any?
+
+    public abstract suspend fun inc(a: Any?): Any?
+    public abstract suspend fun dec(a: Any?): Any?
+
+    public abstract suspend fun neg(a: Any?): Any?
+    public abstract suspend fun pos(a: Any?): Any?
+
+    public abstract suspend fun toNumber(a: Any?, strict: Boolean = false): Number
+
+    public abstract fun fromKotlin(a: Any?): Any?
+    public abstract fun toKotlin(a: Any?): Any?
 }
 
 
@@ -152,7 +189,6 @@ public abstract class DefaultRuntime : ScriptRuntime() {
 private class StrictRuntime(
     val delegate : ScriptRuntime
 ) : ScriptRuntime(),
-    ScriptContext by delegate,
     CoroutineScope by delegate {
 
     override val thisRef: Any get() = mapThisArg(delegate.thisRef, true)
@@ -190,6 +226,23 @@ private class StrictRuntime(
     )
     override suspend fun <T> useStrict(block: suspend (ScriptRuntime) -> T): T = block(this)
     override fun reset() = delegate.reset()
+
+
+    override suspend fun isFalse(a: Any?): Boolean = delegate.isFalse(a)
+    override suspend fun isComparable(a: Any?, b: Any?): Boolean = delegate.isComparable(a,b)
+    override suspend fun compare(a: Any?, b: Any?): Int = delegate.compare(a,b)
+    override suspend fun sum(a: Any?, b: Any?): Any? = delegate.sum(a,b)
+    override suspend fun sub(a: Any?, b: Any?): Any? = delegate.sub(a,b)
+    override suspend fun mul(a: Any?, b: Any?): Any? = delegate.mul(a,b)
+    override suspend fun div(a: Any?, b: Any?): Any? = delegate.div(a,b)
+    override suspend fun mod(a: Any?, b: Any?): Any? = delegate.mod(a,b)
+    override suspend fun inc(a: Any?): Any? = delegate.inc(a)
+    override suspend fun dec(a: Any?): Any? = delegate.dec(a)
+    override suspend fun neg(a: Any?): Any? = delegate.neg(a)
+    override suspend fun pos(a: Any?): Any? = delegate.pos(a)
+    override suspend fun toNumber(a: Any?, strict: Boolean): Number = delegate.toNumber(a,strict)
+    override fun fromKotlin(a: Any?): Any? = delegate.fromKotlin(a)
+    override fun toKotlin(a: Any?): Any? = delegate.toKotlin(a)
 }
 
 private class ScopedRuntime(
@@ -199,7 +252,6 @@ private class ScopedRuntime(
     mThisRef: Any = parent.thisRef,
     override val isSuspendAllowed: Boolean = parent.isSuspendAllowed
 ) : DefaultRuntime(),
-    ScriptContext by parent,
     CoroutineScope by parent {
 
     override val isStrict get() = strict || parent.isStrict
@@ -251,6 +303,23 @@ private class ScopedRuntime(
     override fun isEmpty(): Boolean {
         return variables.isEmpty() && parent.isEmpty()
     }
+
+
+    override suspend fun isFalse(a: Any?): Boolean = parent.isFalse(a)
+    override suspend fun isComparable(a: Any?, b: Any?): Boolean = parent.isComparable(a,b)
+    override suspend fun compare(a: Any?, b: Any?): Int = parent.compare(a,b)
+    override suspend fun sum(a: Any?, b: Any?): Any? = parent.sum(a,b)
+    override suspend fun sub(a: Any?, b: Any?): Any? = parent.sub(a,b)
+    override suspend fun mul(a: Any?, b: Any?): Any? = parent.mul(a,b)
+    override suspend fun div(a: Any?, b: Any?): Any? = parent.div(a,b)
+    override suspend fun mod(a: Any?, b: Any?): Any? = parent.mod(a,b)
+    override suspend fun inc(a: Any?): Any? = parent.inc(a)
+    override suspend fun dec(a: Any?): Any? = parent.dec(a)
+    override suspend fun neg(a: Any?): Any? = parent.neg(a)
+    override suspend fun pos(a: Any?): Any? = parent.pos(a)
+    override suspend fun toNumber(a: Any?, strict: Boolean): Number = parent.toNumber(a,strict)
+    override fun fromKotlin(a: Any?): Any? = parent.fromKotlin(a)
+    override fun toKotlin(a: Any?): Any? = parent.toKotlin(a)
 }
 
 private tailrec fun ScriptRuntime.closestFunctionScope() : ScriptRuntime {

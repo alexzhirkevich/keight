@@ -6,26 +6,26 @@ class ModTest {
 
     @Test
     fun numbers()= runTest  {
-        "13 % 7".eval().assertEqualsTo(6L)
-        "13 % -7".eval().assertEqualsTo(6L)
-        "-13 % 7".eval().assertEqualsTo(-6L)
-        "-13 % -7".eval().assertEqualsTo(-6L)
+        "13 % 7".eval().assertEqualsTo(6.0)
+        "13 % -7".eval().assertEqualsTo(6.0)
+        "-13 % 7".eval().assertEqualsTo(-6.0)
+        "-13 % -7".eval().assertEqualsTo(-6.0)
 
         "13 % 0".eval().assertEqualsTo(Double.NaN)
         "0 % 0".eval().assertEqualsTo(Double.NaN)
-        "0 % 13".eval().assertEqualsTo(0L)
+        "0 % 13".eval().assertEqualsTo(0.0)
     }
 
     @Test
     fun string() = runTest {
-        "'13' % '7'".eval().assertEqualsTo(6L)
-        "'13' % 7".eval().assertEqualsTo(6L)
-        "13 % '7'".eval().assertEqualsTo(6L)
+        "'13' % '7'".eval().assertEqualsTo(6.0)
+        "'13' % 7".eval().assertEqualsTo(6.0)
+        "13 % '7'".eval().assertEqualsTo(6.0)
     }
 
     @Test
     fun null_undefined() = runTest {
-        "null % 5".eval().assertEqualsTo(0L)
+        "null % 5".eval().assertEqualsTo(0.0)
         "5 % null".eval().assertEqualsTo(Double.NaN)
         "0 % null".eval().assertEqualsTo(Double.NaN)
         "null % 0".eval().assertEqualsTo(Double.NaN)

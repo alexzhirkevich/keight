@@ -58,3 +58,6 @@ internal inline fun <T> List<T>.argOrElse(index: Int, defaultValue: (Int) -> T):
         }
     } else defaultValue(index)
 }
+
+@OptIn(ExperimentalContracts::class)
+internal inline fun <T> List<T>.argOrNull(index: Int): T? = argOrElse(index) { null }

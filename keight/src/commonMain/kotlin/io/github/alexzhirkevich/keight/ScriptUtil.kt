@@ -7,10 +7,13 @@ import kotlin.contracts.contract
 internal fun  Delegate(
     a : Expression,
     b : Expression,
-    op : ScriptRuntime.(Any?, Any?) -> Any?
+    op : suspend ScriptRuntime.(Any?, Any?) -> Any?
 ) = Expression { op(it, a(it), b(it)) }
 
-internal fun Delegate(a : Expression, op :ScriptRuntime.(Any?) -> Any?) = Expression {
+internal fun Delegate(
+    a : Expression,
+    op : suspend ScriptRuntime.(Any?) -> Any?
+) = Expression {
     op(it, a(it))
 }
 

@@ -1,55 +1,23 @@
 package test262
 
-import assertEqualsTo
 import eval
 import io.github.alexzhirkevich.keight.JSRuntime
-import io.github.alexzhirkevich.keight.JavaScriptEngine
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.js.JSError
-import io.github.alexzhirkevich.keight.js.JSObjectImpl
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
-import kotlinx.coroutines.test.TestScope
 import org.yaml.snakeyaml.Yaml
-import runtimeTest
 import java.io.File
-import java.io.FileFilter
 import java.io.IOException
-import kotlin.coroutines.CoroutineContext
 import kotlin.test.assertEquals
 
 
-fun runtimeTest262(
-    runtime : (CoroutineContext) -> JSRuntime = {JSRuntime(it)},
-    test : suspend TestScope.(JSRuntime) -> Unit
-) = runtimeTest(
-    runtime = runtime,
-    before = {
-        evalFile("/harness/sta.js", it)
-        evalFile("/harness/assert.js", it)
-    },
-    test = test
-)
-
-fun resources() = File(object {}.javaClass.getResource("/test/").file)
+fun test262() = File("src/jvmTest/test262/test")
 
 
-suspend fun evalFile(name : String, runtime: JSRuntime) {
-    object {}.javaClass.getResource(name).readText().eval(runtime)
+suspend fun harness(name : String, runtime: JSRuntime) {
+    File("src/jvmTest/test262/harness").resolve(name).readText().eval(runtime)
 }
-
-fun compileFile(name : String, runtime: JSRuntime)=
-    JavaScriptEngine(runtime).compile(
-        object {}.javaClass.getResource(name).readText()
-    )
-
-
-suspend fun evalFiles(dir : String, runtime: JSRuntime) {
-    File(object {}.javaClass.getResource(dir).file).listFiles (FileFilter { it.isFile }).forEach {
-        it.readText().eval(runtime)
-    }
-}
-
 
  class Test262Case(
     private val file: File,

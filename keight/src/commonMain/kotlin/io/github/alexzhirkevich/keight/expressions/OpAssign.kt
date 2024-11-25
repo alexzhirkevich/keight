@@ -13,7 +13,7 @@ internal class OpAssign(
     val variableName: String,
     val receiver: Expression? = null,
     val assignableValue: Expression,
-    private val merge: (ScriptRuntime.(Any?, Any?) -> Any?)?
+    private val merge: (suspend ScriptRuntime.(Any?, Any?) -> Any?)?
 ) : Expression() {
 
     override suspend fun execute(runtime: ScriptRuntime): Any? {

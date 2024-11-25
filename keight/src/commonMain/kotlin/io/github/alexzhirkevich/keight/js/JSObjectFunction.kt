@@ -21,7 +21,6 @@ internal class JSObjectFunction : JSFunction(
     },
     prototype = JSObjectImpl(
         properties = listOf(
-            "valueOf".func { thisRef },
             "toString".func { thisRef.toString() },
             "isPrototypeOf".func("object") {
                 (thisRef as? JsAny)?.isPrototypeOf(it[0],this) == true

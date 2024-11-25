@@ -562,7 +562,7 @@ private fun ListIterator<Token>.parseFactor(
 
 private fun ListIterator<Token>.parseAssignmentValue(
     x: Expression,
-    merge: (ScriptRuntime.(Any?, Any?) -> Any?)? = null
+    merge: (suspend ScriptRuntime.(Any?, Any?) -> Any?)? = null
 ): Expression {
     return when (x) {
         is OpIndex -> OpAssignByIndex(
@@ -583,7 +583,7 @@ private fun ListIterator<Token>.parseAssignmentValue(
     }
 }
 
-private fun getMergeForAssignment(operator: Token.Operator.Assign): (ScriptRuntime.(Any?, Any?) -> Any?)? {
+private fun getMergeForAssignment(operator: Token.Operator.Assign): (suspend ScriptRuntime.(Any?, Any?) -> Any?)? {
     return when (operator) {
         Token.Operator.Assign.Assignment -> null
         Token.Operator.Assign.PlusAssign -> ScriptRuntime::sum

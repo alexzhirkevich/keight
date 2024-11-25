@@ -1,15 +1,11 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.JSRuntime
-import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.findRoot
-
 public open class JSError(
     msg : Any?,
     name : String = "Error",
     cause : Throwable? = null
 ) : Exception("Uncaught $name: $msg", cause),
-    JSObject by JSObjectImpl(properties = mapOf("message" to msg, "name" to name)) {
+    JSObject by JSObjectImpl(properties = mapOf("message" to msg.toString(), "name" to name)) {
 
 //    override suspend fun proto(runtime: ScriptRuntime): Any? {
 //        return (runtime.findRoot() as JSRuntime).Error.get(PROTOTYPE, runtime)

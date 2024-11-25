@@ -5,6 +5,10 @@ import io.github.alexzhirkevich.keight.js.interpreter.typeError
 
 internal class JSBooleanFunction : JSFunction(name = "Boolean") {
 
+    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
+        return invoke(args, runtime)
+    }
+
     override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any {
         return !runtime.isFalse(args.getOrNull(0))
     }

@@ -35,7 +35,7 @@ internal class StringTest {
     }
 
     @Test
-    fun endsWith()= runTest  {
+    fun endsWith() = runTest  {
         "'test123'.endsWith('123')".eval().assertEqualsTo(true)
         "'test123'.endsWith('1234')".eval().assertEqualsTo(false)
         "'test1234'.endsWith('123', 7)".eval().assertEqualsTo(true)
