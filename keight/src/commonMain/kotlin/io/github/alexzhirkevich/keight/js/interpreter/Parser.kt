@@ -1444,7 +1444,6 @@ private fun ListIterator<Token>.parseBlock(
                             if (any is JSObject) {
                                 any.keys(r).fastForEach {
                                     val descriptor = any.descriptor(it) ?: return@fastForEach
-                                    println("$it = ${descriptor.keys(r)}")
                                     defineOwnProperty(
                                         property = it,
                                         value = if (
