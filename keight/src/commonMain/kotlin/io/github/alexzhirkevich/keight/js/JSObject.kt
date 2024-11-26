@@ -1,14 +1,16 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.JSRuntime
+import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
+import io.github.alexzhirkevich.keight.expressions.JSReferenceErrorFunction
 import io.github.alexzhirkevich.keight.fastMapTo
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
-import io.github.alexzhirkevich.keight.js.interpreter.typeError
 
 
 public interface JSObject : JsAny {
@@ -39,12 +41,27 @@ public interface JSObject : JsAny {
     }
 
     public fun descriptor(property: Any?) : JSObject?
+
+    public suspend fun propertyIsEnumerable(name : Any?, runtime: ScriptRuntime) : Boolean {
+        return true
+    }
+
+    public suspend fun hasOwnProperty(name : Any?, runtime: ScriptRuntime) : Boolean {
+        return (proto(runtime) as? JSObject?)?.hasOwnProperty(name, runtime) == true
+    }
 }
 
 internal const val PROTOTYPE = "prototype"
 internal const val PROTO = "__proto__"
 
 internal fun JSObjectImpl.setPrototype(prototype : Any?) {
+    (prototype as JSObjectImpl).defineOwnProperty(
+        property = "constructor",
+        value = this,
+        enumerable = false,
+        configurable = false,
+        writable = false
+    )
     defineOwnProperty(
         property = PROTOTYPE,
         value = prototype,
@@ -120,11 +137,11 @@ internal class ObjectMap<V>(
 }
 
 public open class JSObjectImpl(
-    public open val name : String = "Object",
+    override val name : String = "Object",
     properties : Map<Any?, Any?> = mutableMapOf()
-) : JSObject {
+) : JSObject, Named {
 
-    override var isExtensible : Boolean = true
+    override var isExtensible: Boolean = true
         internal set
 
     private val map = ObjectMap(
@@ -135,7 +152,7 @@ public open class JSObjectImpl(
         }.toMutableMap()
     )
 
-    protected val properties : Map<Any?, Any?>
+    protected val properties: Map<Any?, Any?>
         get() = map.backedMap
 
     override suspend fun keys(runtime: ScriptRuntime): List<String> {
@@ -161,8 +178,12 @@ public open class JSObjectImpl(
         return if (PROTO in map) {
             get(PROTO, runtime)
         } else {
-            (runtime.findRoot() as JSRuntime).Object.get(PROTOTYPE,runtime)
+           fallbackProto(runtime)
         }
+    }
+
+    internal open suspend fun fallbackProto(runtime: ScriptRuntime) : Any? {
+        return (runtime.findRoot() as JSRuntime).Object.get(PROTOTYPE, runtime)
     }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
@@ -235,7 +256,7 @@ public open class JSObjectImpl(
         writable: Boolean?
     ) {
 
-        if (map[property]?.writable == false && runtime.isStrict){
+        if (map[property]?.writable == false && runtime.isStrict) {
             throw TypeError("Cannot assign to read only property '$property' of object $this")
         }
 
@@ -247,6 +268,7 @@ public open class JSObjectImpl(
             writable = writable
         )
     }
+
     internal fun defineOwnProperty(
         property: Any?,
         value: Any?,
@@ -257,7 +279,7 @@ public open class JSObjectImpl(
         val v = value as? JSPropertyAccessor? ?: JSPropertyAccessor.Value(value)
 
         if (property in map) {
-            if (map[property]?.writable != false ) {
+            if (map[property]?.writable != false) {
                 map[property]?.value = v
             }
             if (map[property]?.configurable != false) {
@@ -281,6 +303,14 @@ public open class JSObjectImpl(
         }
     }
 
+    override suspend fun hasOwnProperty(name: Any?, runtime: ScriptRuntime): Boolean {
+        return name in map
+    }
+
+    override suspend fun propertyIsEnumerable(name: Any?, runtime: ScriptRuntime): Boolean {
+        val p = map[name] ?: return false
+        return p.enumerable != false
+    }
 
     override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
         property in map || super.contains(property, runtime)
@@ -294,7 +324,7 @@ public open class JSObjectImpl(
     }
 
     override fun toString(): String {
-        return if (name.isNotBlank()){
+        return if (name.isNotBlank()) {
             "[object $name]"
         } else {
             "[object]"
@@ -308,12 +338,12 @@ public sealed interface ObjectScope {
 
     public fun Any.eq(value: Any?, writable: Boolean? = null, configurable: Boolean? = false, enumerable: Boolean? = null)
 
-    public fun String.func(
+    public fun Any.func(
         vararg args: FunctionParam,
         body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
     )
 
-    public fun String.func(
+    public fun Any.func(
         vararg args: String,
         params: (String) -> FunctionParam = { FunctionParam(it) },
         body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
@@ -346,14 +376,14 @@ internal class ObjectScopeImpl(
             enumerable = enumerable
         )
     }
-    override fun String.func(
+    override fun Any.func(
         vararg args: FunctionParam,
         body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
     ) {
         val argsList = MutableList<Any?>(args.size) { }
 
         this eq JSFunction(
-            this,
+            this.toString(),
             parameters = args.toList(),
             body = Expression { ctx ->
                 with(ctx) {

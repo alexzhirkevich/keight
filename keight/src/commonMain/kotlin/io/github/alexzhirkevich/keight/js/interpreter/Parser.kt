@@ -63,6 +63,28 @@ import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.listOf
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlin.collections.List
+import kotlin.collections.ListIterator
+import kotlin.collections.associateBy
+import kotlin.collections.buildList
+import kotlin.collections.drop
+import kotlin.collections.dropLastWhile
+import kotlin.collections.emptyList
+import kotlin.collections.filterIsInstance
+import kotlin.collections.firstOrNull
+import kotlin.collections.fold
+import kotlin.collections.forEach
+import kotlin.collections.joinToString
+import kotlin.collections.last
+import kotlin.collections.lastOrNull
+import kotlin.collections.listOf
+import kotlin.collections.map
+import kotlin.collections.mutableListOf
+import kotlin.collections.mutableMapOf
+import kotlin.collections.plus
+import kotlin.collections.set
+import kotlin.collections.single
+import kotlin.collections.singleOrNull
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 import kotlin.math.pow
@@ -1417,12 +1439,12 @@ private fun ListIterator<Token>.parseBlock(
                         is PropertyAccessorFactory -> Unit
 
                         is OpSpread -> {
-                            val any = expr.value(r) as JsAny
+                            val any = expr.value(r)
 
                             if (any is JSObject) {
                                 any.keys(r).fastForEach {
                                     val descriptor = any.descriptor(it) ?: return@fastForEach
-
+                                    println("$it = ${descriptor.keys(r)}")
                                     defineOwnProperty(
                                         property = it,
                                         value = if (
@@ -1444,8 +1466,10 @@ private fun ListIterator<Token>.parseBlock(
                                     )
                                 }
                             } else {
-                                any.keys(r).fastForEach {
-                                    set(it, any.get(it, r))
+                                if (any is JsAny) {
+                                    any.keys(r).fastForEach {
+                                        set(it, any.get(it, r))
+                                    }
                                 }
                             }
                         }

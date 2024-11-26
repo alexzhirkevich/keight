@@ -1,7 +1,10 @@
 package io.github.alexzhirkevich.keight.js
 
+import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
+import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
@@ -64,11 +67,6 @@ internal class JSDateFunction : JSFunction(
         "setUTCMonth".func { thisDateWrapper.setUTC(month = toNumber(it[0]).toInt()) }
         "setUTCSeconds".func { thisDateWrapper.setUTC(second = toNumber(it[0]).toInt()) }
 
-//        JSSymbol.toPrimitive eq "".func("hint" defaults OpConstant("default")){
-//            if (it.getOrNull(0) == "number"){
-//
-//            }
-//        }
         "toDateString".func { thisDate.date.toString() }
         "toLocaleDateString".func { thisDate.date.toString() }
         "toTimeString".func { thisDate.time.toString() }
@@ -76,6 +74,15 @@ internal class JSDateFunction : JSFunction(
         "toISOString".func { thisDate.toString() }
         "toUTCString".func { thisDateWrapper.utc().toString() }
         "toJSON".func { thisDate.toString() }
+
+        JSSymbol.toPrimitive.func("hint" defaults OpConstant("default")) {
+            when (val t = toKotlin(it.getOrNull(0))) {
+                "string", "default" -> thisDate.toString()
+                "number" -> thisDateWrapper.toInstant().toEpochMilliseconds()
+                else -> typeError { "Invalid hint: $t" }
+            }
+        }
+
         "valueOf".func { thisDateWrapper.toInstant().toEpochMilliseconds() }
     },
     properties = listOf(
@@ -86,33 +93,36 @@ internal class JSDateFunction : JSFunction(
             val str = JSStringFunction.toString(it[0], this)
             Instant.parse(str).toEpochMilliseconds()
         }
-    ).associateBy { it.name }.toMutableMap()
+    ).associateBy { it.name }.toMutableMap(),
+    parameters = listOf(FunctionParam("date")),
+    body = Expression {
+        it.constructDate(it.get("date").listOf()).value.format(LocalDateTime.Formats.ISO)
+    }
 ) {
+    override suspend fun constructObject(args: List<Any?>, runtime: ScriptRuntime): JSObject {
+        return runtime.constructDate(args)
+    }
+}
 
-    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): JSDateWrapper {
-        val tz = TimeZone.currentSystemDefault()
-        if (args.isEmpty()) {
-            return JSDateWrapper(Clock.System.now().toLocalDateTime(tz), tz)
-        }
-
-        return when (val a = runtime.toKotlin(args[0])) {
-            is String -> JSDateWrapper(LocalDateTime.parse(a), tz)
-            is LocalDateTime -> JSDateWrapper(a, tz)
-            else -> {
-                val num = runtime.toNumber(a)
-                syntaxCheck(num.toDouble().isFinite()) {
-                    "Unexpected number"
-                }
-                JSDateWrapper(
-                    Instant.fromEpochMilliseconds(num.toLong())
-                        .toLocalDateTime(TimeZone.currentSystemDefault()),
-                    tz
-                )
-            }
-        }
+private suspend fun ScriptRuntime.constructDate(args: List<Any?>) : JSDateWrapper{
+    val tz = TimeZone.currentSystemDefault()
+    if (args.isEmpty()) {
+        return JSDateWrapper(Clock.System.now().toLocalDateTime(tz), tz)
     }
 
-    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): String {
-        return construct(args, runtime).value.format(LocalDateTime.Formats.ISO)
+    return when (val a = toKotlin(args[0])) {
+        is String -> JSDateWrapper(LocalDateTime.parse(a), tz)
+        is LocalDateTime -> JSDateWrapper(a, tz)
+        else -> {
+            val num = toNumber(a)
+            syntaxCheck(num.toDouble().isFinite()) {
+                "Unexpected number"
+            }
+            JSDateWrapper(
+                Instant.fromEpochMilliseconds(num.toLong())
+                    .toLocalDateTime(TimeZone.currentSystemDefault()),
+                tz
+            )
+        }
     }
 }

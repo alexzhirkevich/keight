@@ -32,7 +32,7 @@ private fun ListIterator<Char>.tokenize(
                         }
                     }
 
-                    '#' -> hashbangComment().also { println(it) }
+                    '#' -> hashbangComment()
                     '%' -> mod()
                     '&' -> and()
                     '|' -> or()

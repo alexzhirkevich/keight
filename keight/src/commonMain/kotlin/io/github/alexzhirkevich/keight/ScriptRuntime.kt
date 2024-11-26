@@ -4,6 +4,9 @@ import io.github.alexzhirkevich.keight.js.ObjectMap
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
+import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
+import io.github.alexzhirkevich.keight.js.interpreter.referenceError
+import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.mapThisArg
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.sync.Mutex
@@ -33,7 +36,7 @@ public abstract class ScriptRuntime : CoroutineScope {
 
     public abstract suspend fun get(property: Any?): Any?
 
-    public abstract fun set(property: Any?, value: Any?, type: VariableType?)
+    public abstract suspend fun set(property: Any?, value: Any?, type: VariableType?)
 
     public abstract suspend fun <T> withScope(
         thisRef: Any = this.thisRef,
@@ -93,7 +96,7 @@ public abstract class ScriptRuntime : CoroutineScope {
 
 
 
-public operator fun ScriptRuntime.set(property: Any?, value: Any?): Unit =
+public suspend fun ScriptRuntime.set(property: Any?, value: Any?): Unit =
     set(property, fromKotlin(value), null)
 
 
@@ -120,22 +123,22 @@ public abstract class DefaultRuntime : ScriptRuntime() {
         }
     }
 
-    override fun set(property: Any?, value: Any?, type: VariableType?) {
+    override suspend fun set(property: Any?, value: Any?, type: VariableType?) {
 
         val current = variables[property]
         if (
             ((type == VariableType.Const || type == VariableType.Local) && current?.first != null) ||
             (type == VariableType.Global && (current?.first == VariableType.Local || current?.first == VariableType.Const))
-        ){
+        ) {
             throw SyntaxError("Identifier '$property' ($type) is already declared")
         }
 
-        if (current?.first == VariableType.Const) {
-            throw TypeError("Assignment to constant variable ('$property')")
+        typeCheck(current?.first != VariableType.Const) {
+            "Assignment to constant variable ('$property')"
         }
 
-        if (type == null && isStrict && !contains(property)){
-            throw ReferenceError("Unresolved reference $property")
+        referenceCheck(type != null || !isStrict || contains(property)) {
+            "Unresolved reference $property"
         }
         variables[property] = (type ?: current?.first) to value
     }
@@ -202,7 +205,7 @@ private class StrictRuntime(
 
     override fun contains(property: Any?): Boolean = delegate.contains(property)
     override suspend fun get(property: Any?): Any? = delegate.get(property)
-    override fun set(property: Any?, value: Any?, type: VariableType?) {
+    override suspend fun set(property: Any?, value: Any?, type: VariableType?) {
         if (type == null && !contains(property)) {
             throw ReferenceError("Unresolved reference $property")
         }
@@ -284,7 +287,7 @@ private class ScopedRuntime(
         return super.contains(property) || parent.contains(property)
     }
 
-    override fun set(property: Any?, value: Any?, type: VariableType?) {
+    override suspend fun set(property: Any?, value: Any?, type: VariableType?) {
         when {
             type == VariableType.Global -> {
                 val scope = closestFunctionScope()

@@ -11,7 +11,7 @@ public interface JSPropertyAccessor {
 
     public suspend fun set(value : Any?, runtime: ScriptRuntime)
 
-    public class Value(private var field: Any?) : JSPropertyAccessor {
+    public class Value(internal var field: Any?) : JSPropertyAccessor {
 
         override suspend fun get(runtime: ScriptRuntime) : Any? = field
 
@@ -22,7 +22,7 @@ public interface JSPropertyAccessor {
 
     public class BackedField(
         private val getter: Callable?,
-        private val setter: Callable?
+        private val setter: Callable? = null
     ) : JSPropertyAccessor {
 
         override suspend fun get(runtime: ScriptRuntime): Any? {

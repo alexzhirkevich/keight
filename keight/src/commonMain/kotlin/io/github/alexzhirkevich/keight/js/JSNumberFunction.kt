@@ -79,6 +79,13 @@ internal class JSNumberFunction : JSFunction(
                 else -> number.toString()
             }
         }
+        "valueOf".func {
+            when (val t = thisRef) {
+                is JsNumberWrapper -> t.value
+                is JsNumberObject -> t.value
+                else -> t
+            }
+        }
     },
     parameters = listOf(FunctionParam("num")),
     body = Expression {

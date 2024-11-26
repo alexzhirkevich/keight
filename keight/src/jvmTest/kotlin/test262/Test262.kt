@@ -3,6 +3,7 @@ package test262
 import eval
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
+import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
@@ -31,7 +32,7 @@ suspend fun harness(name : String, runtime: JSRuntime) {
 
     suspend fun test(runtime: JSRuntime) {
         val result = try {
-            val s = if (hasFlag("onlyStrict")){
+            val s = if (hasFlag("onlyStrict")) {
                 "'use strict';\n$source"
             } else {
                 source
@@ -47,7 +48,7 @@ suspend fun harness(name : String, runtime: JSRuntime) {
                 if (result is JSError) {
                     val name = result.get("name", runtime)
 
-                    assertEquals(expectedError, name,result.stackTraceToString())
+                    assertEquals(expectedError, name, result.stackTraceToString())
                 } else {
                     throw result
                 }
@@ -55,7 +56,11 @@ suspend fun harness(name : String, runtime: JSRuntime) {
         } else {
             if (result != null) {
                 val msg = if (result is ThrowableValue && result.value is JsAny) {
-                    JSStringFunction.toString(result.value, runtime)
+                    if (result.value.contains("message", runtime)) {
+                        result.value.get("message", runtime)
+                    } else {
+                        JSStringFunction.toString(result.value, runtime)
+                    }
                 } else {
                     null
                 }

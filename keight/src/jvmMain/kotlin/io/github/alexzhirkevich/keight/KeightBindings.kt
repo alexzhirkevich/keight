@@ -12,7 +12,7 @@ internal class KeightBindings(
     }
 
     override fun put(key: String?, value: Any?): Any? {
-        runtime.set(key, value, VariableType.Local)
+        runBlocking { runtime.set(key, value, VariableType.Local) }
         return value
     }
 

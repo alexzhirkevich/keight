@@ -5,31 +5,28 @@ public open class JSError(
     name : String = "Error",
     cause : Throwable? = null
 ) : Exception("Uncaught $name: $msg", cause),
-    JSObject by JSObjectImpl(properties = mapOf("message" to msg.toString(), "name" to name)) {
+    JSObject by JSObjectImpl(
+        name = name,
+        properties = mapOf(
+            "message" to msg.toString(),
+            "name" to name
+        )
+    )
 
-//    override suspend fun proto(runtime: ScriptRuntime): Any? {
-//        return (runtime.findRoot() as JSRuntime).Error.get(PROTOTYPE, runtime)
-//    }
-}
-
-public class JSKotlinError(t : Throwable) : JSError(t.message, t::class.simpleName ?: t::class.toString(), t.cause)
+public class JSKotlinError(t : Throwable) : JSError(
+    msg = t.message,
+    name = t::class.simpleName ?: t::class.toString(),
+    cause = t.cause
+)
 
 public class SyntaxError(msg : Any?, cause : Throwable? = null)
     : JSError(msg, "SyntaxError", cause) {}
 
 public class TypeError(msg : Any?, cause : Throwable? = null)
-    : JSError(msg, "TypeError", cause) {
-//    override suspend fun proto(runtime: ScriptRuntime): Any? {
-//        return (runtime.findRoot() as JSRuntime).TypeError.get(PROTOTYPE, runtime)
-//    }
-}
+    : JSError(msg, "TypeError", cause)
 
 public class RangeError(msg : Any?, cause : Throwable? = null)
     : JSError(msg, "RangeError", cause)
 
 public class ReferenceError(msg : Any?, cause : Throwable? = null)
-    : JSError(msg, "ReferenceError", cause) {
-//    override suspend fun proto(runtime: ScriptRuntime): Any? {
-//        return (runtime.findRoot() as JSRuntime).ReferenceError.get(PROTOTYPE, runtime)
-//    }
-}
+    : JSError(msg, "ReferenceError", cause)

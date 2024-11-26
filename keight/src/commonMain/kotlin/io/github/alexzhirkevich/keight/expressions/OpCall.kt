@@ -42,7 +42,10 @@ internal fun OpCall(
                 return@Expression Unit
             }
 
-            (receiver as JsAny).call(
+            r.typeCheck (receiver is JsAny) {
+                "Can't get properties (${callable.name}) of $receiver"
+            }
+            receiver.call(
                 func = callable.name,
                 thisRef = receiver,
                 args = arguments.fastMap { it(r) },
@@ -74,7 +77,7 @@ internal suspend fun JsAny.call(
         return Unit
     }
     runtime.typeCheck(callable != null) {
-        "$v is not a function"
+        "$func is not a function"
     }
     return callable.call(thisRef, args, runtime)
 }

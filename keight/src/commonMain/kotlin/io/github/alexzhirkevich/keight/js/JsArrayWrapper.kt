@@ -38,6 +38,13 @@ internal value class JsArrayWrapper(
         return (runtime.findRoot() as JSRuntime).Array.get(PROTOTYPE,runtime)
     }
 
+    override suspend fun hasOwnProperty(name: Any?, runtime: ScriptRuntime): Boolean {
+        val idx = (runtime.toKotlin(name) as? String)?.toIntOrNull()
+            ?: return super.hasOwnProperty(name, runtime)
+
+        return idx in value.indices || super.hasOwnProperty(name, runtime)
+    }
+
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
         if (property == "length") {
             return value.size

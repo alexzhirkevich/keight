@@ -8,6 +8,7 @@ import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
+import io.github.alexzhirkevich.keight.thisRef
 
 internal class JSObjectFunction : JSFunction(
     name = "Object",
@@ -24,6 +25,15 @@ internal class JSObjectFunction : JSFunction(
             "toString".func { thisRef.toString() },
             "isPrototypeOf".func("object") {
                 (thisRef as? JsAny)?.isPrototypeOf(it[0],this) == true
+            },
+            "hasOwnProperty".func("name" defaults OpArgOmitted) { args ->
+                val name = args.getOrElse(0) { return@func false }
+                thisRef<JSObject>().hasOwnProperty(name, this)
+            },
+            "propertyIsEnumerable".func("v" defaults OpArgOmitted) {
+                val name = it.argOrElse(0) { return@func false }
+
+                thisRef<JSObject>().propertyIsEnumerable(name, this)
             }
         ).associateBy { it.name }
     ).apply {
@@ -87,7 +97,7 @@ internal class JSObjectFunction : JSFunction(
 
             val name = args.getOrElse(1) {
                 return@func Unit
-            }.let { JSStringFunction.toString(it, this) }
+            }
 
             val prop = args.getOrNull(2) as? JSObject ?: return@func Unit
 
@@ -211,7 +221,7 @@ private suspend fun ScriptRuntime.constructObject(param : Any?) : JSObjectImpl {
     }
 }
 
-private suspend fun JSObject.define(runtime: ScriptRuntime, name : String, property : JsAny) {
+private suspend fun JSObject.define(runtime: ScriptRuntime, name : Any?, property : JsAny) {
     val p = when {
         property.contains("value", runtime) ->
             JSPropertyAccessor.Value(property.get("value", runtime))

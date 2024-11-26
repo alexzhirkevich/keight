@@ -8,16 +8,14 @@ import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JSObjectImpl
 import io.github.alexzhirkevich.keight.js.Object
-import io.github.alexzhirkevich.keight.js.OpArgOmitted
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.TypeError
-import io.github.alexzhirkevich.keight.js.defaults
+import io.github.alexzhirkevich.keight.js.setProto
 
 internal open class JSErrorFunction(
     name : String = "Error",
     prototype : JSObject = Object {
         "message" eq ""
-        "name" eq "Error"
     },
     private val make : (Any?) -> JSError = { JSError(it) }
 ) : JSFunction(
@@ -33,12 +31,18 @@ internal open class JSErrorFunction(
 
 internal class JSTypeErrorFunction(errorFunction: JSErrorFunction) : JSErrorFunction(
     name = "TypeError",
-    prototype = errorFunction,
-    make = { TypeError(it) }
-)
+    prototype = JSObjectImpl("Error")
+        .apply { setProto(errorFunction.prototype) },
+    make = ::TypeError
+) {
+    init { setProto(errorFunction) }
+}
 
 internal class JSReferenceErrorFunction(errorFunction: JSErrorFunction) : JSErrorFunction(
     name = "ReferenceError",
-    prototype = errorFunction,
-    make = { ReferenceError(it) }
-)
+    prototype = JSObjectImpl("Error")
+        .apply { setProto(errorFunction.prototype) },
+    make = ::ReferenceError
+) {
+    init { setProto(errorFunction) }
+}

@@ -6,7 +6,13 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 private val UNSUPPORTED_FEATURES = listOf(
-    "cross-realm", "Proxy", "hashbang", "u180e","generators", "BigInt"
+    "cross-realm",
+    "Proxy",
+    "hashbang",
+    "u180e",
+    "generators",
+    "BigInt",
+    "Symbol.iterator"
 )
 
 class Test262Suite {
@@ -17,34 +23,40 @@ class Test262Suite {
 
         var failed = 0
         var ignored = 0
-        test262().resolve("language/expressions").walk().forEach {
-            if (it.isFile) {
-                try {
-                    val test = Test262Case.fromSource(it)
-                    if (!test.features.any { it in UNSUPPORTED_FEATURES }) {
-                        r.reset()
-                        test.harnessFiles.forEach {
-                            harness(it, r)
+
+        val order = listOf(
+            "language/types",
+            "language/comments",
+            "language/expressions",
+        )
+
+        order.forEach { f ->
+            test262().resolve(f).walk().forEach {
+                if (it.isFile) {
+                    i++
+                    try {
+                        val test = Test262Case.fromSource(it)
+                        if (!test.features.any { it in UNSUPPORTED_FEATURES }) {
+                            r.reset()
+                            test.harnessFiles.forEach {
+                                harness(it, r)
+                            }
+                            test.test(r)
+//                            println("✅ #${i.toString().padEnd(8, ' ')} PASSED     ${it.name}")
+                        } else {
+                            ignored++
+//                            println("⚠\uFE0F #${i.toString().padEnd(8, ' ')} IGNORED     ${it.name}")
                         }
-                        test.test(r)
-                        println("✅ #${(i++).toString().padEnd(8, ' ')} PASSED     ${it.name}")
-                    } else {
-                        ignored++
-                        println(
-                            "⚠\uFE0F #${
-                                (i++).toString().padEnd(8, ' ')
-                            } IGNORED     ${it.name}"
-                        )
-                    }
-                } catch (t: Throwable) {
-                    println("❌ #${(i++).toString().padEnd(8, ' ')} FAILED     ${it.name}",)
-                    failed++
+                    } catch (t: Throwable) {
+                        println("❌ #${i.toString().padEnd(8, ' ')} FAILED     ${it.name}",)
+                        failed++
 //                    println(it.path)
-                    throw t
-                }
-                if (i % 1000 == 0) {
-                    System.gc()
-                    delay(5000)
+                        throw t
+                    }
+                    if (i % 1000 == 0) {
+                        System.gc()
+                        delay(5000)
+                    }
                 }
             }
         }

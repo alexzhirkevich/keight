@@ -39,7 +39,9 @@ internal class KeightScriptEngine(
     }
 
     override fun put(name: String?, value: Any?) {
-        engine.runtime.set(name, value, VariableType.Global)
+        runBlocking {
+            engine.runtime.set(name, value, VariableType.Global)
+        }
     }
 
     override fun get(name: String?): Any? {
@@ -57,6 +59,7 @@ internal class KeightScriptEngine(
     }
 
     override fun setBindings(bindings: Bindings, scope: Int) {
+        runBlocking {
         if (scope == ScriptContext.GLOBAL_SCOPE) {
             factory.globalRuntime.reset()
             bindings.forEach { (k, v) ->
@@ -68,6 +71,7 @@ internal class KeightScriptEngine(
                 engine.runtime.set(k, v, VariableType.Global)
             }
         }
+            }
     }
 
     override fun createBindings(): Bindings {
@@ -88,8 +92,10 @@ internal class KeightScriptEngine(
                 { context.errorWriter }
             )
         }
-        context.getBindings(ScriptContext.ENGINE_SCOPE).forEach { (k, v) ->
-            engine.runtime.set(k, v, VariableType.Global)
+        runBlocking {
+            context.getBindings(ScriptContext.ENGINE_SCOPE).forEach { (k, v) ->
+                engine.runtime.set(k, v, VariableType.Global)
+            }
         }
     }
 

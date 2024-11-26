@@ -18,18 +18,18 @@ class InteropTest {
 
         var x = 0L
 
-        runtime["test"] = { x = 2 }
+        runtime.set("test") { x = 2 }
         "test()".eval(runtime)
         x.assertEqualsTo(2L)
 
-        runtime["test"] =  { a : Long -> x = a }
+        runtime.set("test") { a : Long -> x = a }
         "test(3)".eval(runtime)
         x.assertEqualsTo(3L)
 
-        runtime["test"] = { a : Long -> a+1 }
+        runtime.set("test")  { a : Long -> a+1 }
         "test(3)".eval(runtime).assertEqualsTo(4L)
 
-        runtime["sum"] = ::sum
+        runtime.set("sum",::sum)
 
         "sum(test(9), test(4))".eval(runtime).assertEqualsTo(15L)
     }
@@ -37,8 +37,8 @@ class InteropTest {
     @Test
     fun suspendFunction() = runtimeTest { runtime ->
 
-        runtime["testSuspend"] = suspend { delay(1); "result" }
-        runtime["testInline"] = suspend { "result" }
+        runtime.set("testSuspend", suspend { delay(1); "result" })
+        runtime.set("testInline", suspend { "result" })
 
         assertTrue {
             "testSuspend()".eval(runtime) is Deferred<*>

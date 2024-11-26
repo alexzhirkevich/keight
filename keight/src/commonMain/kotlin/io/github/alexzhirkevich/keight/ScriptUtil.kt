@@ -134,7 +134,7 @@ internal inline fun <T> List<T>.fastSumBy(selector: (T) -> Double): Double {
 
 @Suppress("BanInlineOptIn")
 @OptIn(ExperimentalContracts::class)
-internal inline fun <T, R> List<T>.fastMap(transform: (T) -> R): List<R> {
+internal inline fun <T, R> List<T>.fastMap(transform: (T) -> R): MutableList<R> {
     contract { callsInPlace(transform) }
     val target = ArrayList<R>(size)
     fastForEach {
@@ -214,7 +214,7 @@ internal inline fun <T> List<T>.fastLastOrNull(predicate: (T) -> Boolean): T? {
  */
 @Suppress("BanInlineOptIn") // Treat Kotlin Contracts as non-experimental.
 @OptIn(ExperimentalContracts::class)
-internal inline fun <T> List<T>.fastFilter(predicate: (T) -> Boolean): List<T> {
+internal inline fun <T> List<T>.fastFilter(predicate: (T) -> Boolean): MutableList<T> {
     contract { callsInPlace(predicate) }
     val target = ArrayList<T>(size)
     fastForEach {

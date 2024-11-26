@@ -2,6 +2,7 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
@@ -19,9 +20,12 @@ public value class JSSymbol(public val value : String) : JsAny {
     }
 
     public companion object {
-        public val toPrimitive: JSSymbol = JSSymbol("Symbol.toPrimitive")
+        public val toPrimitive: JSSymbol = JSSymbol("Symbol.toPrimitive",)
         public val toStringTag: JSSymbol = JSSymbol("Symbol.toStringTag")
 
-        internal val defaults = setOf(toPrimitive, toStringTag)
+        internal val defaults = mapOf(
+            "toPrimitive" to toPrimitive,
+            "toStringTag" to toStringTag
+        )
     }
 }

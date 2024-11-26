@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
+import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastAll
 import io.github.alexzhirkevich.keight.fastAny
@@ -49,9 +50,8 @@ internal class JSArrayFunction : JSFunction(
 
         "map".func("callback") { args ->
             op(args) { callable ->
-                thisRef<List<*>>().fastMap {
-                    callable.invoke(it.listOf(), this)
-                }
+                    thisRef<List<*>>()
+                        .fastMap { callable.invoke(it.listOf(), this) }
             }
         }
         "filter".func("callback") { args ->
@@ -372,11 +372,7 @@ private suspend fun <R> ScriptRuntime.op(
     arguments: List<Any?>,
     op: suspend (Callable) -> R
 ) : R {
-    val func = arguments[0]?.callableOrNull()
-    typeCheck(func != null){
-        "$func is not a function"
-    }
-    return op(func)
+    return op(arguments[0].callableOrThrow(this))
 }
 
 private suspend fun List<*>.indexOf(

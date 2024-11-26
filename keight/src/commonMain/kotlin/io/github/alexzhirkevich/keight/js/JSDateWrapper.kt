@@ -1,9 +1,6 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.JSRuntime
-import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
-import io.github.alexzhirkevich.keight.findRoot
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -12,17 +9,13 @@ import kotlinx.datetime.toLocalDateTime
 internal class JSDateWrapper(
     override var value: LocalDateTime,
     val timeZone: TimeZone
-) : JsAny, Wrapper<LocalDateTime> {
+) : JSObjectImpl(), Wrapper<LocalDateTime> {
 
     fun toInstant() = value.toInstant(timeZone)
 
     fun utc(): LocalDateTime = if (timeZone == TimeZone.UTC) {
         value
     } else toInstant().toLocalDateTime(TimeZone.UTC)
-
-    override suspend fun proto(runtime: ScriptRuntime): Any? {
-        return (runtime.findRoot() as JSRuntime).Date.get(PROTOTYPE, runtime)
-    }
 
     fun set(
         year : Int = value.year,

@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
+import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
@@ -20,11 +21,7 @@ internal class JSPromiseFunction : JSFunction(
         "catch".func("onrejected") { args ->
             val value = toKotlin(thisRef) as Job
             val arg = args.getOrNull(0)
-            val callable = arg?.callableOrNull()
-            typeCheck(callable is Callable) {
-                "$arg is not a function"
-            }
-
+            val callable = arg.callableOrThrow(this)
             val job = toKotlin(value) as Job
 
             async {
@@ -51,15 +48,14 @@ internal class JSPromiseFunction : JSFunction(
             async {
                 try {
                     val res = if (job is Deferred<*>) job.await() else job.joinSuccess()
-                    val fulfilled = onFulfilled?.callableOrNull()
-                    typeCheck(fulfilled is Callable) { "$onFulfilled is not a function" }
-                    fulfilled.invoke(res.listOf(), this@func)
+                    onFulfilled.callableOrThrow(this@func)
+                        .invoke(res.listOf(), this@func)
                 } catch (t: CancellationException) {
                     throw t
                 } catch (t: Throwable) {
-                    val rejected = args.argOrElse(1) { throw t }?.callableOrNull()
-                    typeCheck(rejected is Callable) { "$onFulfilled is not a function" }
-                    rejected.invoke(t.toJS().listOf(), this@func)
+                    args.argOrElse(1) { throw t }
+                        .callableOrThrow(this@func)
+                        .invoke(t.toJS().listOf(), this@func)
                 }
             }
         }
@@ -110,11 +106,7 @@ internal class JSPromiseFunction : JSFunction(
     }
 
     override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
-        val resolveReject = args.getOrNull(0)?.callableOrNull()
-
-        runtime.typeCheck(resolveReject is Callable) {
-            "Promise resolver is not a function"
-        }
+        val resolveReject = args.getOrNull(0).callableOrThrow(runtime)
 
         val deferred = CompletableDeferred<Any?>()
 

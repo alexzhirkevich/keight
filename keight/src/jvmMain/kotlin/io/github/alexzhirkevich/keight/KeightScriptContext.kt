@@ -19,7 +19,9 @@ internal class KeightScriptContext(
     override fun setBindings(bindings: Bindings?, scope: Int) {
         val r = if (scope == ScriptContext.GLOBAL_SCOPE) factory.globalRuntime else runtime
         r.reset()
-        bindings?.forEach { (k, v) -> r.set(k, v, VariableType.Global) }
+        runBlocking {
+            bindings?.forEach { (k, v) -> r.set(k, v, VariableType.Global) }
+        }
     }
 
     override fun getBindings(scope: Int): Bindings {
@@ -31,10 +33,12 @@ internal class KeightScriptContext(
     }
 
     override fun setAttribute(name: String?, value: Any?, scope: Int) {
-        if (scope == ScriptContext.GLOBAL_SCOPE) {
-            factory.globalRuntime.set(name, value, VariableType.Global)
-        } else {
-            runtime.set(name, value, VariableType.Local)
+        runBlocking {
+            if (scope == ScriptContext.GLOBAL_SCOPE) {
+                factory.globalRuntime.set(name, value, VariableType.Global)
+            } else {
+                runtime.set(name, value, VariableType.Local)
+            }
         }
     }
 

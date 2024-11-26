@@ -14,7 +14,7 @@ public abstract class Expression {
         currentCoroutineContext().ensureActive()
         return when (val res = execute(runtime)){
             is Expression -> res.invoke(runtime)
-            is Getter<*> -> runtime.fromKotlin(res.get())
+            is Getter<*> -> runtime.fromKotlin(res.get(runtime))
             else -> runtime.fromKotlin(res)
         }
     }

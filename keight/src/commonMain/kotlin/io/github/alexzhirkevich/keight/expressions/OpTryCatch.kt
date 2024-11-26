@@ -1,7 +1,9 @@
 package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.VariableType
+import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.PROTOTYPE
@@ -50,9 +52,9 @@ private fun TryCatchFinally(
         throw x
     } catch (t: Throwable) {
         val t = when  {
-            t is ReferenceError && t.get("constructor", it) == Unit ->
+            t is ReferenceError && t.get("constructor", it) !== (it.findRoot() as JSRuntime).ReferenceError ->
                 it.makeReferenceError { t.message.orEmpty()  }
-            t is TypeError && t.get("constructor", it) == Unit ->
+            t is TypeError && t.get("constructor", it) !== (it.findRoot() as JSRuntime).TypeError ->
                 it.makeTypeError { t.message.orEmpty()  }
             else -> t
         }
