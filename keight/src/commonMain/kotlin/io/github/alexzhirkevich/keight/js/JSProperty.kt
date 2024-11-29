@@ -43,13 +43,32 @@ public interface JSPropertyAccessor {
     }
 }
 
+public interface JSProperty {
+    public val value: JSPropertyAccessor
+    public val writable: Boolean?
+    public val enumerable: Boolean?
+    public val configurable: Boolean?
+}
 
-internal class JSProperty(
-    var value : JSPropertyAccessor,
-    var writable : Boolean? = null,
-    var enumerable : Boolean? = null,
-    var configurable : Boolean? = null,
-) {
+public fun JSProperty.descriptor(): JSObject = Object {
+    when (val v = value) {
+        is JSPropertyAccessor.Value -> "value" eq v
+        is JSPropertyAccessor.BackedField -> {
+            "get".func { v.get(this) }
+            "set".func("v") { v.set(it[0], this) }
+        }
+    }
+    "writable" eq JSBooleanWrapper(writable != false)
+    "enumerable" eq JSBooleanWrapper(enumerable != false)
+    "configurable" eq JSBooleanWrapper(configurable != false)
+}
+
+internal class JSPropertyImpl(
+    override var value : JSPropertyAccessor,
+    override var writable : Boolean? = null,
+    override var enumerable : Boolean? = null,
+    override var configurable : Boolean? = null,
+) : JSProperty {
     fun descriptor(): JSObject = Object {
         when (val v = value) {
             is JSPropertyAccessor.Value -> "value" eq v

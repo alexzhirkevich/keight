@@ -7,7 +7,11 @@ public interface JsAny {
 
     public val type : String get() = "object"
 
-    public suspend fun keys(runtime: ScriptRuntime) : List<String> = emptyList()
+    public suspend fun keys(
+        runtime: ScriptRuntime,
+        excludeSymbols : Boolean = true,
+        excludeNonEnumerables : Boolean = true
+    ) : List<Any?> = emptyList()
 
     public suspend fun proto(runtime: ScriptRuntime) : Any? = Unit
 

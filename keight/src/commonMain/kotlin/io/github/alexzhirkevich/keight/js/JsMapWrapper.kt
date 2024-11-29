@@ -11,8 +11,12 @@ internal value class JsMapWrapper(
     override val value: MutableMap<Any?, Any?>
 ) : JsAny, Wrapper<MutableMap<Any?, Any?>>, Iterable<List<*>> {
 
-    override suspend fun keys(runtime: ScriptRuntime): List<String> {
-        return value.keys.map { it.toString() }
+    override suspend fun keys(
+        runtime: ScriptRuntime,
+        excludeSymbols: Boolean,
+        excludeNonEnumerables: Boolean
+    ): List<Any?> {
+        return value.keys.toList()
     }
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {

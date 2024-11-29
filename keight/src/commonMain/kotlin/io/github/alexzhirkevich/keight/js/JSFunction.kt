@@ -9,19 +9,21 @@ import io.github.alexzhirkevich.keight.LazyGetter
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
+import io.github.alexzhirkevich.keight.expressions.Destruction
+import io.github.alexzhirkevich.keight.expressions.OpBlock
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastForEachIndexed
-import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.fastMapNotNull
 import io.github.alexzhirkevich.keight.findRoot
-import io.github.alexzhirkevich.keight.get
+import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
+import io.github.alexzhirkevich.keight.js.interpreter.typeError
+import io.github.alexzhirkevich.keight.set
 import kotlinx.coroutines.async
 import kotlin.collections.List
 import kotlin.collections.Map
 import kotlin.collections.MutableMap
-import kotlin.collections.buildMap
-import kotlin.collections.contains
 import kotlin.collections.count
 import kotlin.collections.drop
 import kotlin.collections.emptyList
@@ -33,44 +35,102 @@ import kotlin.collections.lastOrNull
 import kotlin.collections.mapOf
 import kotlin.collections.mutableMapOf
 import kotlin.collections.plus
-import kotlin.collections.set
 import kotlin.collections.toSet
+import kotlin.js.JsName
 
-public class FunctionParam(
-    public val name : String,
-    public val isVararg : Boolean = false,
-    public val default : Expression? = null
-)
+
+public sealed interface FunctionParam {
+    public suspend fun set(
+        index: Int,
+        arguments: List<Any?>,
+        runtime: ScriptRuntime
+    )
+
+    public suspend fun get(runtime: ScriptRuntime) : Any?
+
+}
+
+@JsName("MakeFunctionParam")
+public fun FunctionParam(
+    name : String,
+    isVararg : Boolean = false,
+    default : Expression? = null
+) : FunctionParam = SimpleFunctionParam(name, isVararg, default)
+
+internal class SimpleFunctionParam(
+    val name : String,
+    val isVararg : Boolean = false,
+    val default : Expression? = null
+) : FunctionParam {
+
+    private suspend fun defaultOrUnit(runtime: ScriptRuntime) : Any? {
+        return if (default != null) {
+            runtime.withScope {
+                it.set(
+                    property = name,
+                    value = Getter { it.referenceError { "Cannot access '$name' before initialization" } },
+                    type = VariableType.Local
+                )
+                default.invoke(it)
+            }
+        } else {
+            Unit
+        }
+    }
+
+    override suspend fun set(
+        index: Int,
+        arguments: List<Any?>,
+        runtime: ScriptRuntime
+    ) {
+        val value = when {
+            isVararg -> arguments.drop(index)
+            index in arguments.indices -> arguments.argOrElse(index) { Unit }.let {
+                if (it == Unit) {
+                    defaultOrUnit(runtime)
+                } else {
+                    it
+                }
+            }
+            else -> defaultOrUnit(runtime)
+        }
+
+        runtime.set(name, value, VariableType.Local)
+    }
+
+    override suspend fun get(runtime: ScriptRuntime): Any? {
+       return runtime.get(name)
+    }
+}
+
+internal class DestructiveFunctionParam(
+    private val destruction: Destruction,
+    private val default: Expression? = null
+) : FunctionParam {
+    override suspend fun set(
+        index: Int,
+        arguments: List<Any?>,
+        runtime: ScriptRuntime
+    ) {
+        val arg = arguments.getOrElse(index) { Unit }
+        destruction.destruct(arg, null, runtime, default?.invoke(runtime))
+    }
+
+    override suspend fun get(runtime: ScriptRuntime): Any? {
+        return Unit
+    }
+}
 
 internal infix fun String.defaults(default: Expression?) : FunctionParam {
     return FunctionParam(this, false, default)
 }
-
-public open class ExtendableFunction(
-    runtime : JSRuntime,
-    name : String = "",
-    prototype : JSObject = JSObjectImpl(),
-    parameters : List<FunctionParam> = emptyList(),
-    body : (suspend ScriptRuntime.(List<Any?>) -> Any?)? = null,
-    properties : MutableMap<Any?, Any?> = mutableMapOf(),
-) : JSFunction(
-    name = name,
-    parameters = parameters,
-    prototype = prototype,
-    properties = properties,
-    body = if (body != null) {
-        Expression { r ->
-            body.invoke(r, parameters.fastMap { r.get(it.name) })
-        }
-    } else OpConstant(Unit)
-)
 
 public open class JSFunction(
     final override val name : String = "",
     internal val parameters : List<FunctionParam> = emptyList(),
     internal val body : Expression = OpConstant(Unit),
     internal val isAsync : Boolean = false,
-    private val isArrow : Boolean = false,
+    internal val isArrow : Boolean = false,
     private val superConstructor : Constructor? = null,
     internal val prototype : JSObject? = JSObjectImpl(),
     properties : MutableMap<Any?, Any?> = mutableMapOf(),
@@ -97,25 +157,30 @@ public open class JSFunction(
             }
         }
 
-        val varargs = parameters.count { it.isVararg }
+        val varargs = parameters.count { it is SimpleFunctionParam && it.isVararg }
 
-        if (varargs > 1 || varargs == 1 && !parameters.last().isVararg) {
+        if (varargs > 1 || varargs == 1 && !parameters.last().let { it is SimpleFunctionParam && it.isVararg }) {
             throw SyntaxError("Rest parameter must be last formal parameter")
         }
 
-        if (parameters.lastOrNull().let { it?.isVararg == true && it.default != null }){
+        if (parameters.lastOrNull().let { it is SimpleFunctionParam && it.isVararg && it.default != null }){
             throw SyntaxError("Rest parameter may not have a default initializer")
         }
 
-        if (parameters.fastMap { it.name }.toSet().count() != parameters.size){
-            throw SyntaxError("Duplicate parameter name not allowed in this context")
+        val namedList = parameters.fastMapNotNull { (it as? SimpleFunctionParam?)?.name }
+        syntaxCheck(namedList.toSet().size == namedList.size){
+            "Duplicate parameter name not allowed in this context"
+        }
+
+        syntaxCheck(parameters.all { it is SimpleFunctionParam } || body !is OpBlock || !body.isStrict){
+            "Illegal 'use strict' directive in function with non-simple parameter list"
         }
 
         setPrototype(prototype)
 
         defineOwnProperty(
             property = "length",
-            value = parameters.count { it.default != null && !it.isVararg },
+            value = parameters.count { it !is SimpleFunctionParam || it.default != null && !it.isVararg },
             writable = false,
             enumerable = false,
             configurable = true
@@ -191,34 +256,35 @@ public open class JSFunction(
     ): Any? {
         val allArgs = if (bindedArgs.isEmpty()) args else bindedArgs + args
 
-        val arguments = buildMap {
-            parameters.fastForEachIndexed { i, p ->
-                this[p.name] = VariableType.Local to when {
-                    p.isVararg -> allArgs.drop(i)
-                    i in allArgs.indices -> allArgs[i]
-                    p.default != null -> LazyGetter {  p.default.invoke(runtime) }
-                    else -> Unit
+        suspend fun doInvoke() : Any? {
+            return invokeImpl(runtime, thisRef) { r ->
+                parameters.fastForEachIndexed { i, p->
+                    p.set(i, allArgs, r)
                 }
-            }
-
-            extraArgs.forEach {
-                this[it.key] = it.value
-            }
-
-            this["arguments"] = VariableType.Local to Getter {
-                runtime.typeCheck(!isArrow && !isAsync && !it.isStrict){
-                    "'arguments' is not available in this context"
+                extraArgs.forEach {
+                    r.set(it.key,it.value.second, it.value.first)
                 }
-                allArgs
+                if (!isArrow) {
+                    r.set(
+                        "arguments",
+                        Getter {
+                            r.typeCheck(!isArrow && !isAsync && !it.isStrict) {
+                                "'arguments' is not available in this context"
+                            }
+                            allArgs
+                        },
+                        VariableType.Local
+                    )
+                }
             }
         }
 
         return if (isAsync){
             runtime.async {
-                invokeImpl(runtime, arguments, thisRef)
+                doInvoke()
             }
         } else {
-            invokeImpl(runtime, arguments, thisRef)
+            doInvoke()
         }
     }
 
@@ -229,17 +295,18 @@ public open class JSFunction(
 
     private suspend fun invokeImpl(
         runtime: ScriptRuntime,
-        arguments: Map<String, Pair<VariableType,Any?>>,
         thisRef: Any?,
+        initArguments : suspend (ScriptRuntime) -> Unit,
     ) : Any? {
         return try {
             runtime.withScope(
-                extraProperties = arguments,
                 isFunction = true,
                 thisRef = thisRef ?: runtime.thisRef,
                 isSuspendAllowed = isAsync,
-                block = body::invoke
-            )
+            ){
+                initArguments(it)
+                body.invoke(it)
+            }
         } catch (ret: BlockReturn) {
             ret.value
         }

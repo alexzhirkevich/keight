@@ -6,6 +6,7 @@ import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.OpArgOmitted
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
@@ -20,6 +21,8 @@ internal fun OpCall(
     isOptional : Boolean
 ) : Expression {
 
+    val args = arguments
+
     return when {
         callable is OpIndex -> Expression { r ->
             val receiver = callable.receiver.invoke(r)
@@ -30,7 +33,7 @@ internal fun OpCall(
             (receiver as JsAny).call(
                 func = callable.index(r),
                 thisRef = receiver,
-                args = arguments.fastMap() { it(r) },
+                args = args.fastMap() { it(r) },
                 isOptional = callable.isOptional,
                 runtime = r
             )
@@ -48,7 +51,7 @@ internal fun OpCall(
             receiver.call(
                 func = callable.name,
                 thisRef = receiver,
-                args = arguments.fastMap { it(r) },
+                args = args.fastMap { it(r) },
                 isOptional = callable.isOptional,
                 runtime = r
             )
@@ -58,7 +61,7 @@ internal fun OpCall(
             OpCallImpl(
                 runtime = r,
                 callable = callable,
-                arguments = arguments.fastMap { it(r) },
+                arguments = args.fastMap { it(r) },
                 isOptional = isOptional
             )
         }

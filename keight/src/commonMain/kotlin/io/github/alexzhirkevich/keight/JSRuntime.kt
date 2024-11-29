@@ -372,7 +372,6 @@ public open class JSRuntime(
             null -> 0L
             is Boolean -> if (this) 1L else 0L
             is JSSymbol -> typeError { "Symbol cannot be converted to a string" }
-            is Wrapper<*> -> value.absToNumber()
             is CharSequence -> {
                 if (isBlank()){
                     0L
@@ -392,7 +391,8 @@ public open class JSRuntime(
                     s.toLongOrNull() ?: s.toDoubleOrNull() ?: Double.NaN
                 }
             }
-            is JsAny -> absToPrimitive("number").absToNumber()
+            is JSObject -> absToPrimitive("number").absToNumber()
+            is Wrapper<*> -> value.absToNumber()
             is Number -> this
             else -> Double.NaN
         }
@@ -401,9 +401,9 @@ public open class JSRuntime(
     internal tailrec suspend fun Any?.absToString() : String {
         return when(this){
             Unit -> "undefined"
-            is Wrapper<*> -> value.absToString()
             is JSSymbol -> typeError { "Symbol cannot be converted to a string" }
-            is JsAny -> absToPrimitive("string").absToString()
+            is JSObject -> absToPrimitive("string").absToString()
+            is Wrapper<*> -> value.absToString()
             else -> toString()
         }
     }
@@ -557,10 +557,6 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JSObject {
         writable: Boolean?
     ) {
         set(property, value.get(runtime), runtime)
-    }
-
-    override fun descriptor(property: Any?): JSObject? {
-        return null
     }
 
     override suspend fun hasOwnProperty(name: Any?, runtime: ScriptRuntime): Boolean {

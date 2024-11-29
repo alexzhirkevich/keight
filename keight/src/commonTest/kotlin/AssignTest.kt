@@ -1,6 +1,8 @@
+import io.github.alexzhirkevich.keight.js.SyntaxError
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertFailsWith
 
 
 class AssignTest {
@@ -38,4 +40,44 @@ class AssignTest {
         "let x = 1; let y = --x; y".eval().assertEqualsTo(0L)
         "let x = 1; let y = --x; x".eval().assertEqualsTo(0L)
     }
+
+    @Test
+    fun destruction_array() = runtimeTest {
+        "var [a,b,c] = [1,2,3,4]".eval(it)
+        "a".eval(it).assertEqualsTo(1L)
+        "b".eval(it).assertEqualsTo(2L)
+        "c".eval(it).assertEqualsTo(3L)
+    }
+
+    @Test
+    fun destruction_object() = runtimeTest {
+        "var {a,b,c} = { a : 1, b : 2, c : 3}".eval(it)
+        "a".eval(it).assertEqualsTo(1L)
+        "b".eval(it).assertEqualsTo(2L)
+        "c".eval(it).assertEqualsTo(3L)
+    }
+
+    @Test
+    fun destruction_combined() = runtimeTest {
+        "var { a, x: [b,c] } = { a : 1, x : [2,3] }".eval(it)
+        "a".eval(it).assertEqualsTo(1L)
+        "b".eval(it).assertEqualsTo(2L)
+        "c".eval(it).assertEqualsTo(3L)
+    }
+
+    @Test
+    fun destruction_into_object() = runtimeTest {
+        "var obj = {}; [obj.a, obj['b'], c] = [1,2,3,4]".eval(it)
+        "obj.a".eval(it).assertEqualsTo(1L)
+        "obj.b".eval(it).assertEqualsTo(2L)
+        "c".eval(it).assertEqualsTo(3L)
+
+        assertFailsWith<SyntaxError> {
+            "var obj = {}; { obj.a } = { a: 1}".eval()
+        }
+        assertFailsWith<SyntaxError> {
+            "var obj = {}; { obj['a'] } = { a: 1 }".eval()
+        }
+    }
+
 }

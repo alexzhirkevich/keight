@@ -28,10 +28,12 @@ internal value class JsArrayWrapper(
         this.value[runtime.toNumber(value).toInt()] = property
     }
 
-    override fun descriptor(property: Any?): JSObject? = null
-
-    override suspend fun keys(runtime: ScriptRuntime): List<String> {
-        return value.indices.map(Int::toString)
+    override suspend fun keys(
+        runtime: ScriptRuntime,
+        excludeSymbols: Boolean,
+        excludeNonEnumerables: Boolean
+    ): List<Any?> {
+        return value.indices.toList()
     }
 
     override suspend fun proto(runtime: ScriptRuntime): Any? {

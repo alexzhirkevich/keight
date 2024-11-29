@@ -2,6 +2,8 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 
@@ -68,7 +70,7 @@ internal class OpForInLoop(
                 "$o is not iterable"
             }
 
-            val keys = o.keys(runtime)
+            val keys = o.keys(runtime).fastMap { JSStringFunction.toString(it, runtime) }
 
             if (keys.isNotEmpty()){
                 prepare(it)

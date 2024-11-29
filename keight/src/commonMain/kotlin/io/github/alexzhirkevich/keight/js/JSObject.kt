@@ -1,16 +1,15 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
-import io.github.alexzhirkevich.keight.expressions.JSReferenceErrorFunction
 import io.github.alexzhirkevich.keight.fastMapTo
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
+import io.github.alexzhirkevich.keight.unwrap
 
 
 public interface JSObject : JsAny {
@@ -40,7 +39,8 @@ public interface JSObject : JsAny {
         set(property, value.get(runtime), runtime)
     }
 
-    public fun descriptor(property: Any?) : JSObject?
+    public fun ownPropertyDescriptor(property: Any?) : JSProperty? = null
+    public fun ownPropertyDescriptors() : Map<Any?, JSProperty> = emptyMap()
 
     public suspend fun propertyIsEnumerable(name : Any?, runtime: ScriptRuntime) : Boolean {
         return true
@@ -128,9 +128,9 @@ internal class ObjectMap<V>(
         return backedMap.containsKey(mapKey(key))
     }
 
-    private tailrec fun mapKey(key: Any?) : Any? {
+    private fun mapKey(key: Any?) : Any? {
         return when (key) {
-            is Wrapper<*> -> mapKey(key.value)
+            is Wrapper<*> -> key.unwrap()
             else -> key
         }
     }
@@ -146,7 +146,7 @@ public open class JSObjectImpl(
 
     private val map = ObjectMap(
         properties.mapValues {
-            JSProperty(
+            JSPropertyImpl(
                 it.value as? JSPropertyAccessor? ?: JSPropertyAccessor.Value(it.value)
             )
         }.toMutableMap()
@@ -155,13 +155,44 @@ public open class JSObjectImpl(
     protected val properties: Map<Any?, Any?>
         get() = map.backedMap
 
-    override suspend fun keys(runtime: ScriptRuntime): List<String> {
-        return map.filter { it.value.enumerable != false }.keys.map { it.toString() }
+    public override suspend fun keys(
+        runtime: ScriptRuntime,
+        excludeSymbols: Boolean,
+        excludeNonEnumerables: Boolean
+    ): List<Any?> {
+        return map
+            .filter {
+                (!excludeSymbols || it.key !is JSSymbol) &&
+                        (!excludeNonEnumerables || it.value.enumerable != false)
+            }
+            .keys
+            .groupBy {
+                val v = runtime.toKotlin(it)
+                v is Long && v > 0
+            }
+            .let {
+                mapOf(
+                    true to it[true].orEmpty(),
+                    false to it[false].orEmpty()
+                )
+            }
+            .flatMap {
+                it.value.sortedBy {
+                    val v = runtime.fromKotlin(it)
+                    when {
+                        v is Long && v > 0 -> v
+                        v is String -> -1L
+                        v is JSSymbol -> -2L
+                        else -> -3L
+                    }
+                }
+            }
     }
 
-
     override suspend fun values(runtime: ScriptRuntime): List<Any?> {
-        return map.filter { it.value.enumerable != false }.values.map { it.value?.get(runtime) }
+        return map
+            .filter { it.value.enumerable != false }
+            .values.map { it.value.get(runtime) }
     }
 
     override suspend fun entries(runtime: ScriptRuntime): List<List<Any?>> {
@@ -225,7 +256,7 @@ public open class JSObjectImpl(
                 current.value.set(value, runtime)
             }
         } else {
-            map[property] = JSProperty(
+            map[property] = JSPropertyImpl(
                 value = value as? JSPropertyAccessor ?: JSPropertyAccessor.Value(value),
                 writable = null,
                 enumerable = null,
@@ -239,7 +270,7 @@ public open class JSObjectImpl(
         value: Any?,
     ) {
         val v = value as? JSPropertyAccessor ?: JSPropertyAccessor.Value(value)
-        map[property] = JSProperty(
+        map[property] = JSPropertyImpl(
             value = v,
             writable = null,
             enumerable = null,
@@ -294,7 +325,7 @@ public open class JSObjectImpl(
                 }
             }
         } else {
-            map[property] = JSProperty(
+            map[property] = JSPropertyImpl(
                 value = v,
                 writable = writable,
                 enumerable = enumerable,
@@ -315,8 +346,12 @@ public open class JSObjectImpl(
     override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
         property in map || super.contains(property, runtime)
 
-    override fun descriptor(property: Any?): JSObject? {
-        return map[property]?.descriptor()
+    override fun ownPropertyDescriptor(property: Any?): JSProperty? {
+        return map[property]
+    }
+
+    override fun ownPropertyDescriptors(): Map<Any?, JSProperty> {
+        return map
     }
 
     override fun preventExtensions() {
@@ -334,16 +369,16 @@ public open class JSObjectImpl(
 
 public sealed interface ObjectScope {
 
-    public infix fun Any.eq(value: Any?)
+    public infix fun Any?.eq(value: Any?)
 
-    public fun Any.eq(value: Any?, writable: Boolean? = null, configurable: Boolean? = false, enumerable: Boolean? = null)
+    public fun Any?.eq(value: Any?, writable: Boolean? = null, configurable: Boolean? = false, enumerable: Boolean? = null)
 
-    public fun Any.func(
+    public fun Any?.func(
         vararg args: FunctionParam,
         body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
     )
 
-    public fun Any.func(
+    public fun Any?.func(
         vararg args: String,
         params: (String) -> FunctionParam = { FunctionParam(it) },
         body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
@@ -362,7 +397,7 @@ internal class ObjectScopeImpl(
     val o : JSObjectImpl = JSObjectImpl(name)
 ) : ObjectScope {
 
-    override fun Any.eq(
+    override fun Any?.eq(
         value: Any?,
         writable: Boolean?,
         configurable: Boolean?,
@@ -376,7 +411,7 @@ internal class ObjectScopeImpl(
             enumerable = enumerable
         )
     }
-    override fun Any.func(
+    override fun Any?.func(
         vararg args: FunctionParam,
         body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
     ) {
@@ -387,13 +422,13 @@ internal class ObjectScopeImpl(
             parameters = args.toList(),
             body = Expression { ctx ->
                 with(ctx) {
-                    body(args.fastMapTo(argsList) { ctx.get(it.name) })
+                    body(args.fastMapTo(argsList) { it.get(ctx) })
                 }
             }
         )
     }
 
-    override fun Any.eq(value: Any?) {
+    override fun Any?.eq(value: Any?) {
         o.set(this, value,)
     }
 }
@@ -442,9 +477,9 @@ internal fun JSObjectImpl.func(
     return JSFunction(
         name = name,
         parameters = args.toList(),
-        body = Expression {
-            with(it) {
-                body(args.map { get(it.name) })
+        body = Expression { r ->
+            with(r) {
+                body(args.map { it.get(r) })
             }
         }
     ).also {
@@ -459,9 +494,9 @@ internal fun String.func(
 ) = JSFunction(
     trimStart('_'),
     parameters = args.toList(),
-    body = Expression {
-        with(it) {
-            body(args.map { get(it.name) })
+    body = Expression { r ->
+        with(r) {
+            body(args.map { it.get(r) })
         }
     }
 )

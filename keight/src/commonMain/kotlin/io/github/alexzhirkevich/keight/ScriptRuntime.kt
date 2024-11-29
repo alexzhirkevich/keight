@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.ObjectMap
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
@@ -263,6 +264,12 @@ private class ScopedRuntime(
         get() = mapThisArg(field, isStrict)
 
     override suspend fun get(property: Any?): Any? {
+
+//        val t = thisRef
+//        if (t is JsAny && t.contains(property, this)){
+//            return t.get(property, this)
+//        }
+
         return when {
             property in variables -> super.get(property)
             else -> parent.get(property)

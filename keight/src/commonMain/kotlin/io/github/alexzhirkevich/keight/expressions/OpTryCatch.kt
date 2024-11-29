@@ -12,6 +12,7 @@ import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.interpreter.makeReferenceError
 import io.github.alexzhirkevich.keight.js.interpreter.makeTypeError
 import io.github.alexzhirkevich.keight.js.interpreter.referenceError
+import io.github.alexzhirkevich.keight.set
 
 internal class ThrowableValue(val value : Any?) : JSError(value) {
     override fun toString(): String {
@@ -45,30 +46,30 @@ private fun TryCatchFinally(
     catchVariableName : String?,
     catchBlock : Expression,
     finallyBlock : Expression? = null,
-) = Expression {
+) = Expression { r ->
     try {
-        tryBlock(it)
+        tryBlock(r)
     } catch (x: ScopeException) {
         throw x
     } catch (t: Throwable) {
         val t = when  {
-            t is ReferenceError && t.get("constructor", it) !== (it.findRoot() as JSRuntime).ReferenceError ->
-                it.makeReferenceError { t.message.orEmpty()  }
-            t is TypeError && t.get("constructor", it) !== (it.findRoot() as JSRuntime).TypeError ->
-                it.makeTypeError { t.message.orEmpty()  }
+            t is ReferenceError && t.get("constructor", r) !== (r.findRoot() as JSRuntime).ReferenceError ->
+                r.makeReferenceError { t.message.orEmpty()  }
+            t is TypeError && t.get("constructor", r) !== (r.findRoot() as JSRuntime).TypeError ->
+                r.makeTypeError { t.message.orEmpty()  }
             else -> t
         }
         if (catchVariableName != null) {
             val throwable = if (t is ThrowableValue) t.value else t
-            it.withScope(
-                extraProperties = mapOf(catchVariableName to (VariableType.Local to throwable)),
-                block = catchBlock::invoke
-            )
+            r.withScope {
+                it.set(catchVariableName, throwable, VariableType.Local)
+                catchBlock.invoke(it)
+            }
         } else {
-            catchBlock(it)
+            catchBlock(r)
         }
     } finally {
-        finallyBlock?.invoke(it)
+        finallyBlock?.invoke(r)
     }
 }
 

@@ -247,7 +247,7 @@ class LoopsTest {
         assertFailsWith<ReferenceError> {
             """
             let i = 1
-            for (let i=0; i<3; i++){
+            for (i=0; i<3; i++){
                 let x = 1
             }
             x

@@ -2,6 +2,7 @@ import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.ReferenceError
+import io.github.alexzhirkevich.keight.js.SimpleFunctionParam
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -193,8 +194,8 @@ class SyntaxTest {
         val func = "/**/function /**/name/**/(/**/arg1,/**/arg2/**/){/**/}; name".eval() as JSFunction
         func.name.assertEqualsTo("name")
         func.parameters.let {
-            it[0].name.assertEqualsTo("arg1")
-            it[1].name.assertEqualsTo("arg2")
+            (it[0] as SimpleFunctionParam).name.assertEqualsTo("arg1")
+            (it[1] as SimpleFunctionParam).name.assertEqualsTo("arg2")
         }
 
         """

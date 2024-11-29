@@ -8,7 +8,6 @@ import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.expressions.OpAssign
 import io.github.alexzhirkevich.keight.expressions.OpAssignByIndex
 import io.github.alexzhirkevich.keight.expressions.OpBlock
@@ -18,6 +17,7 @@ import io.github.alexzhirkevich.keight.expressions.OpCase
 import io.github.alexzhirkevich.keight.expressions.OpCompare
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.expressions.OpContinue
+import io.github.alexzhirkevich.keight.expressions.OpDestructAssign
 import io.github.alexzhirkevich.keight.expressions.OpDoWhileLoop
 import io.github.alexzhirkevich.keight.expressions.OpEquals
 import io.github.alexzhirkevich.keight.expressions.OpExp
@@ -32,7 +32,9 @@ import io.github.alexzhirkevich.keight.expressions.OpIndex
 import io.github.alexzhirkevich.keight.expressions.OpKeyValuePair
 import io.github.alexzhirkevich.keight.expressions.OpLongInt
 import io.github.alexzhirkevich.keight.expressions.OpLongLong
+import io.github.alexzhirkevich.keight.expressions.OpMake
 import io.github.alexzhirkevich.keight.expressions.OpMakeArray
+import io.github.alexzhirkevich.keight.expressions.OpMakeObject
 import io.github.alexzhirkevich.keight.expressions.OpNot
 import io.github.alexzhirkevich.keight.expressions.OpNotEquals
 import io.github.alexzhirkevich.keight.expressions.OpReturn
@@ -44,10 +46,12 @@ import io.github.alexzhirkevich.keight.expressions.OpTryCatch
 import io.github.alexzhirkevich.keight.expressions.OpWhileLoop
 import io.github.alexzhirkevich.keight.expressions.PropertyAccessorFactory
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
+import io.github.alexzhirkevich.keight.expressions.asDestruction
 import io.github.alexzhirkevich.keight.fastAll
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.findRoot
+import io.github.alexzhirkevich.keight.js.DestructiveFunctionParam
 import io.github.alexzhirkevich.keight.js.FunctionParam
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
@@ -57,6 +61,7 @@ import io.github.alexzhirkevich.keight.js.JSPropertyAccessor
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.OpClassInit
 import io.github.alexzhirkevich.keight.js.ReferenceError
+import io.github.alexzhirkevich.keight.js.SimpleFunctionParam
 import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.joinSuccess
@@ -600,10 +605,29 @@ private fun ListIterator<Token>.parseAssignmentValue(
             assignableValue = parseStatement(blockType = ExpectedBlockType.Object),
             merge = merge
         )
+        is OpBlock, is OpMake -> OpDestructAssign(
+            destruction = x.asDestruction(),
+            variableType = null,
+            value = parseStatement(blockType = ExpectedBlockType.Object)
+        )
+
+//        // destruction
+//        is OpMakeArray -> {
+//            val array = parseStatement(blockType = ExpectedBlockType.Object)
+//
+//            return OpDestructAssign(
+//                destruction =
+//            )
+//        }
+//
+//        x is OpMakeObject -> {
+//
+//        }
 
         else -> throw SyntaxError("Invalid left-hand in assignment")
     }
 }
+
 
 private fun getMergeForAssignment(operator: Token.Operator.Assign): (suspend ScriptRuntime.(Any?, Any?) -> Any?)? {
     return when (operator) {
@@ -743,10 +767,31 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
         Token.Identifier.Keyword.Await -> parseAwait()
         Token.Identifier.Keyword.Try -> parseTryCatch(blockContext)
         Token.Identifier.Keyword.This -> Expression { it.thisRef }
+        Token.Identifier.Keyword.With -> {
+            val arg = parseExpressionGrouping().expressions.single()
+            val block = parseBlock(type = ExpectedBlockType.Block, scoped = false, blockContext = emptyList())
+
+            return Expression { r ->
+
+                val a = arg(r)
+
+                if (a is JSObject) {
+                    r.withScope(
+                        thisRef = a,
+                    ) {
+                        block(it)
+                    }
+                } else {
+
+                }
+            }
+        }
+
         Token.Identifier.Keyword.Else,
         Token.Identifier.Keyword.Extends,
         Token.Identifier.Keyword.Finally,
         Token.Identifier.Keyword.Catch -> throw SyntaxError(unexpected(keyword.identifier))
+
     }
 }
 
@@ -1255,8 +1300,8 @@ private fun ListIterator<Token>.parseTryCatch(blockContext: List<BlockContext>):
 private fun ListIterator<Token>.parseArrowFunction(blockContext: List<BlockContext>, args: Expression) : JSFunction {
     val fArgs = when(args){
         is OpTouple -> args.expressions
-        else -> listOf(args)
-    }.filterIsInstance<OpGetProperty>()
+        else -> args.listOf()
+    }.map(Expression::toFunctionParam)
 
     val lambda = parseBlock(
         type = ExpectedBlockType.Block,
@@ -1270,7 +1315,7 @@ private fun ListIterator<Token>.parseArrowFunction(blockContext: List<BlockConte
 
     return JSFunction(
         name = "",
-        parameters = fArgs.map { FunctionParam(it.name) },
+        parameters = fArgs,
         body = lambda.copy(isExpressible = !lambda.isSurroundedWithBraces),
         isArrow = true
     )
@@ -1312,8 +1357,11 @@ private fun ListIterator<Token>.parseFunction(
 
 private fun Expression.toFunctionParam() : FunctionParam {
     return when (this) {
-        is OpGetProperty -> FunctionParam(name = name, default = null)
+        is OpGetProperty -> FunctionParam(name = name)
         is OpSpread -> value.toFunctionParam().let {
+            syntaxCheck(it is SimpleFunctionParam) {
+                "Invalid function declaration"
+            }
             FunctionParam(
                 name = it.name,
                 isVararg = true,
@@ -1324,7 +1372,8 @@ private fun Expression.toFunctionParam() : FunctionParam {
             name = variableName,
             default = assignableValue
         )
-
+        is OpDestructAssign ->  DestructiveFunctionParam(destruction, value)
+        is OpBlock, is OpMake -> DestructiveFunctionParam(asDestruction())
         else -> throw SyntaxError("Invalid function declaration")
     }
 }
@@ -1343,7 +1392,7 @@ private fun ListIterator<Token>.parseBlock(
     val list = buildList {
         if (eat(Token.Operator.Bracket.CurlyOpen)) {
             isSurroundedWithBraces = true
-            val context =  if (type == ExpectedBlockType.Object)
+            val context = if (type == ExpectedBlockType.Object)
                 blockContext + BlockContext.Object
             else blockContext
             while (!nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
@@ -1367,14 +1416,14 @@ private fun ListIterator<Token>.parseBlock(
                         )
                     }
 
-                    expr is OpConstant && expr.value is JSFunction -> {
+                    expr is OpConstant && expr.value is JSFunction && !expr.value.isArrow -> {
                         val name = (expr.value as Named).name
 
-                        syntaxCheck(name.isNotBlank()){
+                        syntaxCheck(name.isNotBlank()) {
                             "Function statements require a function name"
                         }
 
-                        val assign =  OpAssign(
+                        val assign = OpAssign(
                             type = VariableType.Local,
                             variableName = name,
                             receiver = null,
@@ -1398,7 +1447,7 @@ private fun ListIterator<Token>.parseBlock(
                     }
                     hasSeparator = true
                 }
-                syntaxCheck(hasSeparator || nextIsInstance<Token.Operator.Bracket.CurlyClose>()){
+                syntaxCheck(hasSeparator || nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
                     "Unexpected token ${next()}"
                 }
             }
@@ -1419,63 +1468,14 @@ private fun ListIterator<Token>.parseBlock(
 
     return if (
         type != ExpectedBlockType.Block
-        && isSurroundedWithBraces && list.fastAll { it is OpKeyValuePair || it is OpSpread || it is PropertyAccessorFactory }
-    ) {
-        Expression { r ->
-            JSObjectImpl().apply {
-                val getters = list.filterIsInstance<OpGetter>().associateBy { it.value.name }
-                val setters = list.filterIsInstance<OpSetter>().associateBy { it.value.name }
-
-                (getters.keys + setters.keys).forEach {
-                    set(it, JSPropertyAccessor.BackedField(getters[it]?.value, setters[it]?.value))
-                }
-
-                list.forEach { expr ->
-                    when (expr) {
-                        is OpKeyValuePair -> {
-                            set(expr.key, expr.value(r))
-                        }
-
-                        is PropertyAccessorFactory -> Unit
-
-                        is OpSpread -> {
-                            val any = expr.value(r)
-
-                            if (any is JSObject) {
-                                any.keys(r).fastForEach {
-                                    val descriptor = any.descriptor(it) ?: return@fastForEach
-                                    defineOwnProperty(
-                                        property = it,
-                                        value = if (
-                                            descriptor.contains("get", r) ||
-                                            descriptor.contains("set", r)
-                                        ) {
-                                            JSPropertyAccessor.BackedField(
-                                                descriptor.get("get", r)?.callableOrNull(),
-                                                descriptor.get("set", r)?.callableOrNull()
-                                            )
-                                        } else {
-                                            JSPropertyAccessor.Value(
-                                                descriptor.get("value", r)
-                                            )
-                                        },
-                                        writable = !r.isFalse(descriptor.get("writable", r)),
-                                        enumerable = !r.isFalse(descriptor.get("enumerable", r)),
-                                        configurable = !r.isFalse(descriptor.get("configurable", r))
-                                    )
-                                }
-                            } else {
-                                if (any is JsAny) {
-                                    any.keys(r).fastForEach {
-                                        set(it, any.get(it, r))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        && isSurroundedWithBraces
+        && list.fastAll {
+            it is OpKeyValuePair //  { a : 'b' }
+                    || it is OpSpread //  { ...obj }
+                    || it is PropertyAccessorFactory //  { get x(){} }
         }
+    ) {
+        OpMakeObject(list)
     } else {
         val (isStrict, exprs) = if ((list.firstOrNull() as? OpConstant)?.value as? CharSequence == "use strict") {
             true to list.drop(1)
@@ -1503,12 +1503,17 @@ private fun ListIterator<Token>.parseVariable(type: VariableType) : Expression {
                     assignableValue = expr.assignableValue,
                     merge = null
                 )
-
                 is OpGetProperty -> OpAssign(
                     type = type,
                     variableName = expr.name,
                     assignableValue = OpConstant(Unit),
                     merge = null
+                )
+
+                is OpDestructAssign -> OpDestructAssign(
+                    destruction = expr.destruction,
+                    variableType = type,
+                    value = expr.value
                 )
 
                 // for (let x in y) ...

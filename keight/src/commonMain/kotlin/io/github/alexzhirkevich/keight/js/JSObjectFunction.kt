@@ -4,8 +4,9 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.callableOrNull
+import io.github.alexzhirkevich.keight.expressions.OpEqualsImpl
 import io.github.alexzhirkevich.keight.fastForEach
-import io.github.alexzhirkevich.keight.get
+import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import io.github.alexzhirkevich.keight.thisRef
@@ -65,7 +66,9 @@ internal class JSObjectFunction : JSFunction(
         },
 
         "keys".func("object") {
-            (it.firstOrNull() as? JsAny)?.keys(this) ?: emptySet<String>()
+            (it.firstOrNull() as? JsAny)?.keys(this)
+                ?.fastMap { JSStringFunction.toString(it, this) }
+                ?: emptyList<String>()
         },
         "values".func( "object") {
             (it.firstOrNull() as? JSObject)?.values(this) ?: emptyList<String>()
@@ -135,7 +138,7 @@ internal class JSObjectFunction : JSFunction(
 
             val name = args.getOrElse(1) { return@func Unit }
 
-            obj.descriptor(name) ?: Unit
+            obj.ownPropertyDescriptor(name)?.descriptor() ?: Unit
         },
 
         "getOwnPropertyDescriptors".func( "object") { args ->
@@ -145,16 +148,14 @@ internal class JSObjectFunction : JSFunction(
             }
 
             JSObjectImpl(
-                properties = obj.keys(this).mapNotNull { k ->
-                    obj.descriptor(k)?.let { k to it }
-                }.toMap()
+                properties = obj.ownPropertyDescriptors().mapValues { it.value.descriptor() }
             )
         },
 
         "getOwnPropertyNames".func( "object") { args ->
             val obj = args.getOrNull(0)
             typeCheck(obj is JsAny) { "$obj is not an object" }
-            obj.keys(this)
+            obj.keys(this).fastMap { it.toString() }
         },
 
         "getPrototypeOf".func( "object") {
@@ -190,6 +191,19 @@ internal class JSObjectFunction : JSFunction(
 
         "isFrozen".func( "object") {
             TODO()
+        },
+        "is".func("a","b") { args ->
+            val a = args[0]
+            val b = args[1]
+
+            if (OpEqualsImpl(a,b, true, this)){
+                return@func true
+            }
+
+            val ka = toKotlin(a)
+            val kb = toKotlin(b)
+
+            ka is Double && ka.isNaN() && kb is Double && kb.isNaN()
         }
     ).associateBy { it.name }.toMutableMap()
 ) {

@@ -163,6 +163,7 @@ internal sealed interface Token {
             Finally,
             Async,
             Await,
+            With,
             This,
             Extends;
 
