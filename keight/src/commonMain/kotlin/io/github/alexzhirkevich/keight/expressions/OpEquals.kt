@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
+import io.github.alexzhirkevich.keight.js.JsArrayWrapper
 
 internal fun OpEquals(
     a : Expression,
@@ -21,11 +22,13 @@ internal fun OpNotEquals(
 }
 
 internal tailrec suspend fun OpEqualsImpl(a : Any?, b : Any?, typed : Boolean, runtime: ScriptRuntime) : Boolean {
+
     return when {
         !typed && a is Wrapper<*> -> OpEqualsImpl(a.value, b, typed, runtime)
         !typed && b is Wrapper<*> -> OpEqualsImpl(a, b.value, typed, runtime)
         a == null || b == null -> a == b
         typed -> a::class == b::class && OpEqualsImpl(a, b, false, runtime)
+        a is List<*> && b is List<*> -> a === b
         a is String && a.isEmpty() && b == false -> true
         b is String && b.isEmpty() && a == false -> true
         a is Number && b is Number -> {

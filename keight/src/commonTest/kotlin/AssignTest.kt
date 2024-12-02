@@ -8,7 +8,7 @@ import kotlin.test.assertFailsWith
 class AssignTest {
 
     @Test
-    fun add_sub_mull_div_assign() = runTest{
+    fun add_sub_mull_div_assign() = runTest {
         "var x = 13; x += 17".eval().assertEqualsTo(30L)
         "var x = 56; x -=17".eval().assertEqualsTo(39L)
         "var x = 5; x *=2".eval().assertEqualsTo(10L)
@@ -80,4 +80,10 @@ class AssignTest {
         }
     }
 
+    @Test
+    fun destruction_rest() = runtimeTest {
+        "var [ a, ...b ] = [1, 2, 3]".eval(it)
+        "a".eval(it).assertEqualsTo(1L)
+        "b".eval(it).assertEqualsTo(listOf(2L, 3L))
+    }
 }

@@ -14,3 +14,15 @@ internal class OpTouple(
         return res
     }
 }
+
+internal tailrec fun OpTouple.singleRecursiveOrNull() : Expression? {
+    if (expressions.size != 1){
+        return null
+    }
+
+    return when {
+        expressions.size != 1 -> null
+        expressions[0] is OpTouple -> (expressions[0] as OpTouple).singleRecursiveOrNull()
+        else -> expressions[0]
+    }
+}

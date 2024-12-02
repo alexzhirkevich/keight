@@ -9,6 +9,9 @@ public fun interface Getter<T> {
 }
 
 private object UNINITIALIZED
+
+internal val UndefinedGetter = Getter { Unit }
+
 public fun <T> LazyGetter(producer : suspend (ScriptRuntime) -> T): Getter<T> = object : Getter<T> {
 
     var mutex = Mutex()

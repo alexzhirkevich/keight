@@ -7,19 +7,24 @@ import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.LazyGetter
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.UndefinedGetter
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.Destruction
+import io.github.alexzhirkevich.keight.expressions.OpAssign
 import io.github.alexzhirkevich.keight.expressions.OpBlock
 import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.expressions.OpDestructAssign
+import io.github.alexzhirkevich.keight.expressions.OpGetProperty
+import io.github.alexzhirkevich.keight.expressions.OpMake
+import io.github.alexzhirkevich.keight.expressions.OpSpread
+import io.github.alexzhirkevich.keight.expressions.asDestruction
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMapNotNull
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
-import io.github.alexzhirkevich.keight.js.interpreter.typeError
-import io.github.alexzhirkevich.keight.set
 import kotlinx.coroutines.async
 import kotlin.collections.List
 import kotlin.collections.Map
@@ -105,15 +110,28 @@ internal class SimpleFunctionParam(
 
 internal class DestructiveFunctionParam(
     private val destruction: Destruction,
-    private val default: Expression? = null
+    private val default: Expression? = null,
+    private val isArrayBinding : Boolean = false
 ) : FunctionParam {
     override suspend fun set(
         index: Int,
         arguments: List<Any?>,
         runtime: ScriptRuntime
     ) {
-        val arg = arguments.getOrElse(index) { Unit }
-        destruction.destruct(arg, null, runtime, default?.invoke(runtime))
+        val arg = arguments.getOrElse(index) {
+            if (isArrayBinding) {
+                Unit
+            } else {
+                destruction.destruct(default?.invoke(runtime), null, runtime, UndefinedGetter)
+                return
+            }
+        }
+        destruction.destruct(
+            obj = arg,
+            variableType = null,
+            runtime = runtime,
+            default = LazyGetter { if (default != null) default.invoke(runtime) else Unit }
+        )
     }
 
     override suspend fun get(runtime: ScriptRuntime): Any? {
@@ -126,7 +144,7 @@ internal infix fun String.defaults(default: Expression?) : FunctionParam {
 }
 
 public open class JSFunction(
-    final override val name : String = "",
+    final override var name : String = "",
     internal val parameters : List<FunctionParam> = emptyList(),
     internal val body : Expression = OpConstant(Unit),
     internal val isAsync : Boolean = false,
@@ -185,10 +203,18 @@ public open class JSFunction(
             enumerable = false,
             configurable = true
         )
+
+        if ("name" !in this.properties) {
+            defineName(name)
+        }
+    }
+
+    internal fun defineName(name: String){
+        this.name = name
         defineOwnProperty(
             property = "name",
             value = name,
-            configurable = false,
+            configurable = true,
             writable = false,
             enumerable = false
         )
@@ -314,6 +340,29 @@ public open class JSFunction(
 
     override fun toString(): String {
         return "[function $name]"
+    }
+}
+
+internal fun Expression.toFunctionParam() : FunctionParam {
+    return when (this) {
+        is OpGetProperty -> FunctionParam(name = name)
+        is OpSpread -> value.toFunctionParam().let {
+            syntaxCheck(it is SimpleFunctionParam) {
+                "Invalid function declaration"
+            }
+            FunctionParam(
+                name = it.name,
+                isVararg = true,
+                default = it.default
+            )
+        }
+        is OpAssign -> FunctionParam(
+            name = variableName,
+            default = assignableValue
+        )
+        is OpDestructAssign ->  DestructiveFunctionParam(destruction, value)
+        is OpBlock, is OpMake ->  DestructiveFunctionParam(asDestruction())
+        else -> throw SyntaxError("Invalid function declaration")
     }
 }
 

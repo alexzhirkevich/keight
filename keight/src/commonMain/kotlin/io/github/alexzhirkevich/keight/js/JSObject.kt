@@ -144,7 +144,7 @@ public open class JSObjectImpl(
     override var isExtensible: Boolean = true
         internal set
 
-    private val map = ObjectMap(
+    internal val map = ObjectMap(
         properties.mapValues {
             JSPropertyImpl(
                 it.value as? JSPropertyAccessor? ?: JSPropertyAccessor.Value(it.value)
@@ -265,7 +265,7 @@ public open class JSObjectImpl(
         }
     }
 
-    internal fun set(
+    internal fun setOverwrite(
         property: Any?,
         value: Any?,
     ) {
@@ -310,20 +310,19 @@ public open class JSObjectImpl(
         val v = value as? JSPropertyAccessor? ?: JSPropertyAccessor.Value(value)
 
         if (property in map) {
-            if (map[property]?.writable != false) {
-                map[property]?.value = v
+            map[property]?.value = v
+            if (configurable != null) {
+                map[property]?.configurable = configurable
             }
-            if (map[property]?.configurable != false) {
+
+//            if (map[property]?.configurable != false) {
                 if (writable != null) {
                     map[property]?.writable = writable
                 }
                 if (enumerable != null) {
                     map[property]?.enumerable = enumerable
                 }
-                if (configurable != null) {
-                    map[property]?.configurable = configurable
-                }
-            }
+//            }
         } else {
             map[property] = JSPropertyImpl(
                 value = v,
@@ -429,7 +428,7 @@ internal class ObjectScopeImpl(
     }
 
     override fun Any?.eq(value: Any?) {
-        o.set(this, value,)
+        o.setOverwrite(this, value,)
     }
 }
 
@@ -483,7 +482,7 @@ internal fun JSObjectImpl.func(
             }
         }
     ).also {
-        set(name, it)
+        setOverwrite(name, it)
     }
 }
 
@@ -492,7 +491,7 @@ internal fun String.func(
     vararg args: FunctionParam,
     body: suspend ScriptRuntime.(args: List<Any?>) -> Any?
 ) = JSFunction(
-    trimStart('_'),
+    name = this,
     parameters = args.toList(),
     body = Expression { r ->
         with(r) {
@@ -510,7 +509,7 @@ internal fun JSObjectImpl.func(
         params = params,
         body = body
     ).also {
-        set(name, it,)
+        setOverwrite(name, it,)
     }
 }
 

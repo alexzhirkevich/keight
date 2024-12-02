@@ -39,13 +39,13 @@ internal class OpMakeObject(
             val setters = items.filterIsInstance<OpSetter>().associateBy { it.value.name }
 
             (getters.keys + setters.keys).forEach {
-                set(it, JSPropertyAccessor.BackedField(getters[it]?.value, setters[it]?.value))
+                setOverwrite(it, JSPropertyAccessor.BackedField(getters[it]?.value, setters[it]?.value))
             }
 
             items.forEach { expr ->
                 when (expr) {
                     is OpKeyValuePair -> {
-                        set(expr.key, expr.value(runtime))
+                        setOverwrite(expr.key, expr.value(runtime))
                     }
 
                     is PropertyAccessorFactory -> Unit
@@ -71,7 +71,7 @@ internal class OpMakeObject(
                         } else {
                             if (any is JsAny) {
                                 any.keys(runtime).fastForEach {
-                                    set(it, any.get(it, runtime))
+                                    setOverwrite(it, any.get(it, runtime))
                                 }
                             }
                         }

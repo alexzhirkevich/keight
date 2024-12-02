@@ -66,6 +66,7 @@ import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.listOf
+import io.github.alexzhirkevich.keight.js.toFunctionParam
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlin.collections.List
@@ -511,7 +512,11 @@ private fun ListIterator<Token>.parseFactor(
             OpConstant(num)
         }
 
-        Token.Operator.Spread -> OpSpread(parseStatement(blockType = ExpectedBlockType.Object))
+        Token.Operator.Spread -> OpSpread(
+            parseStatement(
+                blockType = ExpectedBlockType.Object,
+            )
+        )
         Token.Operator.Arithmetic.Inc,
         Token.Operator.Arithmetic.Dec -> {
             val isInc = next is Token.Operator.Arithmetic.Inc
@@ -610,19 +615,7 @@ private fun ListIterator<Token>.parseAssignmentValue(
             variableType = null,
             value = parseStatement(blockType = ExpectedBlockType.Object)
         )
-
-//        // destruction
-//        is OpMakeArray -> {
-//            val array = parseStatement(blockType = ExpectedBlockType.Object)
-//
-//            return OpDestructAssign(
-//                destruction =
-//            )
-//        }
-//
-//        x is OpMakeObject -> {
-//
-//        }
+        is OpSpread -> throw SyntaxError("Rest parameter may not have a default initializer")
 
         else -> throw SyntaxError("Invalid left-hand in assignment")
     }
@@ -1022,10 +1015,15 @@ private fun ListIterator<Token>.parseTernary(
 }
 
 private fun ListIterator<Token>.parseClass() : OpClassInit {
-    val name = nextSignificant()
 
-    syntaxCheck(name is Token.Identifier) {
-        "Invalid class declaration"
+    val i = nextIndex()
+    val name = nextSignificant().let {
+        if (it is Token.Identifier){
+            it.identifier
+        } else {
+            returnToIndex(i)
+            ""
+        }
     }
 
     val extends = if (eat(Token.Identifier.Keyword.Extends)) {
@@ -1075,7 +1073,7 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
     }
 
     return OpClassInit(
-        name = name.identifier,
+        name = name,
         extends = extends,
         properties = properties,
         static = staticMembers/*.reversed()*/.associateBy { it.name },
@@ -1355,28 +1353,7 @@ private fun ListIterator<Token>.parseFunction(
     )
 }
 
-private fun Expression.toFunctionParam() : FunctionParam {
-    return when (this) {
-        is OpGetProperty -> FunctionParam(name = name)
-        is OpSpread -> value.toFunctionParam().let {
-            syntaxCheck(it is SimpleFunctionParam) {
-                "Invalid function declaration"
-            }
-            FunctionParam(
-                name = it.name,
-                isVararg = true,
-                default = it.default
-            )
-        }
-        is OpAssign -> FunctionParam(
-            name = variableName,
-            default = assignableValue
-        )
-        is OpDestructAssign ->  DestructiveFunctionParam(destruction, value)
-        is OpBlock, is OpMake -> DestructiveFunctionParam(asDestruction())
-        else -> throw SyntaxError("Invalid function declaration")
-    }
-}
+
 
 
 private fun ListIterator<Token>.parseBlock(
