@@ -7,7 +7,6 @@ import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.LazyGetter
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.UndefinedGetter
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.Destruction
@@ -22,6 +21,7 @@ import io.github.alexzhirkevich.keight.expressions.asDestruction
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMapNotNull
 import io.github.alexzhirkevich.keight.findRoot
+import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
 import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
@@ -45,6 +45,9 @@ import kotlin.js.JsName
 
 
 public sealed interface FunctionParam {
+
+    public val default : Expression?
+
     public suspend fun set(
         index: Int,
         arguments: List<Any?>,
@@ -65,7 +68,7 @@ public fun FunctionParam(
 internal class SimpleFunctionParam(
     val name : String,
     val isVararg : Boolean = false,
-    val default : Expression? = null
+    override val default : Expression? = null
 ) : FunctionParam {
 
     private suspend fun defaultOrUnit(runtime: ScriptRuntime) : Any? {
@@ -109,9 +112,8 @@ internal class SimpleFunctionParam(
 }
 
 internal class DestructiveFunctionParam(
-    private val destruction: Destruction,
-    private val default: Expression? = null,
-    private val isArrayBinding : Boolean = false
+    val destruction: Destruction,
+    override val default: Expression? = null,
 ) : FunctionParam {
     override suspend fun set(
         index: Int,
@@ -119,18 +121,13 @@ internal class DestructiveFunctionParam(
         runtime: ScriptRuntime
     ) {
         val arg = arguments.getOrElse(index) {
-            if (isArrayBinding) {
-                Unit
-            } else {
-                destruction.destruct(default?.invoke(runtime), null, runtime, UndefinedGetter)
-                return
-            }
+            return destruction.destruct(default?.invoke(runtime), null, runtime, null)
         }
         destruction.destruct(
             obj = arg,
             variableType = null,
             runtime = runtime,
-            default = LazyGetter { if (default != null) default.invoke(runtime) else Unit }
+            default = default?.let { LazyGetter(it::invoke) }
         )
     }
 
@@ -141,6 +138,15 @@ internal class DestructiveFunctionParam(
 
 internal infix fun String.defaults(default: Expression?) : FunctionParam {
     return FunctionParam(this, false, default)
+}
+
+internal class OpFunctionInit(
+    val function : JSFunction
+) : Expression() {
+    override suspend fun execute(runtime: ScriptRuntime): Any? {
+        function.closure = runtime
+        return function
+    }
 }
 
 public open class JSFunction(
@@ -159,6 +165,7 @@ public open class JSFunction(
     private var thisRef : Any? = null
     private var isMutableThisRef = !isArrow
     private var bindedArgs = emptyList<Any?>()
+    internal var closure : ScriptRuntime? = null
 
     private val superConstructorPropertyMap =
         if (superConstructor != null) {
@@ -196,9 +203,17 @@ public open class JSFunction(
 
         setPrototype(prototype)
 
+        var length = 0
+        for (p in parameters){
+            if (p.default != null || (p is SimpleFunctionParam && p.isVararg)){
+                break
+            }
+            length++
+        }
+
         defineOwnProperty(
             property = "length",
-            value = parameters.count { it !is SimpleFunctionParam || it.default != null && !it.isVararg },
+            value = length,
             writable = false,
             enumerable = false,
             configurable = true
@@ -270,7 +285,41 @@ public open class JSFunction(
         }
         return constructObject(args, runtime).also { o ->
             o.setProto(runtime, get(PROTOTYPE, runtime))
-            invoke(args, runtime, superConstructorPropertyMap, o)
+            var superInitialized = false
+
+            val mustHaveSuperInitialized = superConstructor != null && this is JSClass && construct != null
+
+            suspend fun assertSuperInitialized() {
+                if (mustHaveSuperInitialized && !superInitialized) {
+                    runtime.referenceError {
+                        "Must call super constructor in derived class before accessing 'this' or returning from derived constructor"
+                    }
+                }
+            }
+
+            invoke(
+                args = args,
+                runtime = runtime,
+                extraArgs = if (superConstructor == null ) emptyMap() else  mapOf(
+                    "super" to Pair(
+                        VariableType.Const,
+                        Callable {
+                            superConstructor.call(o, it, runtime).also {
+                                runtime.referenceCheck(!superInitialized){
+                                    "Super constructor may only be called once"
+                                }
+                                superInitialized = true
+                            }
+                        }
+                    )
+                ),
+                thisRef = Getter {
+                    assertSuperInitialized()
+                    o
+                }
+            ).also {
+                assertSuperInitialized()
+            }
         }
     }
 
@@ -282,22 +331,24 @@ public open class JSFunction(
     ): Any? {
         val allArgs = if (bindedArgs.isEmpty()) args else bindedArgs + args
 
+        val invokeRuntime = closure ?: runtime
+
         suspend fun doInvoke() : Any? {
-            return invokeImpl(runtime, thisRef) { r ->
-                parameters.fastForEachIndexed { i, p->
+            return invokeImpl(invokeRuntime, thisRef) { r ->
+                parameters.fastForEachIndexed { i, p ->
                     p.set(i, allArgs, r)
                 }
                 extraArgs.forEach {
-                    r.set(it.key,it.value.second, it.value.first)
+                    r.set(it.key, it.value.second, it.value.first)
                 }
                 if (!isArrow) {
                     r.set(
                         "arguments",
-                        Getter {
+                        LazyGetter {
                             r.typeCheck(!isArrow && !isAsync && !it.isStrict) {
                                 "'arguments' is not available in this context"
                             }
-                            allArgs
+                            JsArrayWrapper(allArgs.toMutableList())
                         },
                         VariableType.Local
                     )
@@ -306,7 +357,7 @@ public open class JSFunction(
         }
 
         return if (isAsync){
-            runtime.async {
+            invokeRuntime.async {
                 doInvoke()
             }
         } else {

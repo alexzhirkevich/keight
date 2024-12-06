@@ -48,7 +48,7 @@ internal value class JsArrayWrapper(
     }
 
     override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
-        if (property == "length") {
+        if (property.toString() == "length") {
             return value.size
         }
 

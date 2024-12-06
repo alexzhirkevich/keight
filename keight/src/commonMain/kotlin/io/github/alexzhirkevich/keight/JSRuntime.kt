@@ -2,6 +2,7 @@ package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.expressions.JSErrorFunction
 import io.github.alexzhirkevich.keight.expressions.JSReferenceErrorFunction
+import io.github.alexzhirkevich.keight.expressions.JSSyntaxErrorFunction
 import io.github.alexzhirkevich.keight.expressions.JSTypeErrorFunction
 import io.github.alexzhirkevich.keight.js.JSArrayFunction
 import io.github.alexzhirkevich.keight.js.JSBooleanFunction
@@ -31,6 +32,7 @@ import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.JsSetWrapper
 import io.github.alexzhirkevich.keight.js.JsStringWrapper
 import io.github.alexzhirkevich.keight.js.OpArgOmitted
+import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.argOrElse
 import io.github.alexzhirkevich.keight.js.defaults
 import io.github.alexzhirkevich.keight.js.func
@@ -77,6 +79,7 @@ public open class JSRuntime(
     internal lateinit var Error: JSErrorFunction
     internal lateinit var TypeError: JSTypeErrorFunction
     internal lateinit var ReferenceError: JSReferenceErrorFunction
+    internal lateinit var SyntaxError: JSSyntaxErrorFunction
     internal lateinit var Date: JSDateFunction
 
     internal var jobsCounter = 1L
@@ -114,6 +117,7 @@ public open class JSRuntime(
         Error = JSErrorFunction()
         TypeError = JSTypeErrorFunction(Error)
         ReferenceError = JSReferenceErrorFunction(Error)
+        SyntaxError = JSSyntaxErrorFunction(Error)
         Date = JSDateFunction()
 
         listOf(
@@ -130,6 +134,7 @@ public open class JSRuntime(
             Error,
             TypeError,
             ReferenceError,
+            SyntaxError,
             Date
         ).fastForEach {
             variables[it.name] = VariableType.Global to it

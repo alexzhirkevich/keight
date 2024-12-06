@@ -17,12 +17,14 @@ import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
+import kotlin.reflect.KClass
 
 internal fun interface Destruction {
 
     class Group(
         val items: List<Destruction>,
-        private val context: DestructionContext?
+        val context: DestructionContext?,
+        val itemsContext : KClass<out DestructionContext>?
     ) : Destruction {
 
         init {
@@ -37,10 +39,18 @@ internal fun interface Destruction {
             runtime: ScriptRuntime,
             default: Getter<*>?
         ) {
-            return items.fastForEach {
+
+            // const f = ({} = null) => {};
+            // assert.throws(TypeError, function() { f(); }
+            if (itemsContext == DestructionContext.Object::class && (obj !is JsAny) && default == null){
+                runtime.typeError { "cannot read properties of $obj" }
+            }
+
+            items.fastForEach {
                 val v = if (context != null) {
                     context.property(null, obj, runtime, default)
                 } else obj
+
                 it.destruct(v, variableType, runtime, default)
             }
         }
@@ -68,9 +78,15 @@ internal sealed interface DestructionContext {
             default: Getter<*>?
         ): Any? {
             return when {
-                obj is JsAny && obj.contains(name, runtime) -> obj.get(name, runtime)
+                obj is JsAny -> obj.get(name, runtime)/*.let {
+                    if (it is Unit && default != null) {
+                        property(name, default.get(runtime), runtime, null)
+                    } else {
+                        it
+                    }
+                }*/
                 default != null -> property(name, default.get(runtime), runtime, null)
-                else -> runtime.typeError { "cannot read properties of $obj" }
+                else -> runtime.typeError { "can't get properties of $obj" }
             }
         }
     }
@@ -115,31 +131,30 @@ internal fun Expression.asDestruction(
 ) : Destruction {
     return when (this) {
         is OpDestructAssign -> {
-
-//            if (
-//                context is DestructionContext.Array &&
-//                destruction is Destruction.Group &&
-//                context.index in destruction.items.indices &&
-//                destruction.items[context.index] is SpreadDestruction
-//            ) {
-//                throw SyntaxError("Invalid destructuring assignment target")
+            DestructionWithDefault(destruction, context, value)
+//            if (context is DestructionContext.Array) {
+//                Destruction { obj, variableType, runtime, default ->
+//                    obj as List<*>
+//                    destruction.destruct(
+//                        obj = obj.getOrElse(context.index) { Unit },
+//                        variableType = variableType,
+//                        runtime = runtime,
+//                        default = default ?: LazyGetter(value::invoke)
+//                    )
+//                }
+//            } else {
+//                Destruction { obj, variableType, runtime, default ->
+//                    destruction.destruct(
+//                        obj = obj,
+//                        variableType = variableType,
+//                        runtime = runtime,
+//                        default = default ?: LazyGetter(value::invoke)
+//                    )
+//                }
 //            }
-
-            when (context){
-                is DestructionContext.Array -> Destruction { obj, variableType, runtime, _ ->
-                    obj as List<*>
-                    destruction.destruct(
-                        obj = obj.getOrElse(context.index) { Unit },
-                        variableType = variableType,
-                        runtime = runtime,
-                        default = LazyGetter(value::invoke)
-                    )
-                }
-                else -> invalidDestruction()
-            }
         }
         is OpAssign -> {
-            Destruction { obj, variableType, runtime, _ ->
+            Destruction { obj, variableType, runtime, default ->
                 OpAssign.invoke(
                     variableName = variableName,
                     receiver = receiver,
@@ -149,10 +164,7 @@ internal fun Expression.asDestruction(
                             name = variableName,
                             obj = obj,
                             runtime = runtime,
-                            default = when (context) {
-                                is DestructionContext.Array -> Getter { emptyList<Any>() }
-                                DestructionContext.Object -> Getter { JSObjectImpl() }
-                            }
+                            default = default
                         )
                         if (v != Unit) {
                             v
@@ -207,7 +219,7 @@ internal fun Expression.asDestruction(
             syntaxCheck(context is DestructionContext.Array){
                 "Invalid destruction syntax"
             }
-            Destruction { obj, _, runtime, default->
+            Destruction { obj, _, runtime, default ->
                 OpAssignByIndex.invoke(
                     index = index,
                     receiver = receiver,
@@ -226,24 +238,27 @@ internal fun Expression.asDestruction(
             items.mapIndexed { i, v ->
                 v.asDestruction(DestructionContext.Array(i))
             },
-            context = context
+            context = context,
+            itemsContext = DestructionContext.Array::class
         )
         is OpMakeObject -> Destruction.Group(
             items.map {
                 it.asDestruction(DestructionContext.Object)
             },
-            context = context
+            context = context,
+            itemsContext = DestructionContext.Object::class
         )
         is OpBlock -> Destruction.Group(
             expressions.map {
                 it.asDestruction(DestructionContext.Object)
             },
-            context = context
+            context = context,
+            itemsContext = DestructionContext.Object::class
         )
         is OpKeyValuePair -> {
-            value.asDestruction().run {
+            value.asDestruction().let {
                 Destruction { obj, variableType, runtime, default ->
-                    destruct(
+                    it.destruct(
                         obj = DestructionContext.Object.property(key, obj, runtime, default),
                         variableType = variableType,
                         runtime = runtime,
@@ -256,11 +271,9 @@ internal fun Expression.asDestruction(
             syntaxCheck(context is DestructionContext.Array){
                 "Invalid destruction syntax"
             }
-
-            syntaxCheck(value !is OpAssign){
-                "Rest parameter may not have a default initialize"
+            syntaxCheck(value !is OpAssign && value !is OpDestructAssign){
+                "Rest parameter may not have a default initializer"
             }
-
             SpreadDestruction(value.asDestruction(), context)
         }
         is OpConstant -> {
@@ -284,26 +297,48 @@ private class SpreadDestruction(
         runtime: ScriptRuntime,
         default: Getter<*>?
     ) {
-        val arr = if (obj is List<*>) {
-            obj
-        } else {
-            when (val d = default?.get(runtime)) {
-                is List<*> -> d
-                is Unit -> runtime.typeError {
-                    "${JSStringFunction.toString(obj, runtime)} is not iterable"
-                }
-
-                else -> runtime.typeError {
-                    "${JSStringFunction.toString(d, runtime)} is not iterable"
-                }
+        when {
+            obj is Iterable<*> -> value.destruct(
+                obj = JsArrayWrapper(obj.drop(context.index).toMutableList()),
+                variableType = variableType,
+                runtime = runtime,
+                default = default
+            )
+            default != null -> destruct(default.get(runtime), variableType, runtime, null)
+            else -> runtime.typeError {
+                "${JSStringFunction.toString(obj, runtime)} is not iterable"
             }
         }
-        value.destruct(
-            obj = JsArrayWrapper(arr.drop(context.index).toMutableList()),
-            variableType = variableType,
-            runtime = runtime,
-            default = default
-        )
+    }
+}
+
+private class DestructionWithDefault(
+    private val destruction: Destruction,
+    private val context: DestructionContext?,
+    var defaultValue : Expression
+) : Destruction {
+    override suspend fun destruct(
+        obj: Any?,
+        variableType: VariableType?,
+        runtime: ScriptRuntime,
+        default: Getter<*>?
+    ) {
+        if (context is DestructionContext.Array) {
+            obj as List<*>
+            destruction.destruct(
+                obj = obj.getOrElse(context.index) { Unit },
+                variableType = variableType,
+                runtime = runtime,
+                default = default ?: LazyGetter(defaultValue::invoke)
+            )
+        } else {
+            destruction.destruct(
+                obj = obj,
+                variableType = variableType,
+                runtime = runtime,
+                default = default ?: LazyGetter(defaultValue::invoke)
+            )
+        }
     }
 }
 

@@ -137,6 +137,19 @@ internal sealed interface Token {
         @JvmInline
         value class Property(override val identifier: String) : Identifier
 
+        enum class Reserved : Identifier {
+            Enum,
+            Export,
+            Implements,
+            Import,
+            Package,
+            Private,
+            Protected,
+            Public,
+            ;
+            override val identifier: String = name.lowercase()
+        }
+
         enum class Keyword : Identifier {
             Var,
             Let,
@@ -165,7 +178,8 @@ internal sealed interface Token {
             Await,
             With,
             This,
-            Extends;
+            Extends,
+            Debugger;
 
             override val identifier: String = name.lowercase()
         }

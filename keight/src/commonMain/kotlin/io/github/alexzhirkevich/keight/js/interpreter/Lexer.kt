@@ -516,6 +516,10 @@ private val keywords by lazy {
     Token.Identifier.Keyword.entries.associateBy { it.identifier }
 }
 
+private val reserved by lazy {
+    Token.Identifier.Reserved.entries.associateBy { it.identifier }
+}
+
 private fun ListIterator<Char>.identifier(start : Char) : Token {
     val value = StringBuilder(start.toString())
 
@@ -537,6 +541,7 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
         "void" -> Token.Operator.Void
         "delete" -> Token.Operator.Delete
         in keywords -> keywords[string]!!
+        in reserved -> reserved[string]!!
         else ->Token.Identifier.Property(string)
     }
 }

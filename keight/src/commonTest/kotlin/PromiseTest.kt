@@ -97,4 +97,15 @@ class PromiseTest {
            """.eval()
         }.let { assertTrue { it.inWholeMilliseconds >= 50L } }
     }
+
+    @Test
+    fun error_handle() = runTest {
+        """
+            async function fetch() {
+                throw Error("bad thing happened");
+            };
+            await fetch().catch((e) => {});
+            'Caught';
+        """.trimIndent().eval().assertEqualsTo("Caught")
+    }
 }

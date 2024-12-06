@@ -32,8 +32,6 @@ internal class OpClassInit(
             "$extendsConstructor is not a constructor"
         }
 
-        val construct = construct ?: JSFunction("")
-
         return JSClass(
             name = name,
             properties = properties.mapValues { it.value.invoke(runtime) },
@@ -60,13 +58,13 @@ internal class OpClassInit(
 internal class JSClass(
     name : String,
     static: Map<String, Any?>,
-    construct: JSFunction,
+    val construct: JSFunction?,
     extends: Constructor?,
     properties : Map<String, Any?>,
 ) : JSFunction(
     name = name,
-    parameters = construct.parameters,
-    body = construct.body,
+    parameters = construct?.parameters ?: emptyList(),
+    body = construct?.body ?: Expression {  },
     prototype = JSObjectImpl(properties = properties.toMutableMap()),
     properties = static.toMutableMap(),
     superConstructor = extends

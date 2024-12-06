@@ -297,11 +297,10 @@ private class ScopedRuntime(
     override suspend fun set(property: Any?, value: Any?, type: VariableType?) {
         when {
             type == VariableType.Global -> {
-                val scope = closestFunctionScope()
-                if (scope === this){
+                if (isFunction){
                     super.set(property, value, type)
                 } else {
-                    scope.set(property, value, type)
+                    closestFunctionScope().set(property, value, type)
                 }
             }
             type != null || property in variables -> super.set(property, value, type)

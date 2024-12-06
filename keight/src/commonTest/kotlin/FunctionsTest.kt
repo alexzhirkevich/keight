@@ -1,3 +1,4 @@
+import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.ReferenceError
@@ -194,6 +195,18 @@ class FunctionsTest {
             
             test(1, 2, 3, 4)
         """.eval().assertEqualsTo("1_234")
+    }
+
+    @Test
+    fun closure() = runTest {
+        """
+            function a() {
+                let x = 1
+                return () => x
+            }
+            
+            a()()
+        """.eval().assertEqualsTo(1L)
     }
 
     @Test

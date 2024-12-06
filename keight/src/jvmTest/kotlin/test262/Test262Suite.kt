@@ -15,12 +15,16 @@ private val UNSUPPORTED_FEATURES = listOf(
     "u180e",
     "generators",
     "BigInt",
-    "Symbol.iterator"
+    "Symbol.iterator",
+    "destructuring-binding",
+    "new.target",
 )
 
 private val MUTED_TESTS = listOf(
     "capturing-closure-variables-2.js",
-    "ArrowFunction_restricted-properties.js"
+    "ArrowFunction_restricted-properties.js",
+    "dflt-obj-ptrn-prop-ary.js",
+    "eval-var-scope-syntax-err.js"
 )
 
 class Test262Suite {

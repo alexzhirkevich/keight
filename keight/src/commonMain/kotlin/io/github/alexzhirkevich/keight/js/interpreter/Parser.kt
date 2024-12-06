@@ -48,20 +48,15 @@ import io.github.alexzhirkevich.keight.expressions.PropertyAccessorFactory
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.expressions.asDestruction
 import io.github.alexzhirkevich.keight.fastAll
-import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.findRoot
-import io.github.alexzhirkevich.keight.js.DestructiveFunctionParam
-import io.github.alexzhirkevich.keight.js.FunctionParam
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JSObject
-import io.github.alexzhirkevich.keight.js.JSObjectImpl
-import io.github.alexzhirkevich.keight.js.JSPropertyAccessor
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.OpClassInit
+import io.github.alexzhirkevich.keight.js.OpFunctionInit
 import io.github.alexzhirkevich.keight.js.ReferenceError
-import io.github.alexzhirkevich.keight.js.SimpleFunctionParam
 import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.joinSuccess
@@ -76,10 +71,8 @@ import kotlin.collections.buildList
 import kotlin.collections.drop
 import kotlin.collections.dropLastWhile
 import kotlin.collections.emptyList
-import kotlin.collections.filterIsInstance
 import kotlin.collections.firstOrNull
 import kotlin.collections.fold
-import kotlin.collections.forEach
 import kotlin.collections.joinToString
 import kotlin.collections.last
 import kotlin.collections.lastOrNull
@@ -196,7 +189,7 @@ private fun ListIterator<Token>.parseStatement(
                 when  {
                     next is Token.Operator.Bracket.RoundOpen -> {
                         prevSignificant()
-                        parseFunctionCall(x)
+                        parseFunctionCall(x, blockContext = blockContext)
                     }
 
                     next is Token.Operator.Period ||
@@ -458,7 +451,7 @@ private fun ListIterator<Token>.parseStatement(
                         value = parseStatement(blockContext, precedence, ExpectedBlockType.Object)
                     )
 
-                    Token.Operator.Arrow -> OpConstant(parseArrowFunction(blockContext, x))
+                    Token.Operator.Arrow -> OpFunctionInit(parseArrowFunction(blockContext, x))
 
                     is Token.Operator.Assign -> parseAssignmentValue(
                         x, getMergeForAssignment(next)
@@ -571,6 +564,7 @@ private fun ListIterator<Token>.parseFactor(
         is Token.Operator.Void -> parseVoid()
         is Token.Operator.Delete -> parseDelete()
         is Token.Identifier.Keyword -> parseKeyword(next, blockContext)
+        is Token.Identifier.Reserved -> throw SyntaxError("Unexpected reserved word (${next.identifier})")
         is Token.Identifier.Property -> {
             val isObject = blockContext.lastOrNull() == BlockContext.Object
             var i = nextIndex()
@@ -734,7 +728,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
                 parseBlock(blockContext = blockContext)
             } else null
         )
-        Token.Identifier.Keyword.Function -> OpConstant(parseFunction(blockContext = blockContext))
+        Token.Identifier.Keyword.Function -> OpFunctionInit(parseFunction(blockContext = blockContext))
         Token.Identifier.Keyword.Return -> {
             syntaxCheck(BlockContext.Function in blockContext) {
                 unexpected("return")
@@ -779,7 +773,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
                 }
             }
         }
-
+        Token.Identifier.Keyword.Debugger -> throw SyntaxError("Debugger is not supported")
         Token.Identifier.Keyword.Else,
         Token.Identifier.Keyword.Extends,
         Token.Identifier.Keyword.Finally,
@@ -892,10 +886,10 @@ private fun ListIterator<Token>.parseExpressionGrouping(): OpTouple {
         emptyList()
     } else buildList {
         do {
-            if (nextIsInstance<Token.Operator.Bracket.RoundClose>()){
+            if (nextIsInstance<Token.Operator.Bracket.RoundClose>()) {
                 return@buildList
             }
-            add(parseStatement(emptyList(),blockType = ExpectedBlockType.Object))
+            add(parseStatement(emptyList(), blockType = ExpectedBlockType.Object))
         } while (nextSignificant() is Token.Operator.Comma)
         prevSignificant()
     }
@@ -945,7 +939,7 @@ private fun ListIterator<Token>.parseOptionalChaining(receiver: Expression): Exp
         }
         is Token.Operator.Bracket.RoundOpen -> {
             prevSignificant()
-            parseFunctionCall(receiver, optional = true)
+            parseFunctionCall(receiver, optional = true, blockContext = emptyList())
         }
         is Token.Identifier -> {
             OpGetProperty(
@@ -958,12 +952,32 @@ private fun ListIterator<Token>.parseOptionalChaining(receiver: Expression): Exp
     }
 }
 
-private fun ListIterator<Token>.parseFunctionCall(function : Expression, optional : Boolean = false) : Expression {
-    return OpCall(
-        callable = function,
-        arguments = parseExpressionGrouping().expressions,
-        isOptional = optional
-    )
+private fun ListIterator<Token>.parseFunctionCall(
+    function : Expression,
+    optional : Boolean = false,
+    blockContext: List<BlockContext>
+) : Expression {
+
+    val argsIndex = nextIndex()
+    val arguments = parseExpressionGrouping().expressions
+    val afterIndex = nextIndex()
+
+    return if (
+        function is OpGetProperty
+        && blockContext.lastOrNull() == BlockContext.Object
+        && hasNext()
+        && next() == Token.Operator.Bracket.CurlyOpen
+    ) {
+        returnToIndex(argsIndex)
+        OpFunctionInit(parseFunction(name = function.name, blockContext = blockContext))
+    } else {
+        returnToIndex(afterIndex)
+        OpCall(
+            callable = function,
+            arguments = arguments,
+            isOptional = optional
+        )
+    }
 }
 
 
@@ -1043,7 +1057,7 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
 
         when {
             token is Token.Identifier && nextIsInstance<Token.Operator.Bracket.RoundOpen>() -> {
-                val f =  parseFunction(
+                val f = parseFunction(
                     name = token.identifier,
                     blockContext = listOf(BlockContext.Class)
                 )
@@ -1053,7 +1067,7 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
                     }
                     construct = f
                 }
-                properties[token.identifier] = OpConstant(f)
+                properties[token.identifier] = OpFunctionInit(f)
             }
 
             token is Token.Identifier.Property && token.identifier == "static" -> {
@@ -1077,7 +1091,7 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
         extends = extends,
         properties = properties,
         static = staticMembers/*.reversed()*/.associateBy { it.name },
-        construct = construct ?: JSFunction("")
+        construct = construct
     )
 }
 
@@ -1238,11 +1252,11 @@ private fun ListIterator<Token>.parseDoWhileLoop(blockContext: List<BlockContext
 private fun ListIterator<Token>.parseAsync(): Expression {
     val subject = parseStatement(blockType = ExpectedBlockType.Object)
 
-    syntaxCheck(subject is OpConstant && subject.value is JSFunction && !subject.value.isAsync) {
+    syntaxCheck(subject is OpFunctionInit && !subject.function.isAsync) {
         "Illegal usage of 'async' keyword"
     }
 
-    return OpConstant(subject.value.copy(isAsync = true))
+    return OpFunctionInit(subject.function.copy(isAsync = true))
 }
 
 private fun ListIterator<Token>.parseAwait(): Expression {
@@ -1334,7 +1348,7 @@ private fun ListIterator<Token>.parseFunction(
 
     val touple = parseStatement(blockType = ExpectedBlockType.None)
 
-    syntaxCheck (touple is OpTouple) {
+    syntaxCheck(touple is OpTouple) {
         "Invalid function declaration"
     }
 
@@ -1393,8 +1407,8 @@ private fun ListIterator<Token>.parseBlock(
                         )
                     }
 
-                    expr is OpConstant && expr.value is JSFunction && !expr.value.isArrow -> {
-                        val name = (expr.value as Named).name
+                    expr is OpFunctionInit && !expr.function.isArrow -> {
+                        val name = expr.function.name
 
                         syntaxCheck(name.isNotBlank()) {
                             "Function statements require a function name"

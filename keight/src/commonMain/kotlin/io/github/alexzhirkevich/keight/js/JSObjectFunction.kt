@@ -174,7 +174,11 @@ internal class JSObjectFunction : JSFunction(
         },
 
         "isExtensible".func( "object") {
-            TODO()
+            val t = thisRef
+            if (t !is JSObject){
+                return@func false
+            }
+            t.isExtensible
         },
 
         "seal".func( "object") {

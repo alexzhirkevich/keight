@@ -9,6 +9,7 @@ import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JSObjectImpl
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.ReferenceError
+import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.setProto
 
@@ -43,6 +44,15 @@ internal class JSReferenceErrorFunction(errorFunction: JSErrorFunction) : JSErro
     prototype = JSObjectImpl("Error")
         .apply { setProto(errorFunction.prototype) },
     make = ::ReferenceError
+) {
+    init { setProto(errorFunction) }
+}
+
+internal class JSSyntaxErrorFunction(errorFunction: JSErrorFunction) : JSErrorFunction(
+    name = "SyntaxError",
+    prototype = JSObjectImpl("Error")
+        .apply { setProto(errorFunction.prototype) },
+    make = ::SyntaxError
 ) {
     init { setProto(errorFunction) }
 }

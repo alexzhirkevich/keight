@@ -250,7 +250,6 @@ class ClassesTest {
     }
 
     @Test
-    @Ignore
     fun doubleSuperCall() = runTest {
 
         assertFailsWith<ReferenceError> {
@@ -275,24 +274,41 @@ class ClassesTest {
     }
 
     @Test
-    @Ignore
     fun missedSuperCall() = runTest {
         assertFailsWith<ReferenceError> {
             """
-                class A {
-                }
-                    
-                class B extends A {
-                    constructor(x) {
-                        console.log(this)
-                        this.x = x;
-                    }
-                }
+               class A {
+               } 
+                   
+               class B extends A {
+                    constructor(){}
+               }
                 
-                const emp1 = new B(1);
+                new B();
             """.trimIndent().eval()
         }
     }
+
+    @Test
+    fun thisBeforeSuperCall() = runTest {
+        assertFailsWith<ReferenceError> {
+            """
+               class A {
+                    constructor() {}
+               } 
+                   
+                class B extends A {
+                    constructor(x) {
+                        this.x = x;
+                        super()
+                    }
+                }
+                
+                new B(1);
+            """.trimIndent().eval()
+        }
+    }
+
     @Test
     fun notMatchingArgConstructor()= runTest {
         """

@@ -1,4 +1,5 @@
 import io.github.alexzhirkevich.keight.js.SyntaxError
+import io.github.alexzhirkevich.keight.js.TypeError
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -86,4 +87,5 @@ class AssignTest {
         "a".eval(it).assertEqualsTo(1L)
         "b".eval(it).assertEqualsTo(listOf(2L, 3L))
     }
+
 }
