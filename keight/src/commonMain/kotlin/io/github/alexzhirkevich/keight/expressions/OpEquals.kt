@@ -3,7 +3,6 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
-import io.github.alexzhirkevich.keight.js.JsArrayWrapper
 
 internal fun OpEquals(
     a : Expression,

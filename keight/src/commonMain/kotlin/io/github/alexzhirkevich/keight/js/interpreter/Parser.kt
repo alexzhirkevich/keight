@@ -5,7 +5,6 @@ import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Delegate
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
-import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.expressions.OpAssign

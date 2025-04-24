@@ -32,7 +32,6 @@ import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.JsSetWrapper
 import io.github.alexzhirkevich.keight.js.JsStringWrapper
 import io.github.alexzhirkevich.keight.js.OpArgOmitted
-import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.argOrElse
 import io.github.alexzhirkevich.keight.js.defaults
 import io.github.alexzhirkevich.keight.js.func
@@ -219,7 +218,27 @@ public open class JSRuntime(
     }
 
     override suspend fun sum(a: Any?, b: Any?): Any? {
-        return jssum(a, b)
+        var ta: Any? = a
+        var tb: Any? = b
+
+        if (ta is JSObject) {
+            ta = a.ToPrimitive()
+        }
+        if (tb is JSObject) {
+            tb = b.ToPrimitive()
+        }
+
+        if (ta is CharSequence || tb is CharSequence) {
+            return ta.ToString() + tb.ToString()
+        }
+
+        val na = ta.ToNumber()
+        val nb = tb.ToNumber()
+
+        return when {
+            na is Long && nb is Long -> na + nb
+            else -> na.toDouble() + nb.toDouble()
+        }
     }
 
     override suspend fun sub(a: Any?, b: Any?): Any? {
@@ -254,8 +273,8 @@ public open class JSRuntime(
         return jspos(a?.numberOrThis())
     }
 
-    override suspend fun toNumber(a: Any?, strict: Boolean): Number {
-        return a.numberOrNull(withNaNs = !strict) ?: Double.NaN
+    override suspend fun toNumber(a: Any?): Number {
+        return a.ToNumber()
     }
 
     override fun fromKotlin(a: Any?): Any? {
@@ -372,84 +391,232 @@ public open class JSRuntime(
         return this
     }
 
-    internal tailrec suspend fun Any?.absToNumber() : Number {
-        return when(this){
-            null -> 0L
-            is Boolean -> if (this) 1L else 0L
-            is JSSymbol -> typeError { "Symbol cannot be converted to a string" }
-            is CharSequence -> {
-                if (isBlank()){
-                    0L
-                } else {
-                    val s = trim().toString()
-                        .trimStart('\n', '+')
-                        .trimEnd('\n')
-                        .lowercase()
-
-                    NumberFormat.entries.forEach {
-                        val p = "0${it.prefix}"
-                        if (it.prefix != null && s.startsWith(p)) {
-                            return s.removePrefix(p).toLong(it.radix)
-                        }
-                    }
-
-                    s.toLongOrNull() ?: s.toDoubleOrNull() ?: Double.NaN
-                }
-            }
-            is JSObject -> absToPrimitive("number").absToNumber()
-            is Wrapper<*> -> value.absToNumber()
-            is Number -> this
+    /**
+     * 7.1.4
+     *
+     * [ToNumber (argument)](https://tc39.es/ecma262/#sec-tonumber)
+     *
+     * The abstract operation ToNumber takes argument argument (an ECMAScript language value) and
+     * returns either a normal completion containing a Number or a throw completion. It converts
+     * argument to a value of type Number.
+     *
+     * It performs the following steps when called:
+     *
+     * 1. If argument is a Number, return argument.
+     * 2. If argument is either a Symbol or a BigInt, throw a TypeError exception.
+     * 3. If argument is undefined, return NaN.
+     * 4. If argument is either null or false, return +0𝔽.
+     * 5. If argument is true, return 1𝔽.
+     * 6. If argument is a String, return StringToNumber(argument).
+     * 7. Assert: argument is an Object.
+     * 8. Let primValue be ? ToPrimitive(argument, number).
+     * 9. Assert: primValue is not an Object.
+     * 10. Return ? ToNumber(primValue).
+     * */
+    internal tailrec suspend fun Any?.ToNumber() : Number {
+        return when(this) {
+            is Wrapper<*> -> value.ToNumber()
+            is Byte -> toLong()
+            is UByte -> toLong()
+            is Short -> toLong()
+            is UShort -> toLong()
+            is Int -> toLong()
+            is UInt -> toLong()
+            is ULong -> toLong()
+            is Float -> toDouble()
+            is Long -> this
+            is Double -> this
+            is JSSymbol -> typeError { "Symbol cannot be converted to a number" }
+            is Unit -> return Double.NaN
+            null, false -> +0L
+            true -> 1L
+            is CharSequence -> StringToNumber()
+            is JsAny -> ToPrimitive(S_NUMBER).ToNumber()
             else -> Double.NaN
         }
     }
 
-    internal tailrec suspend fun Any?.absToString() : String {
+    /**
+     * 7.1.4.1.1
+     *
+     * [StringToNumber (str)](https://tc39.es/ecma262/#sec-stringtonumber)
+     *
+     * The abstract operation StringToNumber takes argument str (a String) and returns a Number.
+     *
+     * It performs the following steps when called:
+     *
+     * 1. Let literal be ParseText(str, StringNumericLiteral).
+     * 2. If literal is a List of errors, return NaN.
+     * 3. Return the StringNumericValue of literal.
+     *
+     * */
+    internal fun CharSequence.StringToNumber() : Number {
+        return if (isBlank()){
+            0L
+        } else {
+            val s = toString()
+                .trim()
+                .trimStart('\n', '+')
+                .trimEnd('\n')
+                .lowercase()
+
+            NumberFormat.entries.forEach {
+                val p = "0${it.prefix}"
+                if (it.prefix != null && s.startsWith(p)) {
+                    return s.removePrefix(p).toLong(it.radix)
+                }
+            }
+
+            s.toLongOrNull() ?: s.toDoubleOrNull() ?: Double.NaN
+        }
+    }
+
+    /**
+     * 11.1.6
+     *
+     * [11.1.6 Static Semantics: ParseText ( sourceText, goalSymbol )](https://tc39.es/ecma262/#sec-parsetext)
+     *
+     * TThe abstract operation ParseText takes arguments sourceText (a String or a sequence of
+     * Unicode code points) and goalSymbol (a nonterminal in one of the ECMAScript grammars) and
+     * returns a Parse Node or a non-empty List of SyntaxError objects.
+     *
+     * It performs the following steps when called:
+     *
+     * 1. If sourceText is a String, set sourceText to StringToCodePoints(sourceText).
+     * 2. Attempt to parse sourceText using goalSymbol as the goal symbol, and analyse the parse
+     * result for any early error conditions. Parsing and early error detection may be interleaved
+     * in an implementation-defined manner.
+     * 3. If the parse succeeded and no early errors were found, return the Parse Node (an instance
+     * of goalSymbol) at the root of the parse tree resulting from the parse.
+     * */
+    internal fun CharSequence.ParseText(){
+
+    }
+
+    /**
+     * 7.1.17
+     *
+     * [ToString (argument)](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-tostring)
+     *
+     * The abstract operation ToString takes argument argument (an ECMAScript language value) and
+     * returns either a normal completion containing a String or a throw completion. It converts
+     * argument to a value of type String.
+     *
+     * It performs the following steps when called:
+     *
+     * 1. If argument is a String, return argument.
+     * 2. If argument is a Symbol, throw a TypeError exception.
+     * 3. If argument is undefined, return "undefined".
+     * 4. If argument is null, return "null".
+     * 5. If argument is true, return "true".
+     * 6. If argument is false, return "false".
+     * 7. If argument is a Number, return Number::toString(argument, 10).
+     * 8. If argument is a BigInt, return BigInt::toString(argument, 10).
+     * 9. Assert: argument is an Object.
+     * 10. Let primValue be ? ToPrimitive(argument, string).
+     * 11. Assert: primValue is not an Object.
+     * 12. Return ? ToString(primValue).
+     * */
+    internal tailrec suspend fun Any?.ToString() : String {
         return when(this){
-            Unit -> "undefined"
+            is Wrapper<*> -> value.ToString()
+            is CharSequence -> toString()
             is JSSymbol -> typeError { "Symbol cannot be converted to a string" }
-            is JSObject -> absToPrimitive("string").absToString()
-            is Wrapper<*> -> value.absToString()
+            Unit -> "undefined"
+            null, true, false, Number -> toString()
+            is JSObject -> ToPrimitive(S_STRING).ToString()
             else -> toString()
         }
     }
 
-    internal tailrec suspend fun Any?.absToPrimitive(type: String? = "default") : Any? {
+    /**
+     * 7.1.1
+     *
+     * [ToPrimitive (input [,preferredType])]((https://tc39.es/ecma262/#sec-toprimitive))
+     *
+     * The abstract operation ToPrimitive takes argument input (an ECMAScript language value) and
+     * optional argument preferredType (string or number) and returns either a normal completion
+     * containing an ECMAScript language value or a throw completion. It converts its input argument
+     * to a non-Object type. If an object is capable of converting to more than one primitive type,
+     * it may use the optional hint preferredType to favour that type.
+     *
+     * It performs the following steps when called:
+     *
+     * 1. If input is an Object, then
+     *    a. Let exoticToPrim be ? GetMethod(input, %Symbol.toPrimitive%).
+     *    b. If exoticToPrim is not undefined, then
+     *       i. If preferredType is not present, then
+     *          1. Let hint be "default".
+     *       ii. Else if preferredType is string, then
+     *           1. Let hint be "string".
+     *       iii. Else,
+     *            1. Assert: preferredType is number.
+     *            2. Let hint be "number".
+     *       iv. Let result be ? Call(exoticToPrim, input, « hint »).
+     *       v. If result is not an Object, return result.
+     *       vi. Throw a TypeError exception.
+     *    c. If preferredType is not present, let preferredType be number.
+     *    d. Return ? OrdinaryToPrimitive(input, preferredType).
+     * 2. Return input.
+     */
+    internal tailrec suspend fun Any?.ToPrimitive(type: String? = S_DEFAULT) : Any? {
+
         return when (this) {
-            Unit -> "undefined"
-            is JSSymbol -> typeError { "Symbol cannot be converted to a string" }
-            is JsAny -> {
-                get(JSSymbol.toPrimitive, this@JSRuntime)
-                    ?.callableOrNull()
-                    ?.let {
-                        it.call(this, type?.listOf() ?: emptyList(), this@JSRuntime)
-                            .let {
-                                typeCheck(it !is JSObject) {
-                                    "Cannot convert object to primitive value"
-                                }
-                                return it
-                            }
-                    }
-
-
-                val methods = mutableListOf<Any?>("valueOf", "toString")
-
-                if (type == "string")
-                    methods.reverse()
-
-                for (m in methods) {
-                    val callable = get(m, this@JSRuntime)?.callableOrNull() ?: continue
-                    val res = callable.call(this, emptyList(), this@JSRuntime)
-                    if (res !is JSObject){
-                        return res
-                    }
+            is JSObject -> {
+                val exoticToPrim = get(JSSymbol.toPrimitive, this@JSRuntime)?.callableOrNull()
+                if (exoticToPrim != null){
+                    val hint = type ?: S_DEFAULT
+                    val result = exoticToPrim.call(this, hint.listOf(), this@JSRuntime)
+                    typeCheck(result !is JSObject){ "Cannot convert object to primitive value" }
+                    return result
                 }
 
-                typeError {
-                    "Cannot convert object to primitive value"
-                }
+                return OrdinaryToPrimitive(type ?: S_NUMBER)
             }
-            is Wrapper<*> -> value.absToPrimitive(type)
+            is Wrapper<*> -> value.ToPrimitive(type)
             else -> this
+        }
+    }
+
+    /**
+     * 7.1.1.1
+     *
+     * [OrdinaryToPrimitive(O,hint)](https://tc39.es/ecma262/#sec-ordinarytoprimitive)
+     *
+     * The abstract operation OrdinaryToPrimitive takes arguments O (an Object) and hint (string or
+     * number) and returns either a normal completion containing an ECMAScript language value or a
+     * throw completion.
+     *
+     * It performs the following steps when called:
+     *
+     * 1. If hint is string, then
+     *    a. Let methodNames be « "toString", "valueOf" ».
+     * 2. Else,
+     *    a. Let methodNames be « "valueOf", "toString" ».
+     * 3. For each element name of methodNames, do
+     *    a. Let method be ? Get(O, name).
+     *    b. If IsCallable(method) is true, then
+     *       i. Let result be ? Call(method, O).
+     *       ii. If result is not an Object, return result.
+     * 4. Throw a TypeError exception.
+     * */
+    internal suspend fun JsAny.OrdinaryToPrimitive(hint: String?) : Any? {
+        val methods = mutableListOf<Any?>(S_VALUEOF, S_TOSTRING)
+
+        if (hint == S_STRING)
+            methods.reverse()
+
+        for (m in methods) {
+            val callable = get(m, this@JSRuntime)
+                ?.callableOrNull() ?: continue
+            val res = callable.call(this, emptyList(), this@JSRuntime)
+            if (res !is JSObject){
+                return res
+            }
+        }
+
+        typeError {
+            "Cannot convert object to primitive value"
         }
     }
 
@@ -586,34 +753,6 @@ internal inline fun <reified T> ScriptRuntime.thisRef() : T {
     return thisRef as T
 }
 
-private suspend fun JSRuntime.jssum(
-    a : Any?,
-    b : Any?,
-) : Any? {
-
-    var ta: Any? = a
-    var tb: Any? = b
-
-    if (ta is JSObject) {
-        ta = a.absToPrimitive()
-    }
-    if (tb is JSObject) {
-        tb = b.absToPrimitive()
-    }
-
-    if (ta is CharSequence || tb is CharSequence) {
-        return a.absToString() + b.absToString()
-    }
-
-    val na = ta.absToNumber()
-    val nb = tb.absToNumber()
-
-    return when {
-        na is Long && nb is Long -> na + nb
-        else -> na.toDouble() + nb.toDouble()
-    }
-}
-
 private fun jssub(a : Any?, b : Any?) : Any? {
     return when {
         a is Unit || b is Unit -> Double.NaN
@@ -728,3 +867,9 @@ private fun jspos(v : Any?) : Any {
         else -> Double.NaN
     }
 }
+
+private const val S_NUMBER = "number"
+private const val S_STRING = "string"
+private const val S_DEFAULT = "default"
+private const val S_VALUEOF = "valueOf"
+private const val S_TOSTRING = "toString"

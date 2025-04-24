@@ -1,12 +1,9 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.ObjectMap
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
-import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
-import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.mapThisArg
 import kotlinx.coroutines.CoroutineScope
@@ -89,7 +86,7 @@ public abstract class ScriptRuntime : CoroutineScope {
     public abstract suspend fun neg(a: Any?): Any?
     public abstract suspend fun pos(a: Any?): Any?
 
-    public abstract suspend fun toNumber(a: Any?, strict: Boolean = false): Number
+    public abstract suspend fun toNumber(a: Any?): Number
 
     public abstract fun fromKotlin(a: Any?): Any?
     public abstract fun toKotlin(a: Any?): Any?
@@ -244,7 +241,7 @@ private class StrictRuntime(
     override suspend fun dec(a: Any?): Any? = delegate.dec(a)
     override suspend fun neg(a: Any?): Any? = delegate.neg(a)
     override suspend fun pos(a: Any?): Any? = delegate.pos(a)
-    override suspend fun toNumber(a: Any?, strict: Boolean): Number = delegate.toNumber(a,strict)
+    override suspend fun toNumber(a: Any?): Number = delegate.toNumber(a)
     override fun fromKotlin(a: Any?): Any? = delegate.fromKotlin(a)
     override fun toKotlin(a: Any?): Any? = delegate.toKotlin(a)
 }
@@ -326,7 +323,7 @@ private class ScopedRuntime(
     override suspend fun dec(a: Any?): Any? = parent.dec(a)
     override suspend fun neg(a: Any?): Any? = parent.neg(a)
     override suspend fun pos(a: Any?): Any? = parent.pos(a)
-    override suspend fun toNumber(a: Any?, strict: Boolean): Number = parent.toNumber(a,strict)
+    override suspend fun toNumber(a: Any?): Number = parent.toNumber(a)
     override fun fromKotlin(a: Any?): Any? = parent.fromKotlin(a)
     override fun toKotlin(a: Any?): Any? = parent.toKotlin(a)
 }

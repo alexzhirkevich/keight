@@ -283,7 +283,10 @@ public open class JSFunction(
         syntaxCheck(isMutableThisRef) {
             "Illegal usage of 'new' operator"
         }
-        return constructObject(args, runtime).also { o ->
+        return constructObject(
+            args = args,
+            runtime = runtime
+        ).also { o ->
             o.setProto(runtime, get(PROTOTYPE, runtime))
             var superInitialized = false
 
@@ -300,19 +303,23 @@ public open class JSFunction(
             invoke(
                 args = args,
                 runtime = runtime,
-                extraArgs = if (superConstructor == null ) emptyMap() else  mapOf(
-                    "super" to Pair(
-                        VariableType.Const,
-                        Callable {
-                            superConstructor.call(o, it, runtime).also {
-                                runtime.referenceCheck(!superInitialized){
-                                    "Super constructor may only be called once"
+                extraArgs = if (superConstructor == null ) {
+                    emptyMap()
+                } else {
+                    mapOf(
+                        "super" to Pair(
+                            VariableType.Const,
+                            Callable {
+                                superConstructor.call(o, it, runtime).also {
+                                    runtime.referenceCheck(!superInitialized) {
+                                        "Super constructor may only be called once"
+                                    }
+                                    superInitialized = true
                                 }
-                                superInitialized = true
                             }
-                        }
+                        )
                     )
-                ),
+                },
                 thisRef = Getter {
                     assertSuperInitialized()
                     o

@@ -3,7 +3,6 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.fastAll
@@ -12,7 +11,6 @@ import io.github.alexzhirkevich.keight.fastFilter
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.findRoot
-import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.thisRef
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit
 import kotlin.jvm.JvmInline
@@ -141,6 +139,9 @@ internal class JSArrayFunction : JSFunction(
         "copyWithin" eq CopyWithin(mutableListOf())
         "flat" eq Flat(mutableListOf())
         "flatMap" eq FlatMap(mutableListOf())
+        "toString".func{
+            thisRef<List<*>>().joinToString(separator = ",")
+        }
     }
 ) {
     override suspend fun isInstance(obj: Any?, runtime: ScriptRuntime): Boolean {
@@ -153,7 +154,7 @@ internal class JSArrayFunction : JSFunction(
         }
 
         if (args.size == 1) {
-            val size = runtime.toNumber(args[0], strict = true)
+            val size = runtime.toNumber(args[0])
             when {
                 size is Long || size is Double && size.isFinite() && abs(size - size.toInt()) < Float.MIN_VALUE ->
                     return List(size.toInt()) { Unit }

@@ -52,8 +52,11 @@ internal value class JsArrayWrapper(
             return value.size
         }
 
-        val n = runtime.toNumber(property)
-
+        val n = try {
+            runtime.toNumber(property)
+        } catch (t : Throwable){
+            return super.get(property, runtime)
+        }
         if (!n.toDouble().isNaN()
             && (abs(n.toLong().toDouble() - n.toDouble()) < Float.MIN_VALUE)
             && n.toInt() in value.indices

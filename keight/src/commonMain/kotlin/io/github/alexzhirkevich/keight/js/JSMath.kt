@@ -57,12 +57,30 @@ internal fun JSMath() : JSObject = Object("Math") {
     "random".func("x") { Expression { Random.nextDouble() } }
     "round".func("x") { op1(it, ::round) }
     "sign".func("x") { op1(it, ::sign) }
-    "sin".func("x") { op1(it, ::sin) }
+    "sin".func("x") { Sin(it.firstOrNull() ?: Unit) }
     "sinh".func("x") { op1(it, ::sinh) }
     "sqrt".func("x") { op1(it, ::sqrt) }
     "tan".func("x") { op1(it, ::tan) }
     "tanh".func("x") { op1(it, ::tanh) }
     "trunc".func("x") { op1(it, ::truncate) }
+}
+
+/**
+ * 21.3.2.30
+ *
+ * [Math.sin(x)](https://tc39.es/ecma262/#sec-math.sin)
+ *
+ * This function returns the sine of x. The argument is expressed in radians.
+ **
+ * It performs the following steps when called:
+ *
+ * 1. Let n be ? ToNumber(x).
+ * 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
+ * 3. If n is either +∞𝔽 or -∞𝔽, return NaN.
+ * 4. Return an implementation-approximated Number value representing the sine of ℝ(n).
+ * */
+private suspend inline fun ScriptRuntime.Sin(value : Any?) : Number {
+    return sin(toNumber(value).toDouble())
 }
 
 private suspend fun ScriptRuntime.op1(
@@ -93,7 +111,7 @@ private suspend fun ScriptRuntime.opVararg(
         return onEmpty()
     }
     val a = (args[0] as List<*>).fastMap {
-        toNumber(it, strict = false).toDouble()
+        toNumber(it).toDouble()
     }
     return func(a)
 }
