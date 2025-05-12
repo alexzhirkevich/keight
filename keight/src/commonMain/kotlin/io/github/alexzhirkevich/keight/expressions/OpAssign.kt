@@ -3,15 +3,10 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.fastForEach
-import io.github.alexzhirkevich.keight.fastForEachIndexed
-import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.JSObject
-import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
-import io.github.alexzhirkevich.keight.js.SyntaxError
-import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
+import io.github.alexzhirkevich.keight.js.js
 
 
 internal class OpAssign(
@@ -19,10 +14,10 @@ internal class OpAssign(
     val variableName: String,
     val receiver: Expression? = null,
     val assignableValue: Expression,
-    private val merge: (suspend ScriptRuntime.(Any?, Any?) -> Any?)?
+    private val merge: (suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?)?
 ) : Expression() {
 
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         return invoke(
             type = type,
             variableName = variableName,
@@ -38,18 +33,18 @@ internal class OpAssign(
             type: VariableType?,
             variableName: String,
             receiver: Expression?,
-            value: Any?,
-            merge: (suspend ScriptRuntime.(Any?, Any?) -> Any?)?,
+            value: JsAny?,
+            merge: (suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?)?,
             runtime : ScriptRuntime
-        ) : Any? {
+        ) : JsAny? {
 
             val r = receiver?.invoke(runtime)
 
             val current = if (receiver == null) {
-                runtime.get(variableName)
+                runtime.get(variableName.js())
             } else {
                 when (r){
-                    is JsAny -> r.get(variableName, runtime)
+                    is JsAny -> r.get(variableName.js(), runtime)
                     else -> null
                 }
             }
@@ -64,14 +59,14 @@ internal class OpAssign(
 
             if (receiver == null) {
                 runtime.set(
-                    property = variableName,
+                    property = variableName.js(),
                     value = v,
                     type = type
                 )
             } else {
                 when (r) {
-                    is JSObject -> r.set(variableName, v, runtime)
-                    else -> runtime.typeError { "Cannot set properties of ${if (r == Unit) "undefined" else r}" }
+                    is JSObject -> r.set(variableName.js(), v, runtime)
+                    else -> runtime.typeError { "Cannot set properties of $r" }
                 }
             }
 

@@ -3,13 +3,15 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.fastForEach
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.Undefined
 
 internal class OpTouple(
     val expressions: List<Expression>
 ) : Expression() {
 
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
-        var res: Any? = Unit
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
+        var res: JsAny? = Undefined
         expressions.fastForEach { res = it.invoke(runtime) }
         return res
     }

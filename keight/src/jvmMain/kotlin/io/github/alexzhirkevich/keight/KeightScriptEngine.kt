@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import java.io.Reader
@@ -40,13 +41,13 @@ internal class KeightScriptEngine(
 
     override fun put(name: String?, value: Any?) {
         runBlocking {
-            engine.runtime.set(name, value, VariableType.Global)
+            engine.runtime.set(name?.js(), engine.runtime.fromKotlin(value), VariableType.Global)
         }
     }
 
     override fun get(name: String?): Any? {
         return runBlocking {
-            engine.runtime.get(name)
+            engine.runtime.get(name?.js())
         }
     }
 
@@ -60,18 +61,22 @@ internal class KeightScriptEngine(
 
     override fun setBindings(bindings: Bindings, scope: Int) {
         runBlocking {
-        if (scope == ScriptContext.GLOBAL_SCOPE) {
-            factory.globalRuntime.reset()
-            bindings.forEach { (k, v) ->
-                factory.globalRuntime.set(k, v, VariableType.Global)
-            }
-        } else {
-            engine.reset()
-            bindings.forEach { (k, v) ->
-                engine.runtime.set(k, v, VariableType.Global)
+            if (scope == ScriptContext.GLOBAL_SCOPE) {
+                factory.globalRuntime.reset()
+                bindings.forEach { (k, v) ->
+                    factory.globalRuntime.set(
+                        k.js(),
+                        engine.runtime.fromKotlin(v),
+                        VariableType.Global
+                    )
+                }
+            } else {
+                engine.reset()
+                bindings.forEach { (k, v) ->
+                    engine.runtime.set(k.js(), engine.runtime.fromKotlin(v), VariableType.Global)
+                }
             }
         }
-            }
     }
 
     override fun createBindings(): Bindings {
@@ -94,7 +99,7 @@ internal class KeightScriptEngine(
         }
         runBlocking {
             context.getBindings(ScriptContext.ENGINE_SCOPE).forEach { (k, v) ->
-                engine.runtime.set(k, v, VariableType.Global)
+                engine.runtime.set(k.js(), engine.runtime.fromKotlin(v), VariableType.Global)
             }
         }
     }

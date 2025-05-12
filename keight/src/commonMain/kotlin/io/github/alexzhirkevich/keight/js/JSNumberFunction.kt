@@ -10,34 +10,34 @@ import kotlin.math.roundToLong
 internal fun numberMethods() : List<JSFunction> {
     return listOf(
         "isFinite".func("number") {
-            val arg = it.getOrNull(0) ?: return@func false
+            val arg = it.getOrNull(0) ?: return@func false.js()
             val num = toNumber(arg).toDouble()
             if (num.isNaN())
-                return@func false
-            num.isFinite()
+                return@func false.js()
+            num.isFinite().js()
         },
         "isInteger".func("number") {
-            val arg = it.getOrNull(0) ?: return@func false
+            val arg = it.getOrNull(0) ?: return@func false.js()
             val num = toNumber(arg)
-            num is Long || num is Int || num is Short || num is Byte
+            (num is Long || num is Int || num is Short || num is Byte).js()
         },
         "parseInt".func(
             FunctionParam("number"),
-            "radix" defaults OpConstant(10L)
+            "radix" defaults OpConstant(10L.js())
         ) {
-            val arg = it.getOrNull(0) ?: return@func false
+            val arg = it.getOrNull(0) ?: return@func false.js()
             val radix = it.getOrNull(1)?.let { toNumber(it) }
                 ?.takeIf { !it.toDouble().isNaN() && it.toDouble().isFinite() }
                 ?.toInt() ?: 10
 
-            JSStringFunction.toString(arg, this).trim().trimParseInt(radix)
+            JSStringFunction.toString(arg, this).trim().trimParseInt(radix)?.js()
         },
         "isSafeInteger".func("number") {
-            val arg = it.getOrNull(0) ?: return@func false
-            toNumber(arg) is Long
+            val arg = it.getOrNull(0) ?: return@func false.js()
+            (toNumber(arg) is Long).js()
         },
         "parseFloat".func("number") {
-            val arg = it.getOrNull(0) ?: return@func false
+            val arg = it.getOrNull(0) ?: return@func false.js()
 
             var dotCnt = 0
             var eCount = 0
@@ -47,11 +47,11 @@ internal fun numberMethods() : List<JSFunction> {
                     if (c == 'e') eCount++
                 }
             }
-            num.toDoubleOrNull() ?: 0L
+            (num.toDoubleOrNull() ?: 0L).js()
         },
         "isNaN".func("number") {
-            val arg = it.getOrNull(0) ?: return@func false
-            toNumber(arg).toDouble().isNaN()
+            val arg = it.getOrNull(0) ?: return@func false.js()
+            toNumber(arg).toDouble().isNaN().js()
         },
     )
 }
@@ -59,43 +59,43 @@ internal fun numberMethods() : List<JSFunction> {
 internal class JSNumberFunction : JSFunction(
     name = "Number",
     prototype =  Object {
-        "toFixed".func("digits" defaults OpConstant(0)) { args ->
+        "toFixed".js().func("digits" defaults OpConstant(0.js())) { args ->
             val digits = args.getOrNull(0)?.let { toNumber(it) }?.toInt() ?: 0
-            toNumber(thisRef).toFixed(digits, this)
+            toNumber(thisRef).toFixed(digits, this).js()
         }
-        "toPrecision".func("digits" defaults OpArgOmitted) { args ->
+        "toPrecision".js().func("digits" defaults OpArgOmitted) { args ->
             val value = toNumber(thisRef)
-            val digits = args.argOrElse(0) { return@func value }
-            value.toDouble().roundTo(toNumber(digits).toInt() - 1)
+            val digits = args.argOrElse(0) { return@func value.js() }
+            value.toDouble().roundTo(toNumber(digits).toInt() - 1).js()
         }
-        "toString".func("radix" defaults OpConstant(10)) { args ->
+        "toString".js().func("radix" defaults OpConstant(10.js())) { args ->
 
             val radix = if (args.isEmpty())
                 10
             else args.getOrNull(0)?.let { toNumber(it) }?.toInt() ?: 10
 
             when(val number = toNumber(thisRef)){
-                is Long -> number.toString(radix)
-                else -> number.toString()
+                is Long -> number.toString(radix).js()
+                else -> number.toString().js()
             }
         }
-        "valueOf".func {
+        "valueOf".js().func {
             when (val t = thisRef) {
-                is JsNumberWrapper -> t.value
-                is JsNumberObject -> t.value
+                is JsNumberWrapper -> t.value.js()
+                is JsNumberObject -> t.value.js()
                 else -> t
             }
         }
     },
     parameters = listOf(FunctionParam("num")),
     body = Expression {
-        it.toNumber(it.get("num"))
+        it.toNumber(it.get("num".js())).js()
     },
 ) {
     init {
         numberMethods().forEach {
             defineOwnProperty(
-                property = it.name,
+                property = it.name.js(),
                 value = it,
                 writable = false,
                 configurable = false,
@@ -103,56 +103,56 @@ internal class JSNumberFunction : JSFunction(
             )
         }
         defineOwnProperty(
-            "EPSILON",
+            "EPSILON".js(),
             JsNumberWrapper(Double.MIN_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "MAX_SAFE_INTEGER",
+            "MAX_SAFE_INTEGER".js(),
             JsNumberWrapper(Long.MAX_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "MAX_VALUE",
+            "MAX_VALUE".js(),
             JsNumberWrapper(Double.MAX_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "MIN_VALUE",
+            "MIN_VALUE".js(),
             JsNumberWrapper(Double.MIN_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "MIN_SAFE_INTEGER",
+            "MIN_SAFE_INTEGER".js(),
             JsNumberWrapper(Long.MIN_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "NaN",
+            "NaN".js(),
             JsNumberWrapper(Double.NaN),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "NEGATIVE_INFINITY",
+            "NEGATIVE_INFINITY".js(),
             JsNumberWrapper(Double.NEGATIVE_INFINITY),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "POSITIVE_INFINITY",
+            "POSITIVE_INFINITY".js(),
             JsNumberWrapper(Double.POSITIVE_INFINITY),
             writable = false,
             configurable = false,
@@ -160,11 +160,11 @@ internal class JSNumberFunction : JSFunction(
         )
     }
 
-    override suspend fun isInstance(obj: Any?, runtime: ScriptRuntime): Boolean {
+    override suspend fun isInstance(obj: JsAny?, runtime: ScriptRuntime): Boolean {
         return obj !is JsNumberWrapper && super.isInstance(obj, runtime)
     }
 
-    override suspend fun constructObject(args: List<Any?>, runtime: ScriptRuntime): JSObject {
+    override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JSObject {
         return JsNumberObject(JsNumberWrapper(runtime.toNumber(args.getOrNull(0))))
     }
 }

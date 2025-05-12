@@ -21,6 +21,7 @@ import io.github.alexzhirkevich.keight.expressions.asDestruction
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMapNotNull
 import io.github.alexzhirkevich.keight.findRoot
+import io.github.alexzhirkevich.keight.js.interpreter.makeReferenceError
 import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
 import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
@@ -50,11 +51,11 @@ public sealed interface FunctionParam {
 
     public suspend fun set(
         index: Int,
-        arguments: List<Any?>,
+        arguments: List<JsAny?>,
         runtime: ScriptRuntime
     )
 
-    public suspend fun get(runtime: ScriptRuntime) : Any?
+    public suspend fun get(runtime: ScriptRuntime): JsAny?
 
 }
 
@@ -71,30 +72,30 @@ internal class SimpleFunctionParam(
     override val default : Expression? = null
 ) : FunctionParam {
 
-    private suspend fun defaultOrUnit(runtime: ScriptRuntime) : Any? {
+    private suspend fun defaultOrUnit(runtime: ScriptRuntime) : JsAny? {
         return if (default != null) {
             runtime.withScope {
                 it.set(
-                    property = name,
-                    value = Getter { it.referenceError { "Cannot access '$name' before initialization" } },
+                    property = name.js(),
+                    value = runtime.makeReferenceError { "Cannot access '$name' before initialization" },
                     type = VariableType.Local
                 )
                 default.invoke(it)
             }
         } else {
-            Unit
+            Undefined
         }
     }
 
     override suspend fun set(
         index: Int,
-        arguments: List<Any?>,
+        arguments: List<JsAny?>,
         runtime: ScriptRuntime
     ) {
         val value = when {
-            isVararg -> arguments.drop(index)
-            index in arguments.indices -> arguments.argOrElse(index) { Unit }.let {
-                if (it == Unit) {
+            isVararg -> arguments.drop(index).js()
+            index in arguments.indices -> arguments.argOrElse(index) { Undefined }.let {
+                if (it == Undefined) {
                     defaultOrUnit(runtime)
                 } else {
                     it
@@ -103,11 +104,11 @@ internal class SimpleFunctionParam(
             else -> defaultOrUnit(runtime)
         }
 
-        runtime.set(name, value, VariableType.Local)
+        runtime.set(name.js(), value, VariableType.Local)
     }
 
-    override suspend fun get(runtime: ScriptRuntime): Any? {
-       return runtime.get(name)
+    override suspend fun get(runtime: ScriptRuntime): JsAny? {
+       return runtime.get(name.js())
     }
 }
 
@@ -117,7 +118,7 @@ internal class DestructiveFunctionParam(
 ) : FunctionParam {
     override suspend fun set(
         index: Int,
-        arguments: List<Any?>,
+        arguments: List<JsAny?>,
         runtime: ScriptRuntime
     ) {
         val arg = arguments.getOrElse(index) {
@@ -131,9 +132,7 @@ internal class DestructiveFunctionParam(
         )
     }
 
-    override suspend fun get(runtime: ScriptRuntime): Any? {
-        return Unit
-    }
+    override suspend fun get(runtime: ScriptRuntime): JsAny? = Undefined
 }
 
 internal infix fun String.defaults(default: Expression?) : FunctionParam {
@@ -143,7 +142,7 @@ internal infix fun String.defaults(default: Expression?) : FunctionParam {
 internal class OpFunctionInit(
     val function : JSFunction
 ) : Expression() {
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         function.closure = runtime
         return function
     }
@@ -152,19 +151,19 @@ internal class OpFunctionInit(
 public open class JSFunction(
     final override var name : String = "",
     internal val parameters : List<FunctionParam> = emptyList(),
-    internal val body : Expression = OpConstant(Unit),
+    internal val body : Expression = OpConstant(Undefined),
     internal val isAsync : Boolean = false,
     internal val isArrow : Boolean = false,
     private val superConstructor : Constructor? = null,
     internal val prototype : JSObject? = JSObjectImpl(),
-    properties : MutableMap<Any?, Any?> = mutableMapOf(),
+    properties : MutableMap<JsAny?, JsAny?> = mutableMapOf(),
 ) : JSObjectImpl(name, properties), Callable, JSObject, Constructor {
 
     override val type: String get() = "function"
 
-    private var thisRef : Any? = null
+    private var thisRef : JsAny? = null
     private var isMutableThisRef = !isArrow
-    private var bindedArgs = emptyList<Any?>()
+    private var bindedArgs = emptyList<JsAny?>()
     internal var closure : ScriptRuntime? = null
 
     private val superConstructorPropertyMap =
@@ -212,14 +211,14 @@ public open class JSFunction(
         }
 
         defineOwnProperty(
-            property = "length",
-            value = length,
+            property = "length".js(),
+            value = length.js(),
             writable = false,
             enumerable = false,
             configurable = true
         )
 
-        if ("name" !in this.properties) {
+        if ("name".js() !in this.properties) {
             defineName(name)
         }
     }
@@ -227,21 +226,21 @@ public open class JSFunction(
     internal fun defineName(name: String){
         this.name = name
         defineOwnProperty(
-            property = "name",
-            value = name,
+            property = "name".js(),
+            value = name.js(),
             configurable = true,
             writable = false,
             enumerable = false
         )
     }
 
-    override suspend fun fallbackProto(runtime: ScriptRuntime): Any? {
+    override suspend fun fallbackProto(runtime: ScriptRuntime): JsAny? {
        return (runtime.findRoot() as JSRuntime).Function.get(PROTOTYPE, runtime)
     }
 
     private fun thisRef() = this
 
-    override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
+    override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
         return super<JSObjectImpl>.get(property, runtime)
     }
 
@@ -257,7 +256,7 @@ public open class JSFunction(
         prototype = prototype,
     )
 
-    override suspend fun call(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Any? {
+    override suspend fun call(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
         return invoke(
             args = args,
             runtime = runtime,
@@ -266,7 +265,7 @@ public open class JSFunction(
         )
     }
 
-    override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+    override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
         return copy().also {
             it.thisRef = if (isMutableThisRef) thisArg else thisRef
             it.isMutableThisRef = false
@@ -275,11 +274,11 @@ public open class JSFunction(
     }
 
     public open suspend fun constructObject(
-        args: List<Any?>,
+        args: List<JsAny?>,
         runtime: ScriptRuntime
     ) : JSObject = JSObjectImpl()
 
-    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
+    override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
         syntaxCheck(isMutableThisRef) {
             "Illegal usage of 'new' operator"
         }
@@ -320,10 +319,11 @@ public open class JSFunction(
                         )
                     )
                 },
-                thisRef = Getter {
-                    assertSuperInitialized()
-                    o
-                }
+                thisRef = o
+//                thisRef = Getter {
+//                    assertSuperInitialized()
+//                    o
+//                }
             ).also {
                 assertSuperInitialized()
             }
@@ -331,57 +331,57 @@ public open class JSFunction(
     }
 
     private suspend fun invoke(
-        args: List<Any?>,
+        args: List<JsAny?>,
         runtime: ScriptRuntime,
-        extraArgs : Map<String, Pair<VariableType, Any?>>,
-        thisRef: Any? = this.thisRef
-    ): Any? {
+        extraArgs : Map<String, Pair<VariableType, JsAny?>>,
+        thisRef: JsAny? = this.thisRef
+    ): JsAny? {
         val allArgs = if (bindedArgs.isEmpty()) args else bindedArgs + args
 
         val invokeRuntime = closure ?: runtime
 
-        suspend fun doInvoke() : Any? {
+        suspend fun doInvoke() : JsAny? {
             return invokeImpl(invokeRuntime, thisRef) { r ->
                 parameters.fastForEachIndexed { i, p ->
                     p.set(i, allArgs, r)
                 }
                 extraArgs.forEach {
-                    r.set(it.key, it.value.second, it.value.first)
+                    r.set(it.key.js(), it.value.second, it.value.first)
                 }
                 if (!isArrow) {
                     r.set(
-                        "arguments",
-                        LazyGetter {
-                            r.typeCheck(!isArrow && !isAsync && !it.isStrict) {
-                                "'arguments' is not available in this context"
-                            }
-                            JsArrayWrapper(allArgs.toMutableList())
-                        },
+                        "arguments".js(),
+                        JsArrayWrapper(allArgs.toMutableList()),
+//                        LazyGetter {
+//                            r.typeCheck(!isArrow && !isAsync && !it.isStrict) {
+//                                "'arguments' is not available in this context"
+//                            }
+//                            JsArrayWrapper(allArgs.toMutableList())
+//                        },
                         VariableType.Local
                     )
                 }
+
             }
         }
 
         return if (isAsync){
-            invokeRuntime.async {
-                doInvoke()
-            }
+            invokeRuntime.async { doInvoke() }.js()
         } else {
             doInvoke()
         }
     }
 
     override suspend fun invoke(
-        args: List<Any?>,
+        args: List<JsAny?>,
         runtime: ScriptRuntime,
-    ): Any? = invoke(args, runtime, emptyMap())
+    ): JsAny? = invoke(args, runtime, emptyMap())
 
     private suspend fun invokeImpl(
         runtime: ScriptRuntime,
-        thisRef: Any?,
+        thisRef: JsAny?,
         initArguments : suspend (ScriptRuntime) -> Unit,
-    ) : Any? {
+    ) : JsAny? {
         return try {
             runtime.withScope(
                 isFunction = true,
@@ -424,7 +424,7 @@ internal fun Expression.toFunctionParam() : FunctionParam {
     }
 }
 
-internal fun mapThisArg(arg : Any, strict : Boolean) : Any {
+internal fun mapThisArg(arg : JsAny, strict : Boolean) : JsAny {
     return if (strict) {
         arg
     } else {

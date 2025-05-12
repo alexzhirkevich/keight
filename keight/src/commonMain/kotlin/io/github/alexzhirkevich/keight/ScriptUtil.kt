@@ -1,18 +1,20 @@
 package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.Undefined
+import io.github.alexzhirkevich.keight.js.js
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
-internal fun  Delegate(
+internal fun Delegate(
     a : Expression,
     b : Expression,
-    op : suspend ScriptRuntime.(Any?, Any?) -> Any?
+    op : suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?
 ) = Expression { op(it, a(it), b(it)) }
 
 internal fun Delegate(
     a : Expression,
-    op : suspend ScriptRuntime.(Any?) -> Any?
+    op : suspend ScriptRuntime.(JsAny?) -> JsAny?
 ) = Expression {
     op(it, a(it))
 }
@@ -25,43 +27,38 @@ internal fun <T : Any?> checkNotEmpty(value : T?) : T {
     return value
 }
 
-internal fun Any.valueAtIndexOrUnit(index : Int) : Any {
+internal fun Any.valueAtIndexOrUnit(index : Int) : JsAny {
     return when (this) {
         is Map<*, *> -> {
-            (this as Map<Int, *>)
-            if (index in this) {
-                get(index)
-            } else {
-                Unit
-            }
+            get(index) as JsAny? ?: Undefined
         }
 
-        is List<*> -> getOrElse(index) { Unit }
-        is Array<*> -> getOrElse(index) { Unit }
-        is CharSequence -> getOrNull(index) ?: Unit
-        else -> Unit
-    }!!
+        is List<*> -> getOrElse(index) { Undefined } as JsAny
+        is Array<*> -> getOrElse(index) { Undefined } as JsAny
+        is CharSequence -> getOrNull(index)?.toString()?.js() ?: Undefined
+        else -> Undefined
+    }
 }
 
-internal suspend fun Any.valueAtIndexOrUnit(index : Any?, numberIndex : Int, runtime: ScriptRuntime) : Any {
+internal suspend fun Any.valueAtIndexOrUnit(index : JsAny?, numberIndex : Int, runtime: ScriptRuntime) : JsAny? {
     val indexNorm = when (index){
-        is CharSequence -> index.toString()
+        is CharSequence -> index.toString().js()
         else -> index
     }
     return when (this) {
         is Map<*, *> -> {
             if (indexNorm in this) {
-                get(indexNorm)
+                get(indexNorm) as JsAny
             } else {
-                Unit
+                Undefined
             }
         }
 
-        is List<*> -> getOrElse(numberIndex) { Unit }
-        is Array<*> -> getOrElse(numberIndex) { Unit }
-        is CharSequence -> getOrNull(numberIndex) ?: Unit
+        is List<*> -> getOrElse(numberIndex) { Undefined } as JsAny?
+        is Array<*> -> getOrElse(numberIndex) { Undefined } as JsAny?
+        is CharSequence -> getOrNull(numberIndex)?.toString()?.js() ?: Undefined
         is JsAny -> get(indexNorm, runtime)
-        else -> Unit
+        else -> Undefined
     }!!
 }
 

@@ -8,8 +8,8 @@ public open class JSError(
     JSObject by JSObjectImpl(
         name = name,
         properties = mapOf(
-            "message" to msg.toString(),
-            "name" to name
+            "message".js() to msg.toString().js(),
+            "name".js() to name.js()
         )
     )
 

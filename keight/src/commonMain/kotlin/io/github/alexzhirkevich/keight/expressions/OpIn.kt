@@ -6,6 +6,7 @@ import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
+import io.github.alexzhirkevich.keight.js.js
 
 internal class OpIn(
     val property : Expression,
@@ -15,7 +16,7 @@ internal class OpIn(
     // for (let x in y)
     var variableType : VariableType ?= null
 
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         syntaxCheck(variableType == null){
             "Unexpected token 'in'"
         }
@@ -23,7 +24,7 @@ internal class OpIn(
         runtime.typeCheck(o is JsAny) {
             "$o is not an object (can't use with 'in' operator)"
         }
-        return o.contains(property(runtime), runtime)
+        return o.contains(property(runtime), runtime).js()
     }
 }
 

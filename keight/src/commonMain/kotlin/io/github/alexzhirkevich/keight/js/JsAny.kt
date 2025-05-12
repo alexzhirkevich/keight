@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.get
 
 public interface JsAny {
@@ -9,28 +10,28 @@ public interface JsAny {
 
     public suspend fun keys(
         runtime: ScriptRuntime,
-        excludeSymbols : Boolean = true,
-        excludeNonEnumerables : Boolean = true
-    ) : List<Any?> = emptyList()
+        excludeSymbols: Boolean = true,
+        excludeNonEnumerables: Boolean = true
+    ): List<JsAny?> = emptyList()
 
-    public suspend fun proto(runtime: ScriptRuntime) : Any? = Unit
+    public suspend fun proto(runtime: ScriptRuntime): JsAny? = Undefined
 
-    public suspend fun delete(property: Any?, runtime: ScriptRuntime): Boolean = true
+    public suspend fun delete(property: JsAny?, runtime: ScriptRuntime): Boolean = true
 
-    public suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
-         return when (property) {
-            "__proto__" -> proto(runtime)
-            else -> {
-                when(val proto = proto(runtime)) {
-                    is JsAny -> proto.get(property, runtime)
-                    else -> Unit
-                }
-            }
+    public suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
+
+        if (property is Wrapper<*> && property.toString() == "__proto__"){
+            return proto(runtime)?.get(runtime)
+        }
+        return when(val proto = proto(runtime)) {
+            is JsAny -> proto.get(property, runtime)
+            else -> Undefined
         }?.get(runtime)
+
     }
 
-    public suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean =
-        get(property, runtime) != Unit
+    public suspend fun contains(property: JsAny?, runtime: ScriptRuntime): Boolean =
+        get(property, runtime) != Undefined
 }
 
 internal suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime) : Boolean {

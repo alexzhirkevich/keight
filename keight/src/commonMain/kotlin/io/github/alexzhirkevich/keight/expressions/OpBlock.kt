@@ -2,7 +2,8 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import kotlin.jvm.JvmInline
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.Undefined
 
 
 internal data class OpBlock(
@@ -14,7 +15,7 @@ internal data class OpBlock(
     val isSurroundedWithBraces : Boolean,
 ) : Expression(), Labeled {
 
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         return try {
             when {
                 isScoped -> runtime.withScope(
@@ -27,16 +28,16 @@ internal data class OpBlock(
             }
         } catch (t: BlockBreak) {
             if (label != null && t.label == label) {
-                return Unit
+                return Undefined
             } else {
                 throw t
             }
         }
     }
 
-    private suspend fun invokeInternal(context: ScriptRuntime): Any? {
+    private suspend fun invokeInternal(context: ScriptRuntime): JsAny? {
         if (expressions.isEmpty()) {
-            return Unit
+            return Undefined
         }
 
         if (expressions.size > 1) {
@@ -46,7 +47,7 @@ internal data class OpBlock(
         }
 
         return expressions.last().invoke(context).let {
-            if (isExpressible) it else Unit
+            if (isExpressible) it else Undefined
         }
     }
 }
@@ -55,23 +56,23 @@ internal data class OpBlock(
 internal sealed class ScopeException : Throwable()
 internal class BlockContinue(val label : String? = null) : ScopeException()
 internal class BlockBreak(val label : String? = null) : ScopeException()
-internal class BlockReturn(val value: Any?) : ScopeException()
+internal class BlockReturn(val value: JsAny?) : ScopeException()
 
 internal class OpReturn(
     val value : Expression
 ) : Expression() {
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         throw BlockReturn(value(runtime))
     }
 }
 
 internal class OpContinue(private val label: String? = null) : Expression() {
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         throw BlockContinue(label)
     }
 }
 internal class OpBreak(private val label: String? = null) : Expression() {
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         throw BlockBreak(label)
     }
 }

@@ -8,18 +8,18 @@ import kotlin.jvm.JvmInline
 
 @JvmInline
 internal value class JsMapWrapper(
-    override val value: MutableMap<Any?, Any?>
-) : JsAny, Wrapper<MutableMap<Any?, Any?>>, Iterable<List<*>> {
+    override val value: MutableMap<JsAny?, JsAny?>
+) : JsAny, Wrapper<MutableMap<JsAny?, JsAny?>>, Iterable<List<*>> {
 
     override suspend fun keys(
         runtime: ScriptRuntime,
         excludeSymbols: Boolean,
         excludeNonEnumerables: Boolean
-    ): List<Any?> {
+    ): List<JsAny?> {
         return value.keys.toList()
     }
 
-    override suspend fun proto(runtime: ScriptRuntime): Any? {
+    override suspend fun proto(runtime: ScriptRuntime): JsAny? {
         return (runtime.findRoot() as JSRuntime).Map.get(PROTOTYPE, runtime)
     }
 

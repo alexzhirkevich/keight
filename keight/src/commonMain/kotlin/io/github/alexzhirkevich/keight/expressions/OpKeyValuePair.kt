@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.JSFunction
+import io.github.alexzhirkevich.keight.js.JsAny
 
 
 internal interface Labeled {
@@ -21,7 +22,7 @@ internal class OpKeyValuePair(
         }
     }
 
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         return value.invoke(runtime)
     }
 }
@@ -31,13 +32,13 @@ internal interface PropertyAccessorFactory {
 }
 
 internal class OpGetter(override val value : JSFunction) : Expression(), PropertyAccessorFactory {
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         return value
     }
 }
 
 internal class OpSetter(override val value : JSFunction) : Expression(), PropertyAccessorFactory {
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         return value
     }
 }

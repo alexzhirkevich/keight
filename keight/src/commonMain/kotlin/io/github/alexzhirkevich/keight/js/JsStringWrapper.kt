@@ -10,6 +10,11 @@ internal class JsStringObject(
     override val value : JsStringWrapper
 ) : JSObjectImpl("String"), Wrapper<Wrapper<String>> {
 
+    override fun equals(other: Any?): Boolean {
+        return (other is JsStringWrapper || other is JsStringObject || other is String)
+                && other.toString() == toString()
+    }
+
     override fun toString(): String = value.toString()
 }
 
@@ -21,7 +26,7 @@ internal value class JsStringWrapper(
     override val type: String
         get() = "string"
 
-    override suspend fun proto(runtime: ScriptRuntime): Any? {
+    override suspend fun proto(runtime: ScriptRuntime): JsAny? {
         return (runtime.findRoot() as JSRuntime).String.get(PROTOTYPE, runtime)
     }
 
@@ -29,10 +34,10 @@ internal value class JsStringWrapper(
         return value
     }
 
-    override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
+    override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
         return when(property){
-            "length" -> value.length.toLong()
-            "constructor" -> (runtime.findRoot() as JSRuntime).String
+            "length".js() -> value.length.toLong().js()
+            CONSTRUCTOR -> (runtime.findRoot() as JSRuntime).String
             else -> super.get(property, runtime)
         }
     }

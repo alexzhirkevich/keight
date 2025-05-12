@@ -8,10 +8,10 @@ import kotlin.jvm.JvmInline
 
 @JvmInline
 internal value class JsSetWrapper(
-    override val value: MutableSet<Any?>
-) : JsAny, Wrapper<MutableSet<Any?>>, MutableSet<Any?> by value {
+    override val value: MutableSet<JsAny?>
+) : JsAny, Wrapper<MutableSet<JsAny?>>, MutableSet<JsAny?> by value {
 
-    override suspend fun proto(runtime: ScriptRuntime): Any? {
+    override suspend fun proto(runtime: ScriptRuntime): JsAny? {
         return (runtime.findRoot() as JSRuntime).Set.get(PROTOTYPE, runtime)
     }
 

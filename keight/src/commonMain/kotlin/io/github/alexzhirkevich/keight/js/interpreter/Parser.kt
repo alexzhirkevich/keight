@@ -1,6 +1,5 @@
 package io.github.alexzhirkevich.keight.js.interpreter
 
-import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Delegate
 import io.github.alexzhirkevich.keight.Expression
@@ -51,14 +50,15 @@ import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
-import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.OpClassInit
 import io.github.alexzhirkevich.keight.js.OpFunctionInit
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
+import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.joinSuccess
+import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
 import io.github.alexzhirkevich.keight.js.toFunctionParam
 import kotlinx.coroutines.Deferred
@@ -426,7 +426,7 @@ private fun ListIterator<Token>.parseStatement(
                     Token.Operator.NullishCoalescing -> {
                         val replacement = parseStatement(blockContext, precedence, ExpectedBlockType.Object)
                         val subject = x
-                        Expression { subject(it)?.takeUnless { it is Unit } ?: replacement(it) }
+                        Expression { subject(it)?.takeUnless { it is Undefined } ?: replacement(it) }
                     }
                     else -> return x.also { returnToIndex(i) }
                 }
@@ -470,11 +470,11 @@ private fun ListIterator<Token>.parseFactor(
     blockType: ExpectedBlockType = ExpectedBlockType.None
 ): Expression {
     val expr =  when (val next = nextSignificant()) {
-        is Token.Str -> OpConstant(next.value)
+        is Token.Str -> OpConstant(next.value.js())
         is Token.TemplateString -> {
             val expressions = next.tokens.fastMap {
                 when (it) {
-                    is TemplateStringToken.Str -> OpConstant(it.value)
+                    is TemplateStringToken.Str -> OpConstant(it.value.js())
                     is TemplateStringToken.Template -> it.value.sanitize().listIterator()
                         .parseBlock(
                             type = ExpectedBlockType.Block,
@@ -484,7 +484,7 @@ private fun ListIterator<Token>.parseFactor(
                 }
             }
             Expression { r ->
-                expressions.fastMap { it(r) }.joinToString("")
+                expressions.fastMap { it(r) }.joinToString("").js()
             }
         }
         is Token.Operator.Period, is Token.Num -> {
@@ -501,7 +501,7 @@ private fun ListIterator<Token>.parseFactor(
                 }
                 "0.${number.value}".toDouble()
             }
-            OpConstant(num)
+            OpConstant(num.js())
         }
 
         Token.Operator.Spread -> OpSpread(
@@ -538,7 +538,7 @@ private fun ListIterator<Token>.parseFactor(
         Token.Operator.Bitwise.Reverse -> {
             val expr = parseStatement(precedence = 0, blockType = ExpectedBlockType.Object)
             Expression {
-                it.toNumber(expr(it)).toLong().inv()
+                it.toNumber(expr(it)).toLong().inv().js()
             }
         }
 
@@ -587,7 +587,7 @@ private fun ListIterator<Token>.parseFactor(
 
 private fun ListIterator<Token>.parseAssignmentValue(
     x: Expression,
-    merge: (suspend ScriptRuntime.(Any?, Any?) -> Any?)? = null
+    merge: (suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?)? = null
 ): Expression {
     return when (x) {
         is OpIndex -> OpAssignByIndex(
@@ -615,7 +615,7 @@ private fun ListIterator<Token>.parseAssignmentValue(
 }
 
 
-private fun getMergeForAssignment(operator: Token.Operator.Assign): (suspend ScriptRuntime.(Any?, Any?) -> Any?)? {
+private fun getMergeForAssignment(operator: Token.Operator.Assign): (suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?)? {
     return when (operator) {
         Token.Operator.Assign.Assignment -> null
         Token.Operator.Assign.PlusAssign -> ScriptRuntime::sum
@@ -623,15 +623,15 @@ private fun getMergeForAssignment(operator: Token.Operator.Assign): (suspend Scr
         Token.Operator.Assign.MulAssign -> ScriptRuntime::mul
         Token.Operator.Assign.DivAssign -> ScriptRuntime::div
         Token.Operator.Assign.ExpAssign -> { a, b ->
-            toNumber(a).toDouble().pow(toNumber(b).toDouble())
+            toNumber(a).toDouble().pow(toNumber(b).toDouble()).js()
         }
 
         Token.Operator.Assign.ModAssign -> { a, b ->
-            toNumber(a).toLong() and toNumber(b).toLong()
+            (toNumber(a).toLong() and toNumber(b).toLong()).js()
         }
 
         Token.Operator.Assign.BitAndAssign -> { a, b ->
-            toNumber(a).toLong() and toNumber(b).toLong()
+            (toNumber(a).toLong() and toNumber(b).toLong()).js()
         }
 
         Token.Operator.Assign.LogicAndAssign -> { a, b ->
@@ -639,7 +639,7 @@ private fun getMergeForAssignment(operator: Token.Operator.Assign): (suspend Scr
         }
 
         Token.Operator.Assign.BitOrAssign -> { a, b ->
-            toNumber(a).toLong() or toNumber(b).toLong()
+            (toNumber(a).toLong() or toNumber(b).toLong()).js()
         }
 
         Token.Operator.Assign.LogicOrAssign -> { a, b ->
@@ -647,23 +647,23 @@ private fun getMergeForAssignment(operator: Token.Operator.Assign): (suspend Scr
         }
 
         Token.Operator.Assign.BitXorAssign -> { a, b ->
-            toNumber(a).toLong() xor toNumber(b).toLong()
+            (toNumber(a).toLong() xor toNumber(b).toLong()).js()
         }
 
         Token.Operator.Assign.UshrAssign -> { a, b ->
-            toNumber(a).toLong() ushr toNumber(b).toInt()
+            (toNumber(a).toLong() ushr toNumber(b).toInt()).js()
         }
 
         Token.Operator.Assign.ShrAssign -> { a, b ->
-            toNumber(a).toLong() shr toNumber(b).toInt()
+            (toNumber(a).toLong() shr toNumber(b).toInt()).js()
         }
 
         Token.Operator.Assign.ShlAssign -> { a, b ->
-            toNumber(a).toLong() shl toNumber(b).toInt()
+            (toNumber(a).toLong() shl toNumber(b).toInt()).js()
         }
 
         Token.Operator.Assign.NullCoalescingAssign -> { a, b ->
-            if (a == null || a is Unit) b else a
+            if (a == null || a is Undefined) b else a
         }
     }
 }
@@ -679,8 +679,8 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
                 else -> VariableType.Const
             }
         )
-        Token.Identifier.Keyword.True -> OpConstant(true)
-        Token.Identifier.Keyword.False -> OpConstant(false)
+        Token.Identifier.Keyword.True -> OpConstant(true.js())
+        Token.Identifier.Keyword.False -> OpConstant(false.js())
         Token.Identifier.Keyword.Null -> OpConstant(null)
 
         Token.Identifier.Keyword.Switch -> parseSwitch(blockContext)
@@ -734,7 +734,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
             }
             val next = next()
             if (next == Token.NewLine || next == Token.Operator.SemiColon){
-                OpReturn(OpConstant(Unit))
+                OpReturn(OpConstant(Undefined))
             } else {
                 previous()
                 OpReturn(parseStatement(blockType = ExpectedBlockType.Object))
@@ -754,23 +754,24 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
         Token.Identifier.Keyword.Try -> parseTryCatch(blockContext)
         Token.Identifier.Keyword.This -> Expression { it.thisRef }
         Token.Identifier.Keyword.With -> {
-            val arg = parseExpressionGrouping().expressions.single()
-            val block = parseBlock(type = ExpectedBlockType.Block, scoped = false, blockContext = emptyList())
-
-            return Expression { r ->
-
-                val a = arg(r)
-
-                if (a is JSObject) {
-                    r.withScope(
-                        thisRef = a,
-                    ) {
-                        block(it)
-                    }
-                } else {
-
-                }
-            }
+            TODO()
+//            val arg = parseExpressionGrouping().expressions.single()
+//            val block = parseBlock(type = ExpectedBlockType.Block, scoped = false, blockContext = emptyList())
+//
+//            return Expression { r ->
+//
+//                val a = arg(r)
+//
+//                if (a is JSObject) {
+//                    r.withScope(
+//                        thisRef = a,
+//                    ) {
+//                        block(it)
+//                    }
+//                } else {
+//
+//                }
+//            }
         }
         Token.Identifier.Keyword.Debugger -> throw SyntaxError("Debugger is not supported")
         Token.Identifier.Keyword.Else,
@@ -794,7 +795,7 @@ private fun ListIterator<Token>.parseNew() : Expression {
     }
 
     return Expression { runtime ->
-        val constructor = runtime.get(next.identifier)
+        val constructor = runtime.get(next.identifier.js())
         runtime.typeCheck(constructor is Constructor) {
             "'${next.identifier}' is not a constructor"
         }
@@ -811,7 +812,7 @@ private fun ListIterator<Token>.parseVoid() : Expression {
     }
     return Expression {
         expr(it)
-        Unit
+        Undefined
     }
 }
 
@@ -823,19 +824,7 @@ private fun ListIterator<Token>.parseTypeof() : Expression {
         parseStatement(precedence = 1,blockType = ExpectedBlockType.Object)
     }
     return Expression {
-        try {
-            when (val v = expr(it)) {
-                null -> "object"
-                Unit -> "undefined"
-                true, false -> "boolean"
-                is CharSequence -> "string"
-                is JsAny -> v.type
-                is Callable, is Function<*> -> "function"
-                else -> "object"
-            }
-        } catch (r: ReferenceError) {
-            "undefined"
-        }
+        expr(it)?.type?.js()
     }
 }
 
@@ -844,14 +833,14 @@ private fun ListIterator<Token>.parseDelete() : Expression {
 
     val (subj, obj) = when (x) {
         is OpIndex -> x.receiver to x.index
-        is OpGetProperty -> x.receiver to OpConstant(x.name)
-        else -> return OpConstant(false)
+        is OpGetProperty -> x.receiver to OpConstant(x.name.js())
+        else -> return OpConstant(false.js())
     }
 
     return Expression {
-        val s = subj?.invoke(it) as? JsAny
+        val s = subj?.invoke(it)
         val o = obj(it)
-        s?.delete(o, it) ?: it.delete(o)
+        s?.delete(o, it)?.js() ?: it.delete(o).js()
     }
 }
 
@@ -862,7 +851,7 @@ private fun ListIterator<Token>.parseArrayCreation(): Expression {
     val expressions = buildList {
         while (!eat(Token.Operator.Bracket.SquareClose)) {
             if (eat(Token.Operator.Comma)) {
-                add(OpConstant(Unit))
+                add(OpConstant(Undefined))
             } else {
                 add(parseStatement(blockType = ExpectedBlockType.Object))
                 if (!eat(Token.Operator.Comma)) {
@@ -995,7 +984,7 @@ private fun ListIterator<Token>.parseInstanceOfOperator(subject : Expression, pr
         syntaxCheck(o is Constructor) {
             "Illegal usage of 'instanceof' operator"
         }
-        o.isInstance(subject(it), it)
+        o.isInstance(subject(it), it).js()
     }
 }
 
@@ -1048,7 +1037,7 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
     }
 
     val staticMembers = mutableListOf<StaticClassMember>()
-    val properties = mutableMapOf<String, Expression>()
+    val properties = mutableMapOf<JsAny?, Expression>()
     var construct : JSFunction? = null
 
     while (!eat(Token.Operator.Bracket.CurlyClose)) {
@@ -1066,7 +1055,7 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
                     }
                     construct = f
                 }
-                properties[token.identifier] = OpFunctionInit(f)
+                properties[token.identifier.js()] = OpFunctionInit(f)
             }
 
             token is Token.Identifier.Property && token.identifier == "static" -> {
@@ -1076,8 +1065,8 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
             token is Token.Identifier -> {
                 prevSignificant()
                 when (val statement = parseStatement(blockType = ExpectedBlockType.None)) {
-                    is OpAssign -> properties[statement.variableName] = statement.assignableValue
-                    is OpGetProperty -> properties[statement.name] = OpConstant(Unit)
+                    is OpAssign -> properties[statement.variableName.js()] = statement.assignableValue
+                    is OpGetProperty -> properties[statement.name.js()] = OpConstant(Undefined)
                     else -> throw SyntaxError("Invalid class member")
                 }
             }
@@ -1089,7 +1078,7 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
         name = name,
         extends = extends,
         properties = properties,
-        static = staticMembers/*.reversed()*/.associateBy { it.name },
+        static = staticMembers/*.reversed()*/.associateBy { it.name.js() },
         construct = construct
     )
 }
@@ -1211,13 +1200,13 @@ private fun ListIterator<Token>.parseForInLoop(opIn: OpIn, parentBlockContext : 
             is OpGetProperty -> opIn.property.name
             else -> throw SyntaxError("Invalid for..of loop syntax")
         },
-        assignableValue = OpConstant(Unit),
+        assignableValue = OpConstant(Undefined),
         merge = null
     )
 
     return OpForInLoop(
         prepare = prepare,
-        assign = { r, v -> r.set(prepare.variableName, v, null) },
+        assign = { r, v -> r.set(prepare.variableName.js(), v, null) },
         inObject = opIn.inObject,
         body = parseBlock(blockContext = parentBlockContext + BlockContext.Loop)
     )
@@ -1272,9 +1261,10 @@ private fun ListIterator<Token>.parseAwait(): Expression {
         }
 
         if (job is Deferred<*>){
-            job.await()
+            job.await() as JsAny?
         } else {
             job.joinSuccess()
+            Undefined
         }
     }
 }
@@ -1311,7 +1301,7 @@ private fun ListIterator<Token>.parseTryCatch(blockContext: List<BlockContext>):
 private fun ListIterator<Token>.parseArrowFunction(blockContext: List<BlockContext>, args: Expression) : JSFunction {
     val fArgs = when(args){
         is OpTouple -> args.expressions
-        else -> args.listOf()
+        else -> listOf(args)
     }.map(Expression::toFunctionParam)
 
     val lambda = parseBlock(
@@ -1402,7 +1392,7 @@ private fun ListIterator<Token>.parseBlock(
                         )
                         add(
                             index = funcIndex++,
-                            element = Expression { assign(it); Unit }
+                            element = Expression { assign(it); Undefined }
                         )
                     }
 
@@ -1422,7 +1412,7 @@ private fun ListIterator<Token>.parseBlock(
                         )
                         add(
                             index = funcIndex++,
-                            element = Expression { assign(it); Unit }
+                            element = Expression { assign(it); Undefined }
                         )
                     }
 
@@ -1496,7 +1486,7 @@ private fun ListIterator<Token>.parseVariable(type: VariableType) : Expression {
                 is OpGetProperty -> OpAssign(
                     type = type,
                     variableName = expr.name,
-                    assignableValue = OpConstant(Unit),
+                    assignableValue = OpConstant(Undefined),
                     merge = null
                 )
 
@@ -1575,9 +1565,9 @@ internal suspend inline fun ScriptRuntime.referenceError(lazyMessage: () -> Any)
     throw makeReferenceError(lazyMessage)
 }
 
-internal suspend inline fun ScriptRuntime.makeReferenceError(lazyMessage: () -> Any) : Throwable {
+internal suspend inline fun ScriptRuntime.makeReferenceError(lazyMessage: () -> Any) : ReferenceError {
     return (findRoot() as JSRuntime).ReferenceError
-        .construct(fromKotlin(lazyMessage()).listOf(), this) as Throwable
+        .construct(fromKotlin(lazyMessage()).listOf(), this) as ReferenceError
 }
 
 internal suspend inline fun ScriptRuntime.makeTypeError(lazyMessage: () -> Any) : Throwable {

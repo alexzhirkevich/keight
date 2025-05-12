@@ -32,12 +32,14 @@ import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.JsSetWrapper
 import io.github.alexzhirkevich.keight.js.JsStringWrapper
 import io.github.alexzhirkevich.keight.js.OpArgOmitted
+import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.argOrElse
 import io.github.alexzhirkevich.keight.js.defaults
 import io.github.alexzhirkevich.keight.js.func
 import io.github.alexzhirkevich.keight.js.interpreter.NumberFormat
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
+import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
 import io.github.alexzhirkevich.keight.js.numberMethods
 import kotlinx.coroutines.CoroutineName
@@ -136,20 +138,20 @@ public open class JSRuntime(
             SyntaxError,
             Date
         ).fastForEach {
-            variables[it.name] = VariableType.Global to it
+            variables[it.name.js()] = VariableType.Global to it
         }
 
-        variables["globalThis"] = null to thisRef
+        variables["globalThis".js()] = null to thisRef
 
-        variables["Infinity"] = null to JsNumberWrapper(Double.POSITIVE_INFINITY)
-        variables["NaN"] = null to JsNumberWrapper(Double.NaN)
-        variables["undefined"] = null to Unit
-        variables["console"] = null to JsConsole(::console)
-        variables["Math"] = null to JSMath()
-        variables["JSON"] = null to JSON()
+        variables["Infinity".js()] = null to JsNumberWrapper(Double.POSITIVE_INFINITY)
+        variables["NaN".js()] = null to JsNumberWrapper(Double.NaN)
+        variables["undefined".js()] = null to Undefined
+        variables["console".js()] = null to JsConsole(::console)
+        variables["Math".js()] = null to JSMath()
+        variables["JSON".js()] = null to JSON()
 
         numberMethods().forEach {
-            variables[it.name] = null to it
+            variables[it.name.js()] = null to it
         }
 
         regSetTimeout()
@@ -157,17 +159,17 @@ public open class JSRuntime(
         regClearJob("Timeout")
         regClearJob("Interval")
 
-        variables["eval"] = null to "eval".func("script" defaults OpArgOmitted) {
-            val script = toKotlin(it.argOrElse(0) { return@func Unit }).toString()
-            JavaScriptEngine(this).evaluate(script)
+        variables["eval".js()] = null to "eval".func("script" defaults OpArgOmitted) {
+            val script = toKotlin(it.argOrElse(0) { return@func Undefined }).toString()
+            JavaScriptEngine(this).compile(script).invoke()
         }
     }
 
-    override suspend fun get(property: Any?): Any? {
+    override suspend fun get(property: JsAny?): JsAny? {
         return when (property) {
-            "Infinity" -> Double.POSITIVE_INFINITY
-            "NaN" -> Double.NaN
-            "undefined" -> Unit
+            "Infinity".js() -> Double.POSITIVE_INFINITY.js()
+            "NaN".js() -> Double.NaN.js()
+            "undefined".js() -> Undefined
             else -> super.get(property)
         }
     }
@@ -187,13 +189,13 @@ public open class JSRuntime(
                 || (a as? Wrapper<*>)?.value?.let { isFalse(it) } == true
     }
 
-    override suspend fun isComparable(a: Any?, b: Any?): Boolean {
+    override suspend fun isComparable(a: JsAny?, b: JsAny?): Boolean {
 
         val ka = toKotlin(a)
         val kb = toKotlin(b)
 
         if (ka is Number && kb is CharSequence || kb is Number && ka is CharSequence){
-            return isComparable(toNumber(ka), toNumber(kb))
+            return isComparable(toNumber(a).js(), toNumber(b).js())
         }
 
         if (ka is Double && ka.isNaN() || kb is Double && kb.isNaN()) {
@@ -205,19 +207,19 @@ public open class JSRuntime(
         return false
     }
 
-    override suspend fun compare(a: Any?, b: Any?): Int {
+    override suspend fun compare(a: JsAny?, b: JsAny?): Int {
 
         val ka = toKotlin(a)
         val kb = toKotlin(b)
 
         return if (ka is Number || kb is Number) {
-            toNumber(ka).toDouble().compareTo(toNumber(kb).toDouble())
+            toNumber(a).toDouble().compareTo(toNumber(b).toDouble())
         } else {
             ka.toString().compareTo(kb.toString())
         }
     }
 
-    override suspend fun sum(a: Any?, b: Any?): Any? {
+    override suspend fun sum(a: JsAny?, b: JsAny?): JsAny? {
         var ta: Any? = a
         var tb: Any? = b
 
@@ -229,57 +231,58 @@ public open class JSRuntime(
         }
 
         if (ta is CharSequence || tb is CharSequence) {
-            return ta.ToString() + tb.ToString()
+            return (ta.ToString() + tb.ToString()).js()
         }
 
         val na = ta.ToNumber()
         val nb = tb.ToNumber()
 
         return when {
-            na is Long && nb is Long -> na + nb
-            else -> na.toDouble() + nb.toDouble()
+            na is Long && nb is Long -> (na + nb).js()
+            else -> (na.toDouble() + nb.toDouble()).js()
         }
     }
 
-    override suspend fun sub(a: Any?, b: Any?): Any? {
+    override suspend fun sub(a: JsAny?, b: JsAny?): JsAny? {
         return jssub(a?.numberOrThis(), b?.numberOrThis())
     }
 
-    override suspend fun mul(a: Any?, b: Any?): Any? {
+    override suspend fun mul(a: JsAny?, b: JsAny?): JsAny? {
         return jsmul(a?.numberOrThis(), b?.numberOrThis())
     }
 
-    override suspend fun div(a: Any?, b: Any?): Any? {
+    override suspend fun div(a: JsAny?, b: JsAny?): JsAny? {
         return jsdiv(a?.numberOrThis(), b?.numberOrThis())
     }
 
-    override suspend fun mod(a: Any?, b: Any?): Any? {
+    override suspend fun mod(a: JsAny?, b: JsAny?): JsAny? {
         return jsmod(a?.numberOrThis(), b?.numberOrThis(throwForObjects = true))
     }
 
-    override suspend fun inc(a: Any?): Any? {
+    override suspend fun inc(a: JsAny?): JsAny? {
         return jsinc(a?.numberOrThis())
     }
 
-    override suspend fun dec(a: Any?): Any? {
+    override suspend fun dec(a: JsAny?): JsAny? {
         return jsdec(a?.numberOrThis())
     }
 
-    override suspend fun neg(a: Any?): Any? {
+    override suspend fun neg(a: JsAny?): JsAny? {
         return jsneg(a?.numberOrThis())
     }
 
-    override suspend fun pos(a: Any?): Any? {
+    override suspend fun pos(a: JsAny?): JsAny? {
         return jspos(a?.numberOrThis())
     }
 
-    override suspend fun toNumber(a: Any?): Number {
+    override suspend fun toNumber(a: JsAny?): Number {
         return a.ToNumber()
     }
 
-    override fun fromKotlin(a: Any?): Any? {
+    override fun fromKotlin(a: Any?): JsAny? {
         return when (a) {
-            is Wrapper<*> -> a
+            null -> null
+            is JsAny -> a
             is Boolean -> JSBooleanWrapper(a)
             is Number -> JsNumberWrapper(a)
             is UByte -> JsNumberWrapper(a.toLong())
@@ -295,23 +298,26 @@ public open class JSRuntime(
             is CharSequence -> JsStringWrapper(a.toString())
             is Job -> JSPromiseWrapper(a)
             is Throwable -> if (a is JSError) a else JSKotlinError(a)
-            else -> a
+            else -> error("Failed to convert $a to JS")
         }
     }
 
-    override fun toKotlin(a: Any?): Any? {
+    override fun toKotlin(a: JsAny?): Any? {
         return when (a) {
             is JsMapWrapper -> a.value.map { toKotlin(it.key) to toKotlin(it.value) }.toMap()
             is JsSetWrapper -> a.value.map(::toKotlin).toSet()
             is JsArrayWrapper -> a.value.fastMap(::toKotlin)
-            is Wrapper<*> -> toKotlin(a.value)
-            is Int -> a.toLong()
-            is Float -> a.toDouble()
+            is Wrapper<*> -> if (a.value is JsAny) { toKotlin(a.value as JsAny) } else a.value
             else -> a
         }
     }
 
-    internal tailrec suspend fun Any?.numberOrNull(
+    private suspend fun Any?.numberOrThis(
+        withMagic : Boolean = true,
+        throwForObjects : Boolean = false
+    ) : Any? = numberOrNull(withMagic, throwForObjects) ?: this
+
+    private tailrec suspend fun Any?.numberOrNull(
         withNaNs : Boolean = true,
         throwForObjects : Boolean = false
     ) : Number? = when(this) {
@@ -360,25 +366,22 @@ public open class JSRuntime(
 
         is Wrapper<*> -> value.numberOrNull(withNaNs,throwForObjects)
         is JSObject ->  if (withNaNs) {
-            toPrimitive("number", throwForObjects).numberOrNull(withNaNs, throwForObjects)
+            toPrimitive("number".js(), throwForObjects).numberOrNull(withNaNs, throwForObjects)
         } else {
             null
         }
         else -> null
     }
 
-    private suspend fun Any?.numberOrThis(
-        withMagic : Boolean = true,
-        throwForObjects : Boolean = false
-    ) : Any? = numberOrNull(withMagic, throwForObjects) ?: this
 
-    internal suspend fun JsAny.toNumericOrThis(): Any? {
+
+    private suspend fun JsAny.toNumericOrThis(): JsAny? {
 
         if (this is JSSymbol){
             typeError { "Symbol cannot be converted to a number" }
         }
 
-        get("valueOf", this@JSRuntime)?.callableOrNull()
+        get("valueOf".js(), this@JSRuntime)?.callableOrNull()
             ?.call(this, emptyList(), this@JSRuntime)
             ?.takeIf { it !is JSObject }
             ?.let { return it }
@@ -386,7 +389,7 @@ public open class JSRuntime(
         JSStringFunction.toString(this, this@JSRuntime)
             .toDoubleOrNull()
             .takeIf { it?.isNaN() != true }
-            ?.let { return it  }
+            ?.let { return it.js()  }
 
         return this
     }
@@ -427,7 +430,7 @@ public open class JSRuntime(
             is Long -> this
             is Double -> this
             is JSSymbol -> typeError { "Symbol cannot be converted to a number" }
-            is Unit -> return Double.NaN
+            is Unit, is Undefined -> return Double.NaN
             null, false -> +0L
             true -> 1L
             is CharSequence -> StringToNumber()
@@ -566,7 +569,7 @@ public open class JSRuntime(
                 val exoticToPrim = get(JSSymbol.toPrimitive, this@JSRuntime)?.callableOrNull()
                 if (exoticToPrim != null){
                     val hint = type ?: S_DEFAULT
-                    val result = exoticToPrim.call(this, hint.listOf(), this@JSRuntime)
+                    val result = exoticToPrim.call(this, hint.js().listOf(), this@JSRuntime)
                     typeCheck(result !is JSObject){ "Cannot convert object to primitive value" }
                     return result
                 }
@@ -601,7 +604,7 @@ public open class JSRuntime(
      * 4. Throw a TypeError exception.
      * */
     internal suspend fun JsAny.OrdinaryToPrimitive(hint: String?) : Any? {
-        val methods = mutableListOf<Any?>(S_VALUEOF, S_TOSTRING)
+        val methods = mutableListOf<JsAny?>(S_VALUEOF.js(), S_TOSTRING.js())
 
         if (hint == S_STRING)
             methods.reverse()
@@ -621,12 +624,12 @@ public open class JSRuntime(
     }
 
     internal suspend fun JsAny.toPrimitiveSymbolOrThis(
-        type : Any? = "default",
-    ) : Any? {
+        type : JsAny? = "default".js(),
+    ) : JsAny? {
 
         get(JSSymbol.toPrimitive, this@JSRuntime)
             ?.callableOrNull()
-            ?.call(this, type?.listOf() ?: emptyList(), this@JSRuntime)
+            ?.call(this, listOfNotNull(type), this@JSRuntime)
             ?.let {
                 typeCheck(it !is JSObject){
                     "Cannot convert object to primitive value"
@@ -637,7 +640,7 @@ public open class JSRuntime(
         return this
     }
     internal suspend fun JsAny.toPrimitive(
-        type : Any? = "default",
+        type : JsAny? = "default".js(),
         force : Boolean = false,
         symbolOnly : Boolean = false,
     ) : Any? {
@@ -655,9 +658,9 @@ public open class JSRuntime(
     }
 
     private suspend fun registerJob(
-        args: List<Any?>,
+        args: List<JsAny?>,
         block: suspend CoroutineScope.(Callable, Long) -> Unit
-    ): Long {
+    ): JsAny {
         val jobId = jobsCounter++
 
         val handler = args[0].callableOrThrow(this)
@@ -671,11 +674,11 @@ public open class JSRuntime(
             invokeOnCompletion { jobsMap.remove(jobId) }
         }
 
-        return jobId
+        return jobId.js()
     }
 
     private fun regSetTimeout() {
-        variables["setTimeout"] = null to "setTimeout".func("handler", "timeout") {
+        variables["setTimeout".js()] = null to "setTimeout".func("handler", "timeout") {
             (findRoot() as JSRuntime).registerJob(it) { handler, timeout ->
                 delay(timeout)
                 handler.invoke(emptyList(), this@func)
@@ -684,7 +687,7 @@ public open class JSRuntime(
     }
 
     private fun regSetInterval() {
-        variables["setInterval"] = null to "setInterval".func("handler", "interval") {
+        variables["setInterval".js()] = null to "setInterval".func("handler", "interval") {
             (findRoot() as JSRuntime).registerJob(it) { handler, timeout ->
                 while (isActive) {
                     handler.invoke(emptyList(), this@func)
@@ -695,16 +698,17 @@ public open class JSRuntime(
     }
 
     private fun regClearJob(what: String) {
-        variables[ "clear$what"] =  null to  "clear$what".func("id") {
+        variables[ "clear$what".js()] =  null to  "clear$what".func("id") {
             val id = toNumber(it.getOrNull(0)).toLong()
             jobsMap[id]?.cancel()
+            Undefined
         }
     }
 }
 
 private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JSObject {
 
-    override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
+    override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
         return if (thisRef().contains(property)){
             thisRef().get(property)?.get(runtime)
         } else {
@@ -713,15 +717,15 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JSObject {
     }
 
     override suspend fun set(
-        property: Any?,
-        value: Any?,
+        property: JsAny?,
+        value: JsAny?,
         runtime: ScriptRuntime
     ) {
         thisRef().set(property, value, null)
     }
 
     override suspend fun defineOwnProperty(
-        property: Any?,
+        property: JsAny?,
         value: JSPropertyAccessor,
         runtime: ScriptRuntime,
         enumerable: Boolean?,
@@ -731,16 +735,16 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JSObject {
         set(property, value.get(runtime), runtime)
     }
 
-    override suspend fun hasOwnProperty(name: Any?, runtime: ScriptRuntime): Boolean {
+    override suspend fun hasOwnProperty(name: JsAny?, runtime: ScriptRuntime): Boolean {
         return thisRef().contains(name)
     }
 
-    override suspend fun contains(property: Any?, runtime: ScriptRuntime): Boolean {
+    override suspend fun contains(property: JsAny?, runtime: ScriptRuntime): Boolean {
         return thisRef().contains(property)
     }
 
 
-    override suspend fun delete(property: Any?, runtime: ScriptRuntime): Boolean {
+    override suspend fun delete(property: JsAny?, runtime: ScriptRuntime): Boolean {
 
         thisRef().delete(property, true)
         return true
@@ -749,11 +753,11 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JSObject {
 
 }
 
-internal inline fun <reified T> ScriptRuntime.thisRef() : T {
+internal inline fun <reified T > ScriptRuntime.thisRef() : T {
     return thisRef as T
 }
 
-private fun jssub(a : Any?, b : Any?) : Any? {
+private fun jssub(a : Any?, b : Any?) : JsAny? {
     return when {
         a is Unit || b is Unit -> Double.NaN
         a is Number && b is Unit || a is Unit && b is Number -> Double.NaN
@@ -761,111 +765,112 @@ private fun jssub(a : Any?, b : Any?) : Any? {
         a is Double? && b is Double? ->(a ?: 0.0) - (b ?: 0.0)
         a is Number? && b is Number? ->(a?.toDouble() ?: 0.0) - (b?.toDouble() ?: 0.0)
         else -> Double.NaN
-    }
+    }.js()
 }
 
-private fun jsmul(a : Any?, b : Any?) : Any? {
+private fun jsmul(a : Any?, b : Any?) : JsAny {
     return when {
-        a == Unit || b == Unit -> Double.NaN
-        a == null || b == null -> 0L
-        a is Long && b is Long -> a*b
-        a is Double && b is Double -> a*b
-        a is Long && b is Long -> a * b
-        a is Number && b is Number -> a.toDouble() * b.toDouble()
+        a == Undefined || b == Undefined -> Double.NaN.js()
+        a == null || b == null -> 0L.js()
+        a is Long && b is Long -> (a*b).js()
+        a is Double && b is Double -> (a*b).js()
+        a is Long && b is Long -> (a * b).js()
+        a is Number && b is Number -> (a.toDouble() * b.toDouble()).js()
         a is List<*> && b is Number -> {
             a as List<Number>
             val bf = b.toDouble()
-            a.fastMap { it.toDouble() * bf }
+            a.fastMap { (it.toDouble() * bf).js() }.js()
         }
         a is Number && b is List<*> -> {
             b as List<Number>
             val af = a.toDouble()
-            b.fastMap { it.toDouble() * af }
+            b.fastMap { (it.toDouble() * af).js() }.js()
         }
-        else -> Double.NaN
+        else -> Double.NaN.js()
     }
 }
 
-private fun jsdiv(a : Any?, b : Any?) : Any {
+private fun jsdiv(a : Any?, b : Any?) : JsAny {
     return when {
-        a is Unit || b is Unit
+        a is Undefined || b is Undefined || a is Unit || b is Unit
                 || (a == null && b == null)
                 || ((a as? Number)?.toDouble() == 0.0 && b == null)
                 || ((b as? Number)?.toDouble() == 0.0 && a == null)
                 || ((a as? CharSequence)?.toString()?.toDoubleOrNull() == 0.0 && b == null)
-                || ((b as? CharSequence)?.toString()?.toDoubleOrNull() == 0.0 && a == null) -> Double.NaN
+                || ((b as? CharSequence)?.toString()?.toDoubleOrNull() == 0.0 && a == null) -> Double.NaN.js()
+
         a is Long && b is Long -> when {
             b == 0 -> a / b.toDouble()
             a % b == 0L -> a / b
             else -> a.toDouble() / b
-        }
-        a is Number && b is Number -> a.toDouble() / b.toDouble()
-        a == null -> 0L
-        b == null -> Double.POSITIVE_INFINITY
+        }.js()
+        a is Number && b is Number -> (a.toDouble() / b.toDouble()).js()
+        a == null -> 0L.js()
+        b == null -> Double.POSITIVE_INFINITY.js()
 
         a is List<*> && b is Number -> {
             a as List<Number>
             val bf = b.toDouble()
-            a.fastMap { it.toDouble() / bf }
+            a.fastMap { (it.toDouble() / bf).js() }.js()
         }
 
-        else -> Double.NaN
+        else -> Double.NaN.js()
     }
 }
 
-private fun jsmod(a : Any?, b : Any?) : Any {
+private fun jsmod(a : Any?, b : Any?) : JsAny {
     return when {
-        b == null || a == Unit || b == Unit -> Double.NaN
-        (b as? Number)?.toDouble()?.absoluteValue?.let { it < Double.MIN_VALUE } == true -> Double.NaN
-        a == null -> 0.0
+        b == null || a == Unit || b == Unit
+                || (b as? Number)?.toDouble()?.absoluteValue?.let { it < Double.MIN_VALUE } == true -> Double.NaN.js()
+        a == null -> 0.0.js()
 //        a is Long && b is Long -> a % b
-        a is Number && b is Number -> a.toDouble() % b.toDouble()
-        else -> Double.NaN
+        a is Number && b is Number -> (a.toDouble() % b.toDouble()).js()
+        else -> Double.NaN.js()
     }
 }
 
 
-private fun jsinc(v : Any?) : Any {
+private fun jsinc(v : Any?) : JsAny {
     return when (v) {
         null -> 1L
         is Long -> v + 1
         is Double -> v + 1
         is Number -> v.toDouble() + 1
         else -> Double.NaN
-    }
+    }.js()
 }
 
-private fun jsdec(v : Any?) : Any {
+private fun jsdec(v : Any?) : JsAny {
     return when (v) {
         null -> -1L
         is Long -> v - 1
         is Double -> v - 1
         is Number -> v.toDouble() - 1
         else -> Double.NaN
-    }
+    }.js()
 }
 
-private fun jsneg(v : Any?) : Any {
+private fun jsneg(v : Any?) : JsAny {
     return when (v) {
-        null -> -0
-        0, 0L -> -0.0
-        is Long -> -v
-        is Number -> -v.toDouble()
+        null -> (-0).js()
+        0, 0L -> (-0.0).js()
+        is Long -> (-v).js()
+        is Number -> (-v.toDouble()).js()
         is List<*> -> {
             v as List<Number>
-            v.fastMap { -it.toDouble() }
+            v.fastMap { (-it.toDouble()).js() }.js()
         }
-        else -> Double.NaN
+        else -> Double.NaN.js()
     }
 }
 
-private fun jspos(v : Any?) : Any {
+private fun jspos(v : Any?) : JsAny {
     return when (v) {
         null -> 0
         is Long -> +v
         is Number -> +v.toDouble()
         else -> Double.NaN
-    }
+    }.js()
 }
 
 private const val S_NUMBER = "number"

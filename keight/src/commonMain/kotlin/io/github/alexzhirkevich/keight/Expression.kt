@@ -1,5 +1,7 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.Undefined
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -8,9 +10,9 @@ import kotlinx.coroutines.ensureActive
  * */
 public abstract class Expression {
 
-    protected abstract suspend fun execute(runtime: ScriptRuntime): Any?
+    protected abstract suspend fun execute(runtime: ScriptRuntime): JsAny?
 
-    public suspend operator fun invoke(runtime: ScriptRuntime): Any? {
+    public suspend operator fun invoke(runtime: ScriptRuntime): JsAny? {
         currentCoroutineContext().ensureActive()
         return when (val res = execute(runtime)){
             is Expression -> res.invoke(runtime)
@@ -20,10 +22,11 @@ public abstract class Expression {
     }
 }
 
-public fun Expression(execute : suspend (ScriptRuntime) -> Any?) : Expression {
+public fun Expression(execute : suspend (ScriptRuntime) -> JsAny?) : Expression {
     return object : Expression() {
-        override suspend fun execute(runtime: ScriptRuntime): Any? {
+        override suspend fun execute(runtime: ScriptRuntime): JsAny? {
             return execute.invoke(runtime)
         }
     }
 }
+

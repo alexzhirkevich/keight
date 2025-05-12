@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.js.js
 
 internal fun OpCompare(
     a : Expression,
@@ -12,14 +13,14 @@ internal fun OpCompare(
     val tb = b(it)
 
     if (it.isComparable(ta, tb)) {
-        result(it.compare(ta, tb))
+        result(it.compare(ta, tb)).js()
     } else {
-        false
+        false.js()
     }
 }
 
 internal fun OpNot(
     condition : Expression,
 ) = Expression {
-    it.isFalse(condition(it))
+    it.isFalse(condition(it)).js()
 }

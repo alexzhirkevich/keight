@@ -7,16 +7,15 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.js.JSFunction
-import io.github.alexzhirkevich.keight.js.JSObject
-import io.github.alexzhirkevich.keight.js.JSObjectImpl
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsArrayWrapper
 import io.github.alexzhirkevich.keight.js.OpClassInit
 import io.github.alexzhirkevich.keight.js.SyntaxError
+import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
-import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
+import io.github.alexzhirkevich.keight.js.js
 import kotlin.reflect.KClass
 
 internal fun interface Destruction {
@@ -34,7 +33,7 @@ internal fun interface Destruction {
         }
 
         override suspend fun destruct(
-            obj: Any?,
+            obj: JsAny?,
             variableType: VariableType?,
             runtime: ScriptRuntime,
             default: Getter<*>?
@@ -57,10 +56,10 @@ internal fun interface Destruction {
     }
 
     suspend fun destruct(
-        obj: Any?,
+        obj: JsAny?,
         variableType: VariableType?,
         runtime: ScriptRuntime,
-        default : Getter<*>?
+        default: Getter<*>?
     )
 }
 
@@ -68,7 +67,7 @@ private val EmptyDestruction = Destruction { _, _, _, _ ->  }
 
 internal sealed interface DestructionContext {
 
-    suspend fun property(name : String?, obj: Any?, runtime: ScriptRuntime, default: Getter<*>?) : Any?
+    suspend fun property(name: String?, obj: Any?, runtime: ScriptRuntime, default: Getter<*>?): JsAny?
 
     object Object : DestructionContext {
         override suspend fun property(
@@ -76,9 +75,9 @@ internal sealed interface DestructionContext {
             obj: Any?,
             runtime: ScriptRuntime,
             default: Getter<*>?
-        ): Any? {
+        ): JsAny? {
             return when {
-                obj is JsAny -> obj.get(name, runtime)/*.let {
+                obj is JsAny && name != null -> obj.get(name.js(), runtime)/*.let {
                     if (it is Unit && default != null) {
                         property(name, default.get(runtime), runtime, null)
                     } else {
@@ -97,31 +96,32 @@ internal sealed interface DestructionContext {
             obj: Any?,
             runtime: ScriptRuntime,
             default: Getter<*>?
-        ): Any? {
+        ): JsAny? {
             val ret = if (obj is List<*>) {
-                obj.getOrElse(index) { Unit }
+                obj as List<JsAny>
+                obj.getOrElse(index) { Undefined }
             } else {
                 if (obj == null) {
                     runtime.typeError { "null is not iterable" }
                 } else {
-                    Unit
+                    Undefined
                 }
             }
 
-            if (ret != Unit || default == null){
+            if (ret != Undefined || default == null){
                 return ret
             }
 
             val d = default.get(runtime)
 
             if (d !is List<*>){
-                return Unit
+                return Undefined
             }
 //            runtime.typeCheck (d is List<*>) {
 //                "${JSStringFunction.toString(d, runtime)} is not iterable"
 //            }
-
-            return d.getOrElse(index) { }
+            d as List<JsAny?>
+            return d.getOrElse(index) { Undefined }
         }
     }
 }
@@ -166,7 +166,7 @@ internal fun Expression.asDestruction(
                             runtime = runtime,
                             default = default
                         )
-                        if (v != Unit) {
+                        if (v != Undefined) {
                             v
                         } else {
 
@@ -176,7 +176,7 @@ internal fun Expression.asDestruction(
                             if ((assignableValue is OpConstant || assignableValue is OpClassInit
                                 || (assignableValue is OpTouple && assignableValue.singleRecursiveOrNull() != null))
                                 && defaultValue is JSFunction
-                                && defaultValue.get("name", runtime) == ""
+                                && JSStringFunction.toString(defaultValue.get("name".js(), runtime),runtime).isEmpty()
                             ) {
                                 defaultValue.defineName(variableName)
                             }
@@ -277,7 +277,7 @@ internal fun Expression.asDestruction(
             SpreadDestruction(value.asDestruction(), context)
         }
         is OpConstant -> {
-            if (value == Unit){
+            if (value == Undefined){
                 EmptyDestruction
             } else {
                 invalidDestruction()
@@ -292,18 +292,21 @@ private class SpreadDestruction(
     private val context: DestructionContext.Array
 ) : Destruction {
     override suspend fun destruct(
-        obj: Any?,
+        obj: JsAny?,
         variableType: VariableType?,
         runtime: ScriptRuntime,
         default: Getter<*>?
     ) {
         when {
-            obj is Iterable<*> -> value.destruct(
-                obj = JsArrayWrapper(obj.drop(context.index).toMutableList()),
-                variableType = variableType,
-                runtime = runtime,
-                default = default
-            )
+            obj is Iterable<*> -> {
+                obj as Iterable<JsAny?>
+                value.destruct(
+                    obj = JsArrayWrapper(obj.drop(context.index).toMutableList()),
+                    variableType = variableType,
+                    runtime = runtime,
+                    default = default
+                )
+            }
             default != null -> destruct(default.get(runtime), variableType, runtime, null)
             else -> runtime.typeError {
                 "${JSStringFunction.toString(obj, runtime)} is not iterable"
@@ -318,15 +321,15 @@ private class DestructionWithDefault(
     var defaultValue : Expression
 ) : Destruction {
     override suspend fun destruct(
-        obj: Any?,
+        obj: JsAny?,
         variableType: VariableType?,
         runtime: ScriptRuntime,
         default: Getter<*>?
     ) {
         if (context is DestructionContext.Array) {
-            obj as List<*>
+            obj as List<JsAny?>
             destruction.destruct(
-                obj = obj.getOrElse(context.index) { Unit },
+                obj = obj.getOrElse(context.index) { Undefined },
                 variableType = variableType,
                 runtime = runtime,
                 default = default ?: LazyGetter(defaultValue::invoke)
@@ -350,8 +353,8 @@ internal class OpDestructAssign(
     val value: Expression,
 ) : Expression() {
 
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         destruction.destruct(value(runtime), variableType, runtime, null)
-        return Unit
+        return Undefined
     }
 }

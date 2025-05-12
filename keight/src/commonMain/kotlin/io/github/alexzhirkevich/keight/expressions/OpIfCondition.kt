@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.js.Undefined
 
 
 internal fun OpIfCondition(
@@ -16,6 +17,6 @@ internal fun OpIfCondition(
     if (expressible) {
         res
     } else {
-        Unit
+        Undefined
     }
 }

@@ -1,6 +1,5 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.fastSumBy
@@ -10,59 +9,59 @@ import kotlin.math.*
 import kotlin.random.Random
 
 internal fun JSMath() : JSObject = Object("Math") {
-    "PI".eq(JsNumberWrapper(PI), writable = false, configurable = false)
-    "E".eq(JsNumberWrapper(E), writable = false, configurable = false)
-    "LN10".eq(JsNumberWrapper(2.302585092994046), writable = false, configurable = false)
-    "LN2".eq(JsNumberWrapper(0.6931471805599453), writable = false, configurable = false)
-    "LOG10E".eq(JsNumberWrapper(0.4342944819032518), writable = false, configurable = false)
-    "LOG2E".eq(JsNumberWrapper(1.4426950408889634), writable = false, configurable = false)
-    "SQRT1_2".eq(JsNumberWrapper(0.7071067811865476), writable = false, configurable = false)
-    "SQRT2".eq(JsNumberWrapper(1.4142135623730951), writable = false, configurable = false)
+    "PI".js().eq(JsNumberWrapper(PI), writable = false, configurable = false)
+    "E".js().eq(JsNumberWrapper(E), writable = false, configurable = false)
+    "LN10".js().eq(JsNumberWrapper(2.302585092994046), writable = false, configurable = false)
+    "LN2".js().eq(JsNumberWrapper(0.6931471805599453), writable = false, configurable = false)
+    "LOG10E".js().eq(JsNumberWrapper(0.4342944819032518), writable = false, configurable = false)
+    "LOG2E".js().eq(JsNumberWrapper(1.4426950408889634), writable = false, configurable = false)
+    "SQRT1_2".js().eq(JsNumberWrapper(0.7071067811865476), writable = false, configurable = false)
+    "SQRT2".js().eq(JsNumberWrapper(1.4142135623730951), writable = false, configurable = false)
 
-    "abs".func("x") { op1(it, ::acos) }
-    "asoc".func("x") { op1(it, ::acos) }
-    "asoch".func("x") { op1(it, ::acosh) }
-    "asin".func("x") { op1(it, ::asin) }
-    "asinh".func("x") { op1(it, ::asinh) }
-    "atan".func("x") { op1(it, ::atan) }
-    "atan2".func("y", "x") { op2(it, ::atan2) }
-    "atanh".func("x") { op1(it, ::atanh) }
-    "cbrt".func("x") { op1(it, ::cbrt) }
-    "ceil".func("x") { op1(it, ::ceil) }
-    "cos".func("x") { op1(it, ::cos) }
-    "cosh".func("x") { op1(it, ::cosh) }
-    "exp".func("x") { op1(it, ::exp) }
-    "expm1".func("x") { op1(it, ::expm1) }
-    "floor".func("x") { op1(it, ::floor) }
-    "hypot".func(
+    "abs".js().func("x") { op1(it, ::acos) }
+    "asoc".js().func("x") { op1(it, ::acos) }
+    "asoch".js().func("x") { op1(it, ::acosh) }
+    "asin".js().func("x") { op1(it, ::asin) }
+    "asinh".js().func("x") { op1(it, ::asinh) }
+    "atan".js().func("x") { op1(it, ::atan) }
+    "atan2".js().func("y", "x") { op2(it, ::atan2) }
+    "atanh".js().func("x") { op1(it, ::atanh) }
+    "cbrt".js().func("x") { op1(it, ::cbrt) }
+    "ceil".js().func("x") { op1(it, ::ceil) }
+    "cos".js().func("x") { op1(it, ::cos) }
+    "cosh".js().func("x") { op1(it, ::cosh) }
+    "exp".js().func("x") { op1(it, ::exp) }
+    "expm1".js().func("x") { op1(it, ::expm1) }
+    "floor".js().func("x") { op1(it, ::floor) }
+    "hypot".js().func(
         "values",
         params = { FunctionParam(it, isVararg = true) }
     ) { opVararg(it, { 0 }, ::hypotN) }
-    "imul".func("x", "y",) { op2(it, ::imul) }
-    "log".func("x") { op1(it, ::ln) }
-    "log10".func("x") { op1(it, ::log10) }
-    "log1p ".func("x") { op1(it, ::ln1p) }
-    "log2".func("x") { op1(it, ::log2) }
-    "max".func(
+    "imul".js().func("x", "y",) { op2(it, ::imul) }
+    "log".js().func("x") { op1(it, ::ln) }
+    "log10".js().func("x") { op1(it, ::log10) }
+    "log1p ".js().func("x") { op1(it, ::ln1p) }
+    "log2".js().func("x") { op1(it, ::log2) }
+    "max".js().func(
         "values",
         params = { FunctionParam(it, isVararg = true) }
     ) {
         opVararg(it, { Double.NEGATIVE_INFINITY }, List<Double>::max)
     }
-    "min".func(
+    "min".js().func(
         "values",
         params = { FunctionParam(it, isVararg = true) }
     ) { opVararg(it, { Double.POSITIVE_INFINITY }, List<Double>::min) }
-    "pow".func("x", "y",) { op2(it, Double::pow) }
-    "random".func("x") { Expression { Random.nextDouble() } }
-    "round".func("x") { op1(it, ::round) }
-    "sign".func("x") { op1(it, ::sign) }
-    "sin".func("x") { Sin(it.firstOrNull() ?: Unit) }
-    "sinh".func("x") { op1(it, ::sinh) }
-    "sqrt".func("x") { op1(it, ::sqrt) }
-    "tan".func("x") { op1(it, ::tan) }
-    "tanh".func("x") { op1(it, ::tanh) }
-    "trunc".func("x") { op1(it, ::truncate) }
+    "pow".js().func("x", "y",) { op2(it, Double::pow) }
+    "random".js().func("x") {  Random.nextDouble().js() }
+    "round".js().func("x") { op1(it, ::round) }
+    "sign".js().func("x") { op1(it, ::sign) }
+    "sin".js().func("x") { Sin(it.firstOrNull() ?: Undefined).js() }
+    "sinh".js().func("x") { op1(it, ::sinh) }
+    "sqrt".js().func("x") { op1(it, ::sqrt) }
+    "tan".js().func("x") { op1(it, ::tan) }
+    "tanh".js().func("x") { op1(it, ::tanh) }
+    "trunc".js().func("x") { op1(it, ::truncate) }
 }
 
 /**
@@ -79,41 +78,41 @@ internal fun JSMath() : JSObject = Object("Math") {
  * 3. If n is either +∞𝔽 or -∞𝔽, return NaN.
  * 4. Return an implementation-approximated Number value representing the sine of ℝ(n).
  * */
-private suspend inline fun ScriptRuntime.Sin(value : Any?) : Number {
+private suspend inline fun ScriptRuntime.Sin(value : JsAny?) : Number {
     return sin(toNumber(value).toDouble())
 }
 
 private suspend fun ScriptRuntime.op1(
-    args: List<Any?>,
+    args: List<JsAny?>,
     func: (Double) -> Number
-): Any? {
-    return func(toNumber(args.getOrNull(0) ?: 0).toDouble())
+): JsAny? {
+    return func(toNumber(args.getOrElse(0) { 0.js() }).toDouble()).js()
 }
 
 private suspend fun  ScriptRuntime.op2(
-    args: List<Any?>,
+    args: List<JsAny?>,
     func: (Double, Double) -> Number,
-): Any? {
+): JsAny? {
     checkArgs(args, 2, "")
 
     val a = toNumber(args[0]).toDouble()
     val b = toNumber(args[1]).toDouble()
-    return func(a, b)
+    return func(a, b).js()
 }
 
 private suspend fun ScriptRuntime.opVararg(
-    args: List<Any?>,
+    args: List<JsAny?>,
     onEmpty : () -> Number,
     func: (List<Double>) -> Number,
-): Any? {
+): JsAny {
 
     if (args.isEmpty() || (args[0] as List<*>).isEmpty()){
-        return onEmpty()
+        return onEmpty().js()
     }
-    val a = (args[0] as List<*>).fastMap {
+    val a = (args[0] as List<JsAny?>).fastMap {
         toNumber(it).toDouble()
     }
-    return func(a)
+    return func(a).js()
 }
 
 private fun hypotN(args : List<Double>): Double {

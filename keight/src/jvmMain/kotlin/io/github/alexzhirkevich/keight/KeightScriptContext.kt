@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight;
 
+import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.runBlocking
 import java.io.Reader
 import java.io.Writer
@@ -20,7 +21,7 @@ internal class KeightScriptContext(
         val r = if (scope == ScriptContext.GLOBAL_SCOPE) factory.globalRuntime else runtime
         r.reset()
         runBlocking {
-            bindings?.forEach { (k, v) -> r.set(k, v, VariableType.Global) }
+            bindings?.forEach { (k, v) -> r.set(k.js(), runtime.fromKotlin(v), VariableType.Global) }
         }
     }
 
@@ -35,9 +36,9 @@ internal class KeightScriptContext(
     override fun setAttribute(name: String?, value: Any?, scope: Int) {
         runBlocking {
             if (scope == ScriptContext.GLOBAL_SCOPE) {
-                factory.globalRuntime.set(name, value, VariableType.Global)
+                factory.globalRuntime.set(name?.js(), runtime.fromKotlin(value), VariableType.Global)
             } else {
-                runtime.set(name, value, VariableType.Local)
+                runtime.set(name?.js(), runtime.fromKotlin(value), VariableType.Local)
             }
         }
     }
@@ -45,31 +46,31 @@ internal class KeightScriptContext(
     override fun getAttribute(name: String?, scope: Int): Any? {
         return runBlocking {
             if (scope == ScriptContext.GLOBAL_SCOPE) {
-                factory.globalRuntime.get(name)
+                factory.globalRuntime.get(name?.js())
             } else {
-                runtime.get(name)
+                runtime.get(name?.js())
             }
         }
     }
 
     override fun getAttribute(name: String?): Any? {
         return runBlocking {
-            runtime.get(name)
+            runtime.get(name?.js())
         }
     }
 
     override fun removeAttribute(name: String?, scope: Int): Any? {
         return runBlocking {
             if (scope == ScriptContext.GLOBAL_SCOPE) {
-                factory.globalRuntime.delete(name)
+                factory.globalRuntime.delete(name?.js())
             } else {
-                runtime.delete(name)
+                runtime.delete(name?.js())
             }
         }
     }
 
     override fun getAttributesScope(name: String?): Int {
-        return when (name) {
+        return when (name?.js()) {
             in runtime -> ScriptContext.ENGINE_SCOPE
             in factory.globalRuntime -> ScriptContext.GLOBAL_SCOPE
             else -> 0

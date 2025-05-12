@@ -1,9 +1,10 @@
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SimpleFunctionParam
 import io.github.alexzhirkevich.keight.js.SyntaxError
+import io.github.alexzhirkevich.keight.js.Undefined
+import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -214,7 +215,7 @@ class SyntaxTest {
             let /**/ obj = /**/{ /**/name/**/ : /**/'test'/**/}
         """.trimIndent().eval(runtime).let {
             it as JSObject
-            it.get("name",runtime).toString().assertEqualsTo("test")
+            it.get("name".js(),runtime).toString().assertEqualsTo("test")
         }
 
         """
@@ -239,16 +240,16 @@ class SyntaxTest {
 
     @Test
     fun optional_chaining() = runtimeTest { runtime ->
-        "let x = undefined; x?.test".eval().assertEqualsTo(Unit)
-        "let x = undefined; x?.test?.other?.more".eval().assertEqualsTo(Unit)
+        "let x = undefined; x?.test".eval().assertEqualsTo(Undefined)
+        "let x = undefined; x?.test?.other?.more".eval().assertEqualsTo(Undefined)
 
-        "let x = undefined; x?.['test']".eval().assertEqualsTo(Unit)
-        "let x = undefined; x?.['test']?.['more']".eval().assertEqualsTo(Unit)
+        "let x = undefined; x?.['test']".eval().assertEqualsTo(Undefined)
+        "let x = undefined; x?.['test']?.['more']".eval().assertEqualsTo(Undefined)
 
-        "let x = undefined; x?.(1)".eval().assertEqualsTo(Unit)
-        "let x = undefined; x?.(1)?.(2)".eval().assertEqualsTo(Unit)
+        "let x = undefined; x?.(1)".eval().assertEqualsTo(Undefined)
+        "let x = undefined; x?.(1)?.(2)".eval().assertEqualsTo(Undefined)
 
-        "let x = undefined; x?.one?.['two']?.('three')".eval().assertEqualsTo(Unit)
+        "let x = undefined; x?.one?.['two']?.('three')".eval().assertEqualsTo(Undefined)
 
         """
             let x = {

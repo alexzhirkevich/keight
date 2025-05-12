@@ -12,7 +12,7 @@ internal value class JSPromiseWrapper(
     override val value: Job
 ) : JsAny, Wrapper<Job>, Job by value {
 
-    override suspend fun proto(runtime: ScriptRuntime): Any? {
+    override suspend fun proto(runtime: ScriptRuntime): JsAny? {
         return (runtime.findRoot() as JSRuntime).Promise.get(PROTOTYPE, runtime)
     }
 

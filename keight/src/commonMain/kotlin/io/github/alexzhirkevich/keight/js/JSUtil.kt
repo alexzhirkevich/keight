@@ -6,7 +6,7 @@ import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 import kotlin.jvm.JvmInline
 
-internal fun <T> T.listOf() : List<T> = SingleElementList(this)
+internal fun <T : JsAny?> T.listOf() : List<T> = SingleElementList(this)
 
 @JvmInline
 internal value class SingleElementList<T>(private val element : T) : List<T> {
@@ -44,7 +44,7 @@ internal value class SingleElementList<T>(private val element : T) : List<T> {
     }
 }
 
-internal object ArgOmitted
+internal object ArgOmitted : JsAny
 internal val OpArgOmitted = OpConstant(ArgOmitted)
 
 @OptIn(ExperimentalContracts::class)

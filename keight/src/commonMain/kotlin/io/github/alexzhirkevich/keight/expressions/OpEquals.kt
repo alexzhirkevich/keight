@@ -3,13 +3,15 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.js
 
 internal fun OpEquals(
     a : Expression,
     b : Expression,
     isTyped : Boolean
 ) = Expression {
-    OpEqualsImpl(a(it), b(it), isTyped, it)
+    OpEqualsImpl(a(it), b(it), isTyped, it).js()
 }
 
 internal fun OpNotEquals(
@@ -17,7 +19,7 @@ internal fun OpNotEquals(
     b : Expression,
     isTyped : Boolean
 ) = Expression {
-    !OpEqualsImpl(a(it), b(it), isTyped, it)
+    OpEqualsImpl(a(it), b(it), isTyped, it).not().js()
 }
 
 internal tailrec suspend fun OpEqualsImpl(a : Any?, b : Any?, typed : Boolean, runtime: ScriptRuntime) : Boolean {
@@ -35,8 +37,8 @@ internal tailrec suspend fun OpEqualsImpl(a : Any?, b : Any?, typed : Boolean, r
             val bd = b.toDouble()
             (ad == bd && !ad.isNaN())
         }
-        a is Number -> OpEqualsImpl(a, runtime.toNumber(b), typed, runtime)
-        b is Number -> OpEqualsImpl(b, runtime.toNumber(a), typed, runtime)
+        a is Number && b is JsAny -> OpEqualsImpl(a, runtime.toNumber(b), typed, runtime)
+        b is Number && a is JsAny-> OpEqualsImpl(b, runtime.toNumber(a), typed, runtime)
 //        a::class == b::class -> a == b
         else -> a.toString() == b.toString()
     }

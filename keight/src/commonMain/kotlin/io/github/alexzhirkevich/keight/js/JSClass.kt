@@ -1,10 +1,10 @@
 package io.github.alexzhirkevich.keight.js
 
+import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 
 internal sealed interface StaticClassMember : Named {
@@ -18,13 +18,13 @@ internal sealed interface StaticClassMember : Named {
 
 internal class OpClassInit(
     val name : String,
-    val properties : Map<String, Expression>,
-    val static : Map<String, StaticClassMember>,
+    val properties : Map<JsAny?, Expression>,
+    val static : Map<JsAny?, StaticClassMember>,
     val construct: JSFunction?,
     val extends : Expression?
-) : Expression() {
+) : Expression(), JsAny {
 
-    override suspend fun execute(runtime: ScriptRuntime): JSClass {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
 
         val extendsConstructor = extends?.invoke(runtime)
 
@@ -38,7 +38,7 @@ internal class OpClassInit(
             static = static.mapValues {
                 when (val v = it.value) {
                     is StaticClassMember.Method -> v.function
-                    is StaticClassMember.Variable -> v.init(runtime)
+                    is StaticClassMember.Variable -> v.init.invoke(runtime)
                 }
             },
             construct = construct,
@@ -57,14 +57,14 @@ internal class OpClassInit(
 
 internal class JSClass(
     name : String,
-    static: Map<String, Any?>,
+    static: Map<JsAny?, JsAny?>,
     val construct: JSFunction?,
     extends: Constructor?,
-    properties : Map<String, Any?>,
+    properties : Map<JsAny?, JsAny?>,
 ) : JSFunction(
     name = name,
     parameters = construct?.parameters ?: emptyList(),
-    body = construct?.body ?: Expression {  },
+    body = construct?.body ?: Expression { Undefined },
     prototype = JSObjectImpl(properties = properties.toMutableMap()),
     properties = static.toMutableMap(),
     superConstructor = extends

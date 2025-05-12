@@ -6,13 +6,13 @@ import io.github.alexzhirkevich.keight.js.isPrototypeOf
 
 public interface Constructor : Callable {
 
-    public suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any
+    public suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny
 
-    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+    override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
         return construct(args, runtime)
     }
 
-    public suspend fun isInstance(obj: Any?, runtime: ScriptRuntime): Boolean {
-        return (get(PROTOTYPE, runtime) as? JsAny)?.isPrototypeOf(obj, runtime) == true
+    public suspend fun isInstance(obj: JsAny?, runtime: ScriptRuntime): Boolean {
+        return get(PROTOTYPE, runtime)?.isPrototypeOf(obj, runtime) == true
     }
 }

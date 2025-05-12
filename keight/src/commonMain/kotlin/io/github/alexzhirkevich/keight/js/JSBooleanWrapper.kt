@@ -14,7 +14,7 @@ internal value class JSBooleanWrapper(
     override val type: String
         get() = "boolean"
 
-    override suspend fun proto(runtime: ScriptRuntime): Any? {
+    override suspend fun proto(runtime: ScriptRuntime): JsAny? {
         return (runtime.findRoot() as JSRuntime).Boolean.get(PROTOTYPE, runtime)
     }
 

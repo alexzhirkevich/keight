@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
+import io.github.alexzhirkevich.keight.js.js
 
 internal fun OpLongInt(
     a : Expression,
@@ -10,7 +11,7 @@ internal fun OpLongInt(
     val an = it.toNumber(a(it)).toLong()
     val bn = it.toNumber(b(it)).toInt()
 
-    op(an, bn)
+    op(an, bn).js()
 }
 
 internal fun OpLongLong(
@@ -21,5 +22,5 @@ internal fun OpLongLong(
     val an = it.toNumber(a(it)).toLong()
     val bn = it.toNumber(b(it)).toLong()
 
-    op(an, bn)
+    op(an, bn).js()
 }

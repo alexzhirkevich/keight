@@ -1,5 +1,5 @@
 import io.github.alexzhirkevich.keight.js.JSObject
-import io.github.alexzhirkevich.keight.JSRuntime
+import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -27,8 +27,8 @@ class ObjectTest {
 
         val obj = "{ name : 'test', x : 1 }".eval(runtime) as JSObject
 
-        runtime.toKotlin(obj.get("name", runtime)).assertEqualsTo("test")
-        runtime.toKotlin(obj.get("x",runtime)).assertEqualsTo(1L)
+        runtime.toKotlin(obj.get("name".js(), runtime)).assertEqualsTo("test")
+        runtime.toKotlin(obj.get("x".js(),runtime)).assertEqualsTo(1L)
 
 
         "typeof {}".eval().assertEqualsTo("object")

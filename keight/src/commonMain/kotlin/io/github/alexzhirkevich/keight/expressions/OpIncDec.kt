@@ -2,6 +2,7 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.js.js
 
 internal fun OpIncDecAssign(
     variable: Expression,
@@ -37,6 +38,6 @@ internal fun OpIncDecAssign(
     }
 
     return Expression { ctx ->
-        ctx.toNumber(variable(ctx)).also { assignment(ctx) }
+        ctx.toNumber(variable(ctx)).also { assignment(ctx) }.js()
     }
 }

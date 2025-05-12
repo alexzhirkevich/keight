@@ -3,10 +3,10 @@ package test262
 import eval
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
-import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.js
 import org.yaml.snakeyaml.Yaml
 import java.io.File
 import java.io.IOException
@@ -46,9 +46,9 @@ suspend fun harness(name : String, runtime: JSRuntime) {
         if (isNegative && result != null) {
             if (expectedError != null) {
                 if (result is JSError) {
-                    val name = result.get("name", runtime)
+                    val name = result.get("name".js(), runtime)
 
-                    assertEquals(expectedError, name, result.stackTraceToString())
+                    assertEquals(expectedError, name.toString(), result.stackTraceToString())
                 } else {
                     throw result
                 }
@@ -56,8 +56,8 @@ suspend fun harness(name : String, runtime: JSRuntime) {
         } else {
             if (result != null) {
                 val msg = if (result is ThrowableValue && result.value is JsAny) {
-                    if (result.value.contains("message", runtime)) {
-                        result.value.get("message", runtime)
+                    if (result.value.contains("message".js(), runtime)) {
+                        result.value.get("message".js(), runtime)
                     } else {
                         JSStringFunction.toString(result.value, runtime)
                     }

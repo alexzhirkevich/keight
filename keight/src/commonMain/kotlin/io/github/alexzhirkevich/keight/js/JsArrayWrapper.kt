@@ -3,53 +3,54 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
+import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 import kotlin.math.abs
 
 @JvmInline
 internal value class JsArrayWrapper(
-    override val value : MutableList<Any?>
-) : JSObject, Wrapper<MutableList<Any?>>, MutableList<Any?> by value {
+    override val value : MutableList<JsAny?>
+) : JSObject, Wrapper<MutableList<JsAny?>>, MutableList<JsAny?> by value {
 
-    override suspend fun values(runtime: ScriptRuntime): List<Any?> {
+    override suspend fun values(runtime: ScriptRuntime): List<JsAny?> {
         return value.toList()
     }
 
-    override suspend fun entries(runtime: ScriptRuntime): List<List<Any?>> {
-        return value.mapIndexed { index, v ->  listOf(index,v) }
+    override suspend fun entries(runtime: ScriptRuntime): List<List<JsAny?>> {
+        return value.mapIndexed { index, v ->  listOf(index.js(), v) }
     }
 
     override suspend fun set(
-        property: Any?,
-        value: Any?,
+        property: JsAny?,
+        value: JsAny?,
         runtime: ScriptRuntime
     ) {
-        this.value[runtime.toNumber(value).toInt()] = property
+        this.value[runtime.toNumber(property).toInt()] = value
     }
 
     override suspend fun keys(
         runtime: ScriptRuntime,
         excludeSymbols: Boolean,
         excludeNonEnumerables: Boolean
-    ): List<Any?> {
-        return value.indices.toList()
+    ): List<JsAny?> {
+        return value.indices.toList().fastMap { it.js() }
     }
 
-    override suspend fun proto(runtime: ScriptRuntime): Any? {
+    override suspend fun proto(runtime: ScriptRuntime): JsAny? {
         return (runtime.findRoot() as JSRuntime).Array.get(PROTOTYPE,runtime)
     }
 
-    override suspend fun hasOwnProperty(name: Any?, runtime: ScriptRuntime): Boolean {
+    override suspend fun hasOwnProperty(name: JsAny?, runtime: ScriptRuntime): Boolean {
         val idx = (runtime.toKotlin(name) as? String)?.toIntOrNull()
             ?: return super.hasOwnProperty(name, runtime)
 
         return idx in value.indices || super.hasOwnProperty(name, runtime)
     }
 
-    override suspend fun get(property: Any?, runtime: ScriptRuntime): Any? {
+    override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
         if (property.toString() == "length") {
-            return value.size
+            return value.size.js()
         }
 
         val n = try {

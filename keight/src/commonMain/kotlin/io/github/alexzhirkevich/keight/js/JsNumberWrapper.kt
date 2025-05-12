@@ -22,7 +22,7 @@ internal value class JsNumberWrapper(
 
     override val type: String get() = "number"
 
-    override suspend fun proto(runtime: ScriptRuntime): Any? {
+    override suspend fun proto(runtime: ScriptRuntime): JsAny? {
         return (runtime.findRoot() as JSRuntime).Number.get(PROTOTYPE, runtime)
     }
 

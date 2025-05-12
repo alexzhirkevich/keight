@@ -1,4 +1,5 @@
 import io.github.alexzhirkevich.keight.js.RangeError
+import io.github.alexzhirkevich.keight.js.Undefined
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -103,10 +104,10 @@ class JsArrayTest {
     @Test
     fun at()= runTest {
         "[66,2,8].at(0)".eval().assertEqualsTo(66L)
-        "[66,2,8].at(3)".eval().assertEqualsTo(Unit)
+        "[66,2,8].at(3)".eval().assertEqualsTo(Undefined)
 
         "[66,2,8][1]".eval().assertEqualsTo(2L)
-        "[66,2,8][3]".eval().assertEqualsTo(Unit)
+        "[66,2,8][3]".eval().assertEqualsTo(Undefined)
     }
 
     @Test
@@ -170,8 +171,8 @@ class JsArrayTest {
         "Array(1,2,3)".eval().assertEqualsTo(listOf(1L,2L,3L))
         "new Array(1,2,3)".eval().assertEqualsTo(listOf(1L,2L,3L))
 
-        "Array(2)".eval().assertEqualsTo(listOf(Unit, Unit))
-        "Array(2.0)".eval().assertEqualsTo(listOf(Unit, Unit))
+        "Array(2)".eval().assertEqualsTo(listOf(Undefined, Undefined))
+        "Array(2.0)".eval().assertEqualsTo(listOf(Undefined, Undefined))
 
         assertFailsWith<RangeError> {
             "Array(2.5)".eval()

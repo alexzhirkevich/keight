@@ -5,8 +5,9 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
-
+import io.github.alexzhirkevich.keight.js.js
 
 
 internal class OpForLoop(
@@ -23,12 +24,13 @@ internal class OpForLoop(
         { !it.isFalse(comparison.invoke(it)) }
     }
 
-    override suspend fun execute(runtime: ScriptRuntime): Any {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         runtime.withScope {
             assignment?.invoke(it)
             block(it)
+            Undefined
         }
-        return Unit
+        return Undefined
     }
 
     private suspend fun block(ctx: ScriptRuntime) {
@@ -56,13 +58,13 @@ internal class OpForLoop(
 
 internal class OpForInLoop(
     private val prepare : Expression,
-    private val assign : suspend (ScriptRuntime, Any?) -> Unit,
+    private val assign : suspend (ScriptRuntime, JsAny?) -> Unit,
     private val inObject : Expression,
     private val body: Expression,
     override var label: String? = null
 ) : Expression(), Labeled {
 
-    override suspend fun execute(runtime: ScriptRuntime): Any {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         runtime.withScope {
             val o = inObject(it)
 
@@ -78,7 +80,7 @@ internal class OpForInLoop(
 
             for (k in keys) {
                 try {
-                    assign(it, k)
+                    assign(it, k.js())
                     body(it)
                 } catch (t: BlockContinue) {
                     if (t.label == label) {
@@ -94,8 +96,9 @@ internal class OpForInLoop(
                     }
                 }
             }
+            Undefined
         }
-        return Unit
+        return Undefined
     }
 }
 
@@ -104,7 +107,7 @@ internal class OpDoWhileLoop(
     val body : OpBlock,
     override var label: String? = null
 ) : Expression(), Labeled {
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         do {
             val cond = runtime.withScope {
                 try {
@@ -125,7 +128,8 @@ internal class OpDoWhileLoop(
                 }
             }
         } while (cond)
-        return Unit
+
+        return Undefined
     }
 }
 
@@ -135,7 +139,7 @@ internal class OpWhileLoop(
     val body : Expression,
     override var label: String? = null
 ) : Expression(), Labeled {
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         while (!runtime.isFalse(condition.invoke(runtime))) {
             try {
                 body.invoke(runtime)
@@ -153,6 +157,6 @@ internal class OpWhileLoop(
                 }
             }
         }
-        return Unit
+        return Undefined
     }
 }

@@ -1,4 +1,5 @@
 import io.github.alexzhirkevich.keight.Console
+import io.github.alexzhirkevich.keight.js.Undefined
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
@@ -15,19 +16,19 @@ class JsConsoleTest {
             override fun error(message: Any?) { err = message }
         }
 
-        "console.log(123)".eval(io).assertEqualsTo(Unit)
+        "console.log(123)".eval(io).assertEqualsTo(Undefined)
 
         out.assertEqualsTo(123L)
         err.assertEqualsTo(null)
         out = null
 
-        "console.log('123')".eval(io).assertEqualsTo(Unit)
+        "console.log('123')".eval(io).assertEqualsTo(Undefined)
 
         out.assertEqualsTo("123")
         err.assertEqualsTo(null)
         out = null
 
-        "console.error('123')".eval(io).assertEqualsTo(Unit)
+        "console.error('123')".eval(io).assertEqualsTo(Undefined)
 
         err.assertEqualsTo("123")
         out.assertEqualsTo(null)
@@ -43,7 +44,7 @@ class JsConsoleTest {
             override fun error(message: Any?) { err = message }
         }
 
-        "console.log()".eval(io).assertEqualsTo(Unit)
+        "console.log()".eval(io).assertEqualsTo(Undefined)
         out.assertEqualsTo(null)
         err.assertEqualsTo(null)
     }
@@ -58,13 +59,13 @@ class JsConsoleTest {
             override fun error(message: Any?) { err = message }
         }
 
-        "console.log(123, 456, '789')".eval(io).assertEqualsTo(Unit)
+        "console.log(123, 456, '789')".eval(io).assertEqualsTo(Undefined)
 
         out.assertEqualsTo(listOf(123L, 456L, "789"))
         err.assertEqualsTo(null)
         out = null
 
-        "console.error(123, 456, '789')".eval(io).assertEqualsTo(Unit)
+        "console.error(123, 456, '789')".eval(io).assertEqualsTo(Undefined)
 
         err.assertEqualsTo(listOf(123L, 456L, "789"))
         out.assertEqualsTo(null)

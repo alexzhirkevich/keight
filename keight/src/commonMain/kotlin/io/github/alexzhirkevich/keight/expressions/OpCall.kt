@@ -6,10 +6,11 @@ import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.js.JsAny
-import io.github.alexzhirkevich.keight.js.OpArgOmitted
 import io.github.alexzhirkevich.keight.js.SyntaxError
+import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
+import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.async
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -27,11 +28,11 @@ internal fun OpCall(
         callable is OpIndex -> Expression { r ->
             val receiver = callable.receiver.invoke(r)
 
-            if ((receiver == null || receiver == Unit) && callable.isOptional) {
-                return@Expression Unit
+            if ((receiver == null || receiver == Undefined) && callable.isOptional) {
+                return@Expression Undefined
             }
             (receiver as JsAny).call(
-                func = callable.index(r),
+                func = callable.index.invoke(r),
                 thisRef = receiver,
                 args = args.fastMap() { it(r) },
                 isOptional = callable.isOptional,
@@ -42,14 +43,14 @@ internal fun OpCall(
         callable is OpGetProperty && callable.receiver != null -> Expression { r ->
             val receiver = callable.receiver.invoke(r)
             if ((receiver !is JsAny) && callable.isOptional) {
-                return@Expression Unit
+                return@Expression Undefined
             }
 
             r.typeCheck (receiver is JsAny) {
                 "Can't get properties (${callable.name}) of $receiver"
             }
             receiver.call(
-                func = callable.name,
+                func = callable.name.js(),
                 thisRef = receiver,
                 args = args.fastMap { it(r) },
                 isOptional = callable.isOptional,
@@ -68,16 +69,16 @@ internal fun OpCall(
     }
 }
 internal suspend fun JsAny.call(
-    func : Any?,
-    thisRef : Any?,
-    args: List<Any?>,
+    func : JsAny?,
+    thisRef : JsAny?,
+    args: List<JsAny?>,
     isOptional : Boolean,
     runtime: ScriptRuntime,
-) : Any? {
+) : JsAny? {
     val v = get(func, runtime)
     val callable = v?.callableOrNull()
     if (callable == null && isOptional) {
-        return Unit
+        return Undefined
     }
     runtime.typeCheck(callable != null) {
         "$func is not a function"
@@ -88,14 +89,14 @@ internal suspend fun JsAny.call(
 private tailrec suspend fun OpCallImpl(
     runtime: ScriptRuntime,
     callable: Any?,
-    arguments: List<Any?>,
+    arguments: List<JsAny?>,
     isOptional: Boolean
-) : Any? {
+) : JsAny? {
     return when {
         callable is Expression -> OpCallImpl(runtime, callable(runtime), arguments, isOptional)
         callable is Callable -> callable.invoke(arguments, runtime)
         callable is Function<*> -> execKotlinFunction(runtime, callable, arguments.fastMap(runtime::toKotlin))
-        isOptional && (callable == null || callable == Unit) -> Unit
+        isOptional && (callable == null || callable == Unit) -> Undefined
         else -> runtime.typeError { "$callable is not a function" }
     }
 }
@@ -106,42 +107,45 @@ internal fun Function<*>.asCallable() : Callable = KotlinCallable(this)
 private value class KotlinCallable(
     val function: Function<*>
 ) : Callable {
-    override suspend fun bind(thisArg: Any?, args: List<Any?>, runtime: ScriptRuntime): Callable {
+    override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
         return thisArg?.callableOrNull()!!
     }
 
-    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any? {
+    override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
         return execKotlinFunction(runtime, function, args)
     }
 }
 
 private val SUSPENDED : Any get()  =  kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 
+private fun Any?.jsAnyOrUndefined() : JsAny? {
+    return if (this is JsAny?) this else Undefined
+}
 @Suppress("unchecked_cast")
 private suspend fun execKotlinFunction(
     runtime: ScriptRuntime,
     function: Function<*>,
     args: List<Any?>,
-) : Any? {
+) : JsAny? {
 
     return when (function) {
 
         is Function0<*> -> (function as Function0<Any?>)
-            .invoke()
+            .invoke() as? JsAny?
 
         is Function1<*, *> -> withInvalidArgsCheck {
             function as Function1<Any?, Any?>
             when (args.size){
-                1 -> function.invoke(args[0])
-                0 -> runtime.async<Any?> {
+                1 -> function.invoke(args[0]).jsAnyOrUndefined()
+                0 -> runtime.async {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont).also {
                             if (it != SUSPENDED){
                                 cont.resume(it)
                             }
-                        }
+                        }.jsAnyOrUndefined()
                     }
-                }
+                }.js()
                 else -> notEnoughArgs()
             }
         }
@@ -149,16 +153,16 @@ private suspend fun execKotlinFunction(
         is Function2<*, *, *> -> withInvalidArgsCheck {
             function as Function2<Any?, Any?, Any?>
             when (args.size){
-                2 -> function.invoke(args[0], args[1])
-                1 -> runtime.async<Any?> {
+                2 -> function.invoke(args[0], args[1]).jsAnyOrUndefined()
+                1 -> runtime.async {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0]).also {
                             if (it != SUSPENDED){
                                 cont.resume(it)
                             }
-                        }
+                        }.jsAnyOrUndefined()
                     }
-                }
+                }.js()
                 else -> notEnoughArgs()
             }
         }
@@ -166,16 +170,16 @@ private suspend fun execKotlinFunction(
         is Function3<*, *, *, *> -> withInvalidArgsCheck {
             function as Function3<Any?, Any?, Any?, Any?>
             when (args.size){
-                3 -> function .invoke(args[0], args[1], args[2])
-                2 -> runtime.async<Any?> {
+                3 -> function .invoke(args[0], args[1], args[2]).jsAnyOrUndefined()
+                2 -> runtime.async {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1]).also {
                             if (it != SUSPENDED){
                                 cont.resume(it)
                             }
                         }
-                    }
-                }
+                    }.jsAnyOrUndefined()
+                }.js()
                 else -> notEnoughArgs()
             }
         }
@@ -183,16 +187,16 @@ private suspend fun execKotlinFunction(
         is Function4<*, *, *, *, *> -> withInvalidArgsCheck {
             function as Function4<Any?, Any?, Any?, Any?, Any?>
             when (args.size) {
-                4 -> function.invoke(args[0], args[1], args[2], args[3])
-                3 -> runtime.async<Any?> {
+                4 -> function.invoke(args[0], args[1], args[2], args[3]).jsAnyOrUndefined()
+                3 -> runtime.async {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1], args[2]).also {
                             if (it != SUSPENDED){
                                 cont.resume(it)
                             }
-                        }
+                        }.jsAnyOrUndefined()
                     }
-                }
+                }.js()
 
                 else -> notEnoughArgs()
             }
@@ -202,15 +206,16 @@ private suspend fun execKotlinFunction(
             function as Function5<Any?, Any?, Any?, Any?, Any?, Any?>
             when (args.size) {
                 5 -> function.invoke(args[0], args[1], args[2], args[3], args[4])
-                4 -> runtime.async<Any?> {
+                    .jsAnyOrUndefined()
+                4 -> runtime.async {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1], args[2], args[3]).also {
                             if (it != SUSPENDED){
                                 cont.resume(it)
                             }
-                        }
+                        }.jsAnyOrUndefined()
                     }
-                }
+                }.js()
 
                 else -> notEnoughArgs()
             }
@@ -220,15 +225,16 @@ private suspend fun execKotlinFunction(
             function as Function6<Any?, Any?, Any?, Any?, Any?, Any?, Any?>
             when (args.size) {
                 6 -> function.invoke(args[0], args[1], args[2], args[3], args[4], args[6])
+                    .jsAnyOrUndefined()
                 5 -> runtime.async<Any?> {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1], args[2], args[3], args[4]).also {
                             if (it != SUSPENDED){
                                 cont.resume(it)
                             }
-                        }
+                        }.jsAnyOrUndefined()
                     }
-                }
+                }.js()
 
                 else -> notEnoughArgs()
             }
@@ -237,15 +243,16 @@ private suspend fun execKotlinFunction(
             function as Function7<Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?>
             when (args.size) {
                 7 -> function.invoke(args[0], args[1], args[2], args[3], args[4], args[5], args[6])
-                6 -> runtime.async<Any?> {
+                    .jsAnyOrUndefined()
+                6 -> runtime.async {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1], args[2], args[3], args[4], args[5]).also {
                             if (it != SUSPENDED){
                                 cont.resume(it)
                             }
-                        }
+                        }.jsAnyOrUndefined()
                     }
-                }
+                }.js()
 
                 else -> notEnoughArgs()
             }
@@ -255,15 +262,16 @@ private suspend fun execKotlinFunction(
             function as Function8<Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?>
             when (args.size) {
                 8 -> function.invoke(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7])
-                7 -> runtime.async<Any?> {
+                    .jsAnyOrUndefined()
+                7 -> runtime.async {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1], args[2], args[3], args[4], args[5], args[6]).also {
                             if (it != SUSPENDED){
                                 cont.resume(it)
                             }
-                        }
+                        }.jsAnyOrUndefined()
                     }
-                }
+                }.js()
 
                 else -> notEnoughArgs()
             }

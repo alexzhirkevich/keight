@@ -4,15 +4,16 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.JSObject
 import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.Undefined
 
 internal class OpAssignByIndex(
     private val receiver : Expression,
     private val index : Expression,
     private val assignableValue : Expression,
-    private val merge : (suspend ScriptRuntime.(Any?, Any?) -> Any?)?
+    private val merge : (suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?)?
 ) : Expression() {
 
-    override suspend fun execute(runtime: ScriptRuntime): Any? {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         return invoke(
             receiver = receiver,
             index = index,
@@ -26,16 +27,16 @@ internal class OpAssignByIndex(
         suspend fun invoke(
             receiver: Expression,
             index: Expression,
-            value : Any?,
-            merge: (suspend ScriptRuntime.(Any?, Any?) -> Any?)?,
+            value : JsAny?,
+            merge: (suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?)?,
             runtime: ScriptRuntime
-        ) : Any? {
+        ) : JsAny? {
             val rec = receiver.invoke(runtime) as JsAny
             val idx = index(runtime)
 
             return when (rec) {
                 is MutableList<*> -> {
-                    rec as MutableList<Any?>
+                    rec as MutableList<JsAny?>
                     val i = runtime.toNumber(idx)
 
                     check(!i.toDouble().isNaN()) {
@@ -44,12 +45,12 @@ internal class OpAssignByIndex(
                     val index = i.toInt()
 
                     while (rec.lastIndex < index) {
-                        rec.add(Unit)
+                        rec.add(Undefined)
                     }
 
                     val c = rec[index]
 
-                    rec[index] = if (c !is Unit && merge != null) {
+                    rec[index] = if (c !is Undefined && merge != null) {
                         merge.invoke(runtime, c, value)
                     } else {
                         value

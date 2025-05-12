@@ -18,27 +18,27 @@ import kotlin.coroutines.cancellation.CancellationException
 internal class JSPromiseFunction : JSFunction(
     name = "Promise",
     prototype = Object {
-        "catch".func("onrejected") { args ->
-            val value = toKotlin(thisRef) as Job
+        "catch".js().func("onrejected") { args ->
             val arg = args.getOrNull(0)
             val callable = arg.callableOrThrow(this)
-            val job = toKotlin(value) as Job
+            val job = toKotlin(thisRef) as Job
 
             async {
                 try {
                     if (job is Deferred<*>) {
-                        job.await()
+                        job.await() as JsAny
                     } else {
                         job.joinSuccess()
+                        Undefined
                     }
                 } catch (t: CancellationException) {
                     throw t
                 } catch (t: Throwable) {
-                    callable.invoke(t.toJS().listOf(), this@func)
+                    callable.invoke(t.js().listOf(), this@func)
                 }
-            }
+            }.js()
         }
-        "then".func(
+        "then".js().func(
             FunctionParam("onfulfilled"),
             FunctionParam("onrejected", default = OpArgOmitted),
         ) { args ->
@@ -47,7 +47,12 @@ internal class JSPromiseFunction : JSFunction(
 
             async {
                 try {
-                    val res = if (job is Deferred<*>) job.await() else job.joinSuccess()
+                    val res = if (job is Deferred<*>) {
+                        job.await() as JsAny?
+                    } else {
+                        job.joinSuccess()
+                        Undefined
+                    }
                     onFulfilled.callableOrThrow(this@func)
                         .invoke(res.listOf(), this@func)
                 } catch (t: CancellationException) {
@@ -55,11 +60,11 @@ internal class JSPromiseFunction : JSFunction(
                 } catch (t: Throwable) {
                     args.argOrElse(1) { throw t }
                         .callableOrThrow(this@func)
-                        .invoke(t.toJS().listOf(), this@func)
+                        .invoke(t.js().listOf(), this@func)
                 }
-            }
+            }.js()
         }
-        "finally".func("handle") { args ->
+        "finally".js().func("handle") { args ->
             val arg = args.getOrNull(0)
             val callable = arg?.callableOrNull()
             val value = fromKotlin(thisRef) as Job
@@ -70,61 +75,70 @@ internal class JSPromiseFunction : JSFunction(
             async {
                 try {
                     value.joinSuccess()
+                    Undefined
                 } finally {
                     callable.invoke(emptyList(), this@func)
                 }
-            }
+            }.js()
         }
     },
     properties = listOf(
-        "resolve".func( FunctionParam("value", default = OpConstant(Unit))) {
-            CompletableDeferred(it[0])
+        "resolve".func( FunctionParam("value", default = OpConstant(Undefined))) {
+            CompletableDeferred(it[0]).js()
         },
-        "reject".func(FunctionParam("reason", default = OpConstant(Unit))) {
+        "reject".func(FunctionParam("reason", default = OpConstant(Undefined))) {
             val v = it[0]
 
-            CompletableDeferred<Unit>().apply {
+            CompletableDeferred<Undefined>().apply {
                 completeExceptionally(
                     if (v is Throwable) v else ThrowableValue(v)
                 )
-            }
+            }.js()
         },
         "all".func(FunctionParam("values", isVararg = true)) { args ->
             async {
-                (args[0] as Iterable<*>).map {
+                (args[0] as Iterable<JsAny?>).map {
                     val job = toKotlin(it)
                     typeCheck(job is Job){ "$job is not a Promise" }
-                    if (job is Deferred<*>) job.await() else job.joinSuccess()
-                }
-            }
+                    if (job is Deferred<*>) {
+                        job.await() as JsAny
+                    } else {
+                        job.joinSuccess()
+                        Undefined
+                    }
+                }.js()
+            }.js()
         }
-    ).associateBy { it.name }.toMutableMap()
+    ).associateBy { it.name.js() }.toMutableMap()
 ) {
 
-    override suspend fun invoke(args: List<Any?>, runtime: ScriptRuntime): Any {
+    override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
         runtime.typeError { "Promise constructor cannot be invoked without 'new'" }
     }
 
-    override suspend fun construct(args: List<Any?>, runtime: ScriptRuntime): Any {
+    override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
         val resolveReject = args.getOrNull(0).callableOrThrow(runtime)
 
-        val deferred = CompletableDeferred<Any?>()
+        val deferred = CompletableDeferred<JsAny?>()
 
-        val resolve = { x : Any? -> deferred.complete(x); Unit }
-        val reject = { x : Any? -> deferred.completeExceptionally(if (x is ThrowableValue) x else ThrowableValue(x)); Unit}
+        val resolve = "resolve".func("value") {
+            deferred.complete(it.argOrElse(0) { Undefined }); Undefined
+        }
+
+        val reject = "reject".func("value") {
+            val x = it.argOrElse(0) { Undefined }
+            deferred.completeExceptionally(
+                if (x is ThrowableValue) x else ThrowableValue(x)
+            ); Undefined
+        }
 
         return runtime.async {
             resolveReject.invoke(listOf(resolve, reject), runtime)
             deferred.await()
-        }
+        }.js()
     }
 }
 
-private fun Throwable.toJS()  = when (this) {
-    is ThrowableValue -> value
-    is JSError -> this
-    else -> JSError(message, cause = this)
-}
 
 internal suspend fun Job.joinSuccess(){
     join()

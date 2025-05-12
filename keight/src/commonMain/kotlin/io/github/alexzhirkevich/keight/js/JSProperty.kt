@@ -2,20 +2,19 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 
-public interface JSPropertyAccessor {
+public interface JSPropertyAccessor : JsAny {
 
-    public suspend fun get(runtime: ScriptRuntime) : Any?
+    public suspend fun get(runtime: ScriptRuntime): JsAny?
 
-    public suspend fun set(value : Any?, runtime: ScriptRuntime)
+    public suspend fun set(value: JsAny?, runtime: ScriptRuntime)
 
-    public class Value(internal var field: Any?) : JSPropertyAccessor {
+    public class Value(internal var field: JsAny?) : JSPropertyAccessor {
 
-        override suspend fun get(runtime: ScriptRuntime) : Any? = field
+        override suspend fun get(runtime: ScriptRuntime): JsAny? = field
 
-        override suspend fun set(value: Any?, runtime: ScriptRuntime) {
+        override suspend fun set(value: JsAny?, runtime: ScriptRuntime) {
             field = value
         }
     }
@@ -23,17 +22,17 @@ public interface JSPropertyAccessor {
     public class BackedField(
         private val getter: Callable?,
         private val setter: Callable? = null
-    ) : JSPropertyAccessor {
+    ) : JSPropertyAccessor, JsAny  {
 
-        override suspend fun get(runtime: ScriptRuntime): Any? {
+        override suspend fun get(runtime: ScriptRuntime): JsAny? {
             return if (getter != null) {
                 getter.invoke(emptyList(), runtime)
             } else {
-                Unit
+                Undefined
             }
         }
 
-        override suspend fun set(value: Any?, runtime: ScriptRuntime) {
+        override suspend fun set(value: JsAny?, runtime: ScriptRuntime) {
             runtime.typeCheck(setter != null || !runtime.isStrict){
                 "Cannot set property of which has only a getter"
             }
@@ -52,15 +51,15 @@ public interface JSProperty {
 
 public fun JSProperty.descriptor(): JSObject = Object {
     when (val v = value) {
-        is JSPropertyAccessor.Value -> "value" eq v
+        is JSPropertyAccessor.Value -> "value".js() eq v
         is JSPropertyAccessor.BackedField -> {
             "get".func { v.get(this) }
-            "set".func("v") { v.set(it[0], this) }
+            "set".func("v") { v.set(it[0], this); Undefined }
         }
     }
-    "writable" eq JSBooleanWrapper(writable != false)
-    "enumerable" eq JSBooleanWrapper(enumerable != false)
-    "configurable" eq JSBooleanWrapper(configurable != false)
+    "writable".js() eq JSBooleanWrapper(writable != false)
+    "enumerable".js() eq JSBooleanWrapper(enumerable != false)
+    "configurable".js() eq JSBooleanWrapper(configurable != false)
 }
 
 internal class JSPropertyImpl(
@@ -71,15 +70,15 @@ internal class JSPropertyImpl(
 ) : JSProperty {
     fun descriptor(): JSObject = Object {
         when (val v = value) {
-            is JSPropertyAccessor.Value -> "value" eq v
+            is JSPropertyAccessor.Value -> "value".js() eq v
             is JSPropertyAccessor.BackedField -> {
                 "get".func { v.get(this) }
-                "set".func("v") { v.set(it[0], this) }
+                "set".func("v") { v.set(it[0], this); Undefined }
             }
         }
-        "writable" eq JSBooleanWrapper(writable != false)
-        "enumerable" eq JSBooleanWrapper(enumerable != false)
-        "configurable" eq JSBooleanWrapper(configurable != false)
+        "writable".js() eq JSBooleanWrapper(writable != false)
+        "enumerable".js() eq JSBooleanWrapper(enumerable != false)
+        "configurable".js() eq JSBooleanWrapper(configurable != false)
     }
 }
 

@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
+import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.interpreter.Token
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.runTest
@@ -57,7 +58,7 @@ class FunctionsTest {
                 5  
             }
             test()
-        """.trimIndent().eval().assertEqualsTo(Unit)
+        """.trimIndent().eval().assertEqualsTo(Undefined)
     }
 
     @Test
@@ -156,7 +157,7 @@ class FunctionsTest {
         """
             const test = (a,b) => { a + b }
             test(1,2)
-        """.trimIndent().eval().assertEqualsTo(Unit)
+        """.trimIndent().eval().assertEqualsTo(Undefined)
 
         """
             const test = a => a+1
@@ -223,7 +224,7 @@ class FunctionsTest {
         "typeof p".eval(runtime).assertEqualsTo("object")
         "p.name".eval(runtime).assertEqualsTo("John")
         "p.age".eval(runtime).assertEqualsTo(25L)
-        "p.prototype".eval(runtime).assertEqualsTo(Unit)
+        "p.prototype".eval(runtime).assertEqualsTo(Undefined)
         "p.__proto__".eval(runtime).assertEqualsTo("Person.prototype".eval(runtime))
     }
 

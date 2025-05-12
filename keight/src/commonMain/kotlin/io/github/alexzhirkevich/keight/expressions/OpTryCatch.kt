@@ -4,17 +4,17 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.findRoot
+import io.github.alexzhirkevich.keight.js.CONSTRUCTOR
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.JSError
-import io.github.alexzhirkevich.keight.js.PROTOTYPE
+import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.interpreter.makeReferenceError
 import io.github.alexzhirkevich.keight.js.interpreter.makeTypeError
-import io.github.alexzhirkevich.keight.js.interpreter.referenceError
-import io.github.alexzhirkevich.keight.set
+import io.github.alexzhirkevich.keight.js.js
 
-internal class ThrowableValue(val value : Any?) : JSError(value) {
+internal class ThrowableValue(val value : JsAny?) : JSError(value) {
     override fun toString(): String {
         return value.toString() + " (thrown)"
     }
@@ -53,16 +53,16 @@ private fun TryCatchFinally(
         throw x
     } catch (t: Throwable) {
         val t = when  {
-            t is ReferenceError && t.get("constructor", r) !== (r.findRoot() as JSRuntime).ReferenceError ->
+            t is ReferenceError && t.get(CONSTRUCTOR, r) !== (r.findRoot() as JSRuntime).ReferenceError ->
                 r.makeReferenceError { t.message.orEmpty()  }
-            t is TypeError && t.get("constructor", r) !== (r.findRoot() as JSRuntime).TypeError ->
+            t is TypeError && t.get(CONSTRUCTOR, r) !== (r.findRoot() as JSRuntime).TypeError ->
                 r.makeTypeError { t.message.orEmpty()  }
             else -> t
         }
         if (catchVariableName != null) {
-            val throwable = if (t is ThrowableValue) t.value else t
+            val throwable = if (t is ThrowableValue) t.value else t.js()
             r.withScope {
-                it.set(catchVariableName, throwable, VariableType.Local)
+                it.set(catchVariableName.js(), throwable, VariableType.Local)
                 catchBlock.invoke(it)
             }
         } else {

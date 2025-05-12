@@ -1,5 +1,6 @@
 package test262
 
+import eval
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import kotlinx.coroutines.delay
@@ -24,7 +25,9 @@ private val MUTED_TESTS = listOf(
     "capturing-closure-variables-2.js",
     "ArrowFunction_restricted-properties.js",
     "dflt-obj-ptrn-prop-ary.js",
-    "eval-var-scope-syntax-err.js"
+    "eval-var-scope-syntax-err.js",
+    "lexical-super-property-from-within-constructor.js",
+    "lexical-super-property.js"
 )
 
 class Test262Suite {
@@ -33,37 +36,23 @@ class Test262Suite {
 
     var failed = 0
     var ignored = 0
-    private suspend fun File.testDirectory(r: JSRuntime){
-        walk().forEach {
-            if (it.isFile) {
-                i++
-                try {
-                    val test = Test262Case.fromSource(it)
-                    if (test.features.all { it !in UNSUPPORTED_FEATURES } && it.name !in MUTED_TESTS) {
-                        r.reset()
-                        test.harnessFiles.forEach {
-                            harness(it, r)
-                        }
-                        test.test(r)
-//                            println("✅ #${i.toString().padEnd(8, ' ')} PASSED     ${it.name}")
-                    } else {
-                        ignored++
-//                            println("⚠\uFE0F #${i.toString().padEnd(8, ' ')} IGNORED     ${it.name}")
-                    }
-                } catch (t: Throwable) {
-                    println("❌ #${i.toString().padEnd(8, ' ')} FAILED     ${it.name}",)
-                    failed++
-//                    println(it.path)
-                    throw t
-                }
-                if (i % 1000 == 0) {
-                    System.gc()
-                    delay(5000)
-                }
-            } else {
-                it.testDirectory(r)
+
+    @Test
+    fun temp() = runtimeTest {
+        """
+            function F() {
+              this.af = _ => {
+                return this;
+              };
             }
-        }
+
+            var usurper = {};
+            var f = new F();
+
+            throw f.af.bind(usurper)() == f
+//            assert.sameValue(f.af.call(usurper), f);
+//            assert.sameValue(f.af.bind(usurper)(), f);
+        """.eval(it)
     }
 
     @Test

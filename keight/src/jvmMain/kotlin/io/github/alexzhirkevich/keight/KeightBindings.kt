@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.runBlocking
 import javax.script.Bindings
 
@@ -12,7 +13,7 @@ internal class KeightBindings(
     }
 
     override fun put(key: String?, value: Any?): Any? {
-        runBlocking { runtime.set(key, value, VariableType.Local) }
+        runBlocking { runtime.set(key?.js(), runtime.fromKotlin(value), VariableType.Local) }
         return value
     }
 
@@ -21,11 +22,11 @@ internal class KeightBindings(
     }
 
     override fun remove(k: String?): Any? {
-        return runBlocking { runtime.delete(k) }
+        return runBlocking { runtime.delete(k?.js()) }
     }
 
     override fun containsKey(k: String?): Boolean {
-        return k in runtime
+        return k?.js() in runtime
     }
 
     override fun containsValue(value: Any?): Boolean {
@@ -33,7 +34,7 @@ internal class KeightBindings(
     }
 
     override fun get(p0: String?): Any? {
-        return runBlocking { runtime.get(p0) }
+        return runBlocking { runtime.get(p0?.js()) }
     }
 
     override fun isEmpty(): Boolean {

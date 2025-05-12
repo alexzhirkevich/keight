@@ -3,13 +3,14 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.fastForEachIndexed
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.Undefined
 
 internal fun OpSwitch(
     value : Expression,
     cases : List<Expression>,
 ): Expression =  Expression { r ->
     val v = value(r)
-
     var defaultIndex = -1;
     var run = false
     try {
@@ -32,15 +33,16 @@ internal fun OpSwitch(
     } catch (_: BlockBreak) {
 
     }
+    Undefined
 }
 
 internal class OpCase(
     val value : Expression,
 ) : Expression() {
-    override suspend fun execute(runtime: ScriptRuntime): Any = Unit
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? = Undefined
 
     companion object {
-        val Default = Expression {  }
+        val Default = Expression { Undefined }
     }
 }
 
