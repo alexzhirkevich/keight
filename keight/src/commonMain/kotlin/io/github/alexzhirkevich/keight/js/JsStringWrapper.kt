@@ -10,6 +10,10 @@ internal class JsStringObject(
     override val value : JsStringWrapper
 ) : JSObjectImpl("String"), Wrapper<Wrapper<String>> {
 
+    override fun hashCode(): Int {
+        return value.hashCode()
+    }
+
     override fun equals(other: Any?): Boolean {
         return (other is JsStringWrapper || other is JsStringObject || other is String)
                 && other.toString() == toString()

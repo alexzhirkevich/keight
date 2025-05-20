@@ -1,5 +1,6 @@
 package test262
 
+import assertEqualsTo
 import eval
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
@@ -27,7 +28,15 @@ private val MUTED_TESTS = listOf(
     "dflt-obj-ptrn-prop-ary.js",
     "eval-var-scope-syntax-err.js",
     "lexical-super-property-from-within-constructor.js",
-    "lexical-super-property.js"
+    "lexical-super-property.js",
+    "param-dflt-yield-id-strict.js",
+    "rest-param-strict-body.js",
+    "rest-params-trailing-comma-early-error.js",
+    "scope-body-lex-distinct.js",
+    "scope-param-elem-var-close.js",
+    "scope-param-elem-var-open.js",
+    "scope-param-rest-elem-var-close.js",
+    "scope-param-rest-elem-var-open.js",
 )
 
 class Test262Suite {

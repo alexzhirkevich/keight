@@ -20,10 +20,11 @@ public interface JsAny {
 
     public suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
 
-        if (property is Wrapper<*> && property.toString() == "__proto__"){
+        if (property is JsStringWrapper && property.toString() == "__proto__"){
             return proto(runtime)?.get(runtime)
         }
         return when(val proto = proto(runtime)) {
+            is Undefined -> Undefined
             is JsAny -> proto.get(property, runtime)
             else -> Undefined
         }?.get(runtime)

@@ -22,8 +22,6 @@ internal fun OpCall(
     isOptional : Boolean
 ) : Expression {
 
-    val args = arguments
-
     return when {
         callable is OpIndex -> Expression { r ->
             val receiver = callable.receiver.invoke(r)
@@ -31,10 +29,15 @@ internal fun OpCall(
             if ((receiver == null || receiver == Undefined) && callable.isOptional) {
                 return@Expression Undefined
             }
-            (receiver as JsAny).call(
+
+            r.typeCheck(receiver != null) {
+                "Can't get properties of $receiver"
+            }
+
+            receiver.call(
                 func = callable.index.invoke(r),
                 thisRef = receiver,
-                args = args.fastMap() { it(r) },
+                args = arguments.fastMap { it(r) },
                 isOptional = callable.isOptional,
                 runtime = r
             )
@@ -42,17 +45,19 @@ internal fun OpCall(
 
         callable is OpGetProperty && callable.receiver != null -> Expression { r ->
             val receiver = callable.receiver.invoke(r)
-            if ((receiver !is JsAny) && callable.isOptional) {
+
+            if ((receiver == null || receiver == Undefined) && callable.isOptional) {
                 return@Expression Undefined
             }
 
-            r.typeCheck (receiver is JsAny) {
+            r.typeCheck(receiver != null) {
                 "Can't get properties (${callable.name}) of $receiver"
             }
+
             receiver.call(
                 func = callable.name.js(),
                 thisRef = receiver,
-                args = args.fastMap { it(r) },
+                args = arguments.fastMap { it(r) },
                 isOptional = callable.isOptional,
                 runtime = r
             )
@@ -62,7 +67,7 @@ internal fun OpCall(
             OpCallImpl(
                 runtime = r,
                 callable = callable,
-                arguments = args.fastMap { it(r) },
+                arguments = arguments.fastMap { it(r) },
                 isOptional = isOptional
             )
         }
@@ -77,6 +82,7 @@ internal suspend fun JsAny.call(
 ) : JsAny? {
     val v = get(func, runtime)
     val callable = v?.callableOrNull()
+
     if (callable == null && isOptional) {
         return Undefined
     }
@@ -96,7 +102,7 @@ private tailrec suspend fun OpCallImpl(
         callable is Expression -> OpCallImpl(runtime, callable(runtime), arguments, isOptional)
         callable is Callable -> callable.invoke(arguments, runtime)
         callable is Function<*> -> execKotlinFunction(runtime, callable, arguments.fastMap(runtime::toKotlin))
-        isOptional && (callable == null || callable == Unit) -> Undefined
+        isOptional && (callable == null || callable == Undefined) -> Undefined
         else -> runtime.typeError { "$callable is not a function" }
     }
 }

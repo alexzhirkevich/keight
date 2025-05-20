@@ -77,7 +77,11 @@ internal class SimpleFunctionParam(
             runtime.withScope {
                 it.set(
                     property = name.js(),
-                    value = runtime.makeReferenceError { "Cannot access '$name' before initialization" },
+                    value = JSPropertyAccessor.BackedField(
+                        getter = Callable {
+                            runtime.referenceError { "Cannot access '$name' before initialization" }
+                        }
+                    ),
                     type = VariableType.Local
                 )
                 default.invoke(it)
@@ -134,6 +138,8 @@ internal class DestructiveFunctionParam(
 
     override suspend fun get(runtime: ScriptRuntime): JsAny? = Undefined
 }
+
+internal fun String.vararg() = FunctionParam(this, isVararg = true)
 
 internal infix fun String.defaults(default: Expression?) : FunctionParam {
     return FunctionParam(this, false, default)
@@ -258,7 +264,7 @@ public open class JSFunction(
 
     override suspend fun call(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
         return invoke(
-            args = args,
+            args = if (bindedArgs.isEmpty()) args else bindedArgs + args,
             runtime = runtime,
             extraArgs = emptyMap(),
             thisRef = if (isMutableThisRef) thisArg else thisRef
@@ -269,7 +275,7 @@ public open class JSFunction(
         return copy().also {
             it.thisRef = if (isMutableThisRef) thisArg else thisRef
             it.isMutableThisRef = false
-            it.bindedArgs = bindedArgs + args
+            it.bindedArgs = if (bindedArgs.isEmpty()) args else bindedArgs + args
         }
     }
 
@@ -383,14 +389,19 @@ public open class JSFunction(
         initArguments : suspend (ScriptRuntime) -> Unit,
     ) : JsAny? {
         return try {
-            runtime.withScope(
-                isFunction = true,
-                thisRef = thisRef ?: runtime.thisRef,
-                isSuspendAllowed = isAsync,
-            ){
+            runtime.withScope {
+
                 initArguments(it)
-                body.invoke(it)
+
+                it.withScope(
+                    isFunction = true,
+                    thisRef = thisRef ?: it.thisRef,
+                    isSuspendAllowed = isAsync,
+                ){
+                    body.invoke(it)
+                }
             }
+
         } catch (ret: BlockReturn) {
             ret.value
         }

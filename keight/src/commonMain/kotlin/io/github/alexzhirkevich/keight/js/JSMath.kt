@@ -35,7 +35,7 @@ internal fun JSMath() : JSObject = Object("Math") {
     "floor".js().func("x") { op1(it, ::floor) }
     "hypot".js().func(
         "values",
-        params = { FunctionParam(it, isVararg = true) }
+        params = { it.vararg() }
     ) { opVararg(it, { 0 }, ::hypotN) }
     "imul".js().func("x", "y",) { op2(it, ::imul) }
     "log".js().func("x") { op1(it, ::ln) }
@@ -44,13 +44,13 @@ internal fun JSMath() : JSObject = Object("Math") {
     "log2".js().func("x") { op1(it, ::log2) }
     "max".js().func(
         "values",
-        params = { FunctionParam(it, isVararg = true) }
+        params = { it.vararg() }
     ) {
         opVararg(it, { Double.NEGATIVE_INFINITY }, List<Double>::max)
     }
     "min".js().func(
         "values",
-        params = { FunctionParam(it, isVararg = true) }
+        params = { it.vararg() }
     ) { opVararg(it, { Double.POSITIVE_INFINITY }, List<Double>::min) }
     "pow".js().func("x", "y",) { op2(it, Double::pow) }
     "random".js().func("x") {  Random.nextDouble().js() }

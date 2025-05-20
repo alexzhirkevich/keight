@@ -20,7 +20,7 @@ class PromiseTest {
             let promise = new Promise((_, reject) => reject("failure"))
             await promise
         """.eval()
-        }.value.assertEqualsTo("failure")
+        }.value.toString().assertEqualsTo("failure")
     }
 
     @Test

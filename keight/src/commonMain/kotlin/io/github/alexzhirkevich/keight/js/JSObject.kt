@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
@@ -171,12 +172,11 @@ public open class JSObjectImpl(
                 )
             }
             .flatMap {
-                it.value.sortedBy {
-                    val v = runtime.fromKotlin(it)
+                it.value.sortedByDescending { v ->
                     when {
                         v is JsNumberWrapper && v.value.toLong() > 0 -> v.value.toLong()
                         v is JsNumberObject && v.value.toLong() > 0 -> v.value.toLong()
-                        v is CharSequence -> -1L
+                        v is JsStringWrapper || v is JsStringObject -> -1L
                         v is JSSymbol -> -2L
                         else -> -3L
                     }
@@ -236,12 +236,17 @@ public open class JSObjectImpl(
         value: JsAny?,
         runtime: ScriptRuntime,
     ) {
+
         runtime.typeCheck(map[property]?.writable != false || !runtime.isStrict) {
             "Cannot assign to read only property '$property' of object $this"
         }
 
         runtime.typeCheck(isExtensible || contains(property, runtime)) {
             "Cannot add property $property, object is not extensible"
+        }
+
+        if (!isExtensible && property == PROTO){
+            return
         }
 
         val current = map[property]
@@ -337,8 +342,11 @@ public open class JSObjectImpl(
         return p.enumerable != false
     }
 
-    override suspend fun contains(property: JsAny?, runtime: ScriptRuntime): Boolean =
-        property in map || super.contains(property, runtime)
+    override suspend fun contains(property: JsAny?, runtime: ScriptRuntime): Boolean {
+        val prop = map[property] ?: return super.contains(property, runtime)
+        return prop.enumerable != false
+    }
+
 
     override fun ownPropertyDescriptor(property: JsAny?): JSProperty? {
         return map[property]

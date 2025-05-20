@@ -95,7 +95,7 @@ internal class JSPromiseFunction : JSFunction(
                 )
             }.js()
         },
-        "all".func(FunctionParam("values", isVararg = true)) { args ->
+        "all".func("values".vararg()) { args ->
             async {
                 (args[0] as Iterable<JsAny?>).map {
                     val job = toKotlin(it)

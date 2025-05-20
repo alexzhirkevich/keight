@@ -23,6 +23,8 @@ internal class OpIndex(
 
         val idx = index(runtime)
 
-        return v.valueAtIndexOrUnit(idx, runtime.toNumber(idx).toInt(), runtime)
+        return OpGetProperty.invoke(v, isOptional, idx, runtime)
+
+//        return v.valueAtIndexOrUnit(idx, runtime.toNumber(idx).toInt(), runtime)
     }
 }

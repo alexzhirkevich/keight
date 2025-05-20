@@ -29,17 +29,20 @@ internal class JSStringFunction : JSFunction(
             val search = checkNotEmpty(toString(it[0], this)[0])
             toString(thisRef, this).lastIndexOf(search).js()
         }
-        "concat".js().func(FunctionParam("strings", isVararg = true)) {
+        "concat".js().func("strings".vararg()) {
             (toString(thisRef, this) + (it[0] as List<*>).joinToString("")).js()
         }
         "charCodeAt".js().func("index") {
             val ind = toNumber(it[0]).toInt()
             toString(thisRef, this)[ind].code.js()
         }
-        "endsWith".js().func(FunctionParam("search"), "pos" defaults OpArgOmitted) {
+        "endsWith".js().func(
+            FunctionParam("search"),
+            "pos" defaults OpArgOmitted
+        ) {
             val searchString = toString(it[0], this)
             val position = it.argOrNull(1)?.let { toNumber(it) }?.toInt()
-            val value = thisRef.toString()
+            val value = toString(thisRef, this)
             if (position == null) {
                 value.endsWith(searchString)
             } else {
@@ -50,8 +53,10 @@ internal class JSStringFunction : JSFunction(
             val delimiters = toString(it[0], this)
             val str = toString(thisRef, this).split(delimiters)
             if (delimiters.isEmpty()) {
-                str.subList(1, str.size - 1).fastMap { it.js() }.js()
-            } else it.js()
+                str.subList(1, str.size - 1)
+            } else {
+                str
+            }.fastMap(CharSequence::js).js()
         }
         "startsWith".js() eq StartsWith("")
         "includes".js() eq Includes("")

@@ -183,6 +183,7 @@ public open class JSRuntime(
     override suspend fun isFalse(a: Any?): Boolean {
         return a == null
                 || a == false
+                || a is Undefined
                 || a is Unit
                 || a is CharSequence && a.isEmpty()
                 || a is Number && a.toDouble().let { it == 0.0 || it.isNaN() }
@@ -312,15 +313,16 @@ public open class JSRuntime(
         }
     }
 
-    private suspend fun Any?.numberOrThis(
+    private suspend fun JsAny.numberOrThis(
         withMagic : Boolean = true,
         throwForObjects : Boolean = false
-    ) : Any? = numberOrNull(withMagic, throwForObjects) ?: this
+    ) : Any = numberOrNull(withMagic, throwForObjects) ?: this
 
     private tailrec suspend fun Any?.numberOrNull(
         withNaNs : Boolean = true,
         throwForObjects : Boolean = false
     ) : Number? = when(this) {
+        is Undefined -> null
         null -> 0L
         true -> 1L
         false -> 0L
@@ -366,7 +368,7 @@ public open class JSRuntime(
 
         is Wrapper<*> -> value.numberOrNull(withNaNs,throwForObjects)
         is JSObject ->  if (withNaNs) {
-            toPrimitive("number".js(), throwForObjects).numberOrNull(withNaNs, throwForObjects)
+            toPrimitive("number".js(), throwForObjects)?.numberOrNull(withNaNs, throwForObjects)
         } else {
             null
         }
@@ -562,10 +564,10 @@ public open class JSRuntime(
      *    d. Return ? OrdinaryToPrimitive(input, preferredType).
      * 2. Return input.
      */
-    internal tailrec suspend fun Any?.ToPrimitive(type: String? = S_DEFAULT) : Any? {
+    internal tailrec suspend fun JsAny?.ToPrimitive(type: String? = S_DEFAULT) : JsAny? {
 
-        return when (this) {
-            is JSObject -> {
+        return when  {
+            this is JSObject -> {
                 val exoticToPrim = get(JSSymbol.toPrimitive, this@JSRuntime)?.callableOrNull()
                 if (exoticToPrim != null){
                     val hint = type ?: S_DEFAULT
@@ -576,7 +578,7 @@ public open class JSRuntime(
 
                 return OrdinaryToPrimitive(type ?: S_NUMBER)
             }
-            is Wrapper<*> -> value.ToPrimitive(type)
+             this is Wrapper<*> && value is JsAny -> (value as JsAny).ToPrimitive(type)
             else -> this
         }
     }
@@ -603,7 +605,7 @@ public open class JSRuntime(
      *       ii. If result is not an Object, return result.
      * 4. Throw a TypeError exception.
      * */
-    internal suspend fun JsAny.OrdinaryToPrimitive(hint: String?) : Any? {
+    private suspend fun JsAny.OrdinaryToPrimitive(hint: String?) : JsAny? {
         val methods = mutableListOf<JsAny?>(S_VALUEOF.js(), S_TOSTRING.js())
 
         if (hint == S_STRING)
@@ -623,8 +625,27 @@ public open class JSRuntime(
         }
     }
 
-    internal suspend fun JsAny.toPrimitiveSymbolOrThis(
+//    private suspend fun JsAny.toPrimitiveSymbolOrThis(
+//        type : JsAny? = "default".js(),
+//    ) : JsAny {
+//
+//        get(JSSymbol.toPrimitive, this@JSRuntime)
+//            ?.callableOrNull()
+//            ?.call(this, listOfNotNull(type), this@JSRuntime)
+//            ?.let {
+//                typeCheck(it !is JSObject){
+//                    "Cannot convert object to primitive value"
+//                }
+//                return it
+//            }
+//
+//        return this
+//    }
+
+    internal suspend fun JsAny.toPrimitive(
         type : JsAny? = "default".js(),
+        force : Boolean = false,
+        symbolOnly : Boolean = false,
     ) : JsAny? {
 
         get(JSSymbol.toPrimitive, this@JSRuntime)
@@ -637,21 +658,22 @@ public open class JSRuntime(
                 return it
             }
 
-        return this
-    }
-    internal suspend fun JsAny.toPrimitive(
-        type : JsAny? = "default".js(),
-        force : Boolean = false,
-        symbolOnly : Boolean = false,
-    ) : Any? {
-
-        val prim = toPrimitiveSymbolOrThis(type)
-        if (prim !== this){
-            return prim
-        }
-
         return if (!symbolOnly) {
-            toNumericOrThis().takeIf { it !== this }
+            if (this is JSSymbol){
+                typeError { "Symbol cannot be converted to a number" }
+            }
+
+            get("valueOf".js(), this@JSRuntime)?.callableOrNull()
+                ?.call(this, emptyList(), this@JSRuntime)
+                ?.takeIf { it !is JSObject }
+                ?.let { return it }
+
+            JSStringFunction.toString(this, this@JSRuntime)
+                .toDoubleOrNull()
+                ?.takeUnless(Double::isNaN)
+                ?.let { return it.js()  }
+
+            return null
         } else {
             null
         }
@@ -792,8 +814,8 @@ private fun jsmul(a : Any?, b : Any?) : JsAny {
 
 private fun jsdiv(a : Any?, b : Any?) : JsAny {
     return when {
-        a is Undefined || b is Undefined || a is Unit || b is Unit
-                || (a == null && b == null)
+        a is Undefined || b is Undefined ||
+        (a == null && b == null)
                 || ((a as? Number)?.toDouble() == 0.0 && b == null)
                 || ((b as? Number)?.toDouble() == 0.0 && a == null)
                 || ((a as? CharSequence)?.toString()?.toDoubleOrNull() == 0.0 && b == null)

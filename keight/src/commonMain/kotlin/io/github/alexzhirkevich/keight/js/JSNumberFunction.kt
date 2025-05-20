@@ -59,8 +59,11 @@ internal fun numberMethods() : List<JSFunction> {
 internal class JSNumberFunction : JSFunction(
     name = "Number",
     prototype =  Object {
-        "toFixed".js().func("digits" defaults OpConstant(0.js())) { args ->
+        "toFixed".js().func(
+            "digits" defaults OpConstant(0.js())
+        ) { args ->
             val digits = args.getOrNull(0)?.let { toNumber(it) }?.toInt() ?: 0
+
             toNumber(thisRef).toFixed(digits, this).js()
         }
         "toPrecision".js().func("digits" defaults OpArgOmitted) { args ->

@@ -24,20 +24,28 @@ internal class OpGetProperty(
     private val nameJs = name.js()
 
     override suspend fun execute(runtime: ScriptRuntime, ): JsAny? {
-        return getImpl(receiver, runtime)
+        return getImpl(receiver, nameJs, runtime)
     }
 
-    private tailrec suspend fun getImpl(res: Any?, runtime: ScriptRuntime): JsAny? {
+    private suspend fun getImpl(res: Any?, property : JsAny?, runtime: ScriptRuntime): JsAny? {
         return when {
-            receiver == null -> if (nameJs in runtime) {
-                runtime.get(nameJs)
+            receiver == null -> if (property in runtime) {
+                runtime.get(property)
             } else {
-                runtime.referenceError { "$nameJs is not defined" }
+                runtime.referenceError { "$property is not defined" }
             }
-            res is Expression -> getImpl(res(runtime), runtime)
-            res is JsAny -> res.get(nameJs, runtime)
-            isOptional && (res == null || res == Unit) -> Undefined
-            else -> runtime.typeError { "Cannot get properties of $res" }
+            else -> invoke(receiver, isOptional, property, runtime)
+        }
+    }
+
+    companion object {
+        tailrec suspend fun invoke(receiver: Any?, isOptional: Boolean, property : JsAny?, runtime: ScriptRuntime): JsAny? {
+            return when {
+                receiver is Expression -> invoke(receiver(runtime), isOptional, property, runtime)
+                isOptional && (receiver == null || receiver == Undefined || receiver == Unit) -> Undefined
+                receiver is JsAny -> receiver.get(property, runtime)
+                else -> runtime.typeError { "Cannot get properties of $receiver" }
+            }
         }
     }
 }

@@ -129,7 +129,9 @@ internal class StringTest {
     @Test
     fun split() = runTest {
         "'The quick brown fox jumps over the lazy dog'.split(' ')"
-            .eval().assertEqualsTo(listOf("The", "quick", "brown", "fox", "jumps", "over", "the","lazy","dog"))
+            .eval()
+            .assertEqualsTo(listOf("The", "quick", "brown", "fox", "jumps", "over", "the","lazy","dog"))
+
         "'a b'.split('')".eval().assertEqualsTo(listOf("a", " ", "b"))
     }
 

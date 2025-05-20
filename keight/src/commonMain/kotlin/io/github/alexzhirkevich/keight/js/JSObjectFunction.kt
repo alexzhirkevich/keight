@@ -171,7 +171,7 @@ internal class JSObjectFunction : JSFunction(
 
             typeCheck(obj is JsAny) { "$obj is not an object" }
 
-            (obj as? JsAny)?.get(PROTO, this) ?: Undefined
+            obj.get(PROTO, this) ?: Undefined
         },
 
         "preventExtensions".func( "object") {

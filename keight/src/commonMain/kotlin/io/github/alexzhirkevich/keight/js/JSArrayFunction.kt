@@ -128,12 +128,14 @@ internal class JSArrayFunction : JSFunction(
             }
         }
         "splice".js().func(
-            "value" defaults OpConstant(mutableListOf<JsAny?>().js())
+            "value" defaults OpConstant(mutableListOf<JsAny?>().js()),
+            "deleteCount" defaults OpArgOmitted,
+            "items".vararg()
         ){ args ->
             val value = thisRef<MutableList<JsAny?>>()
 
             val pos = toNumber(args[0]).toInt()
-            val remove = toNumber(args[1]).toInt()
+            val remove = toNumber(args.argOrElse(1) { (value.size-pos).js() }).toInt()
             val rest = args.drop(2)
 
             val deleted = buildList {
@@ -146,12 +148,14 @@ internal class JSArrayFunction : JSFunction(
             deleted.js()
         }
         "toSpliced".js().func(
-            "value" defaults OpConstant(mutableListOf<JsAny?>().js())
+            "value" defaults OpConstant(mutableListOf<JsAny?>().js()),
+            "deleteCount" defaults OpArgOmitted,
+            "items".vararg()
         ){ args ->
 
             val value = thisRef<List<JsAny?>>().toMutableList()
             val pos = toNumber(args[0]).toInt()
-            val remove = toNumber(args[1]).toInt()
+            val remove = toNumber(args.argOrElse(1) { (value.size-pos).js() }).toInt()
             val rest = args.drop(2)
 
             repeat(remove) {
@@ -372,7 +376,7 @@ private fun List<JsAny?>.flat(depth : Int, collector : MutableList<JsAny?> = mut
 }
 
 private suspend fun <R> ScriptRuntime.op(
-    arguments: List<Any?>,
+    arguments: List<JsAny?>,
     op: suspend (Callable) -> R
 ) : R {
     return op(arguments[0].callableOrThrow(this))

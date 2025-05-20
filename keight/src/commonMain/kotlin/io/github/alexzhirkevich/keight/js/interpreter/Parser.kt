@@ -824,7 +824,11 @@ private fun ListIterator<Token>.parseTypeof() : Expression {
         parseStatement(precedence = 1,blockType = ExpectedBlockType.Object)
     }
     return Expression {
-        expr(it)?.type?.js()
+        try {
+            expr(it)?.type?.js() ?: "object".js()
+        } catch (t : ReferenceError){
+            "undefined".js()
+        }
     }
 }
 
@@ -1457,7 +1461,7 @@ private fun ListIterator<Token>.parseBlock(
     ) {
         OpMakeObject(list)
     } else {
-        val (isStrict, exprs) = if ((list.firstOrNull() as? OpConstant)?.value as? CharSequence == "use strict") {
+        val (isStrict, exprs) = if ((list.firstOrNull() as? OpConstant)?.value?.toString() == "use strict") {
             true to list.drop(1)
         } else {
             false to list
