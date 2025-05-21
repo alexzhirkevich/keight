@@ -62,7 +62,7 @@ suspend fun harness(name : String, runtime: JSRuntime) {
                         JSStringFunction.toString(result.value, runtime)
                     }
                 } else {
-                    null
+                    result
                 }
                 throw Exception("Failed test $file (MSG: $msg)", result)
             }

@@ -18,6 +18,7 @@ import io.github.alexzhirkevich.keight.expressions.OpGetProperty
 import io.github.alexzhirkevich.keight.expressions.OpMake
 import io.github.alexzhirkevich.keight.expressions.OpSpread
 import io.github.alexzhirkevich.keight.expressions.asDestruction
+import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMapNotNull
 import io.github.alexzhirkevich.keight.findRoot
@@ -412,6 +413,33 @@ public open class JSFunction(
     }
 }
 
+internal fun validateFunctionParams(
+    params : List<FunctionParam>,
+    isArrow: Boolean,
+){
+    val names = mutableSetOf<String>()
+
+    params.fastForEach {
+        when(it){
+            is DestructiveFunctionParam -> {
+                if (
+                    it.destruction.variables.any { it in names } ||
+                    it.destruction.variables.toSet().size != it.destruction.variables.size
+                ){
+                    throw SyntaxError("Duplicate parameter name not allowed in this context")
+                }
+                names.addAll(it.destruction.variables)
+            }
+            is SimpleFunctionParam -> {
+                if (isArrow &&  it.name in names){
+                    throw SyntaxError("Duplicate parameter name not allowed in this context")
+                }
+                names += it.name
+            }
+        }
+    }
+}
+
 internal fun Expression.toFunctionParam() : FunctionParam {
     return when (this) {
         is OpGetProperty -> FunctionParam(name = name)
@@ -425,12 +453,16 @@ internal fun Expression.toFunctionParam() : FunctionParam {
                 default = it.default
             )
         }
+
         is OpAssign -> FunctionParam(
             name = variableName,
             default = assignableValue
         )
-        is OpDestructAssign ->  DestructiveFunctionParam(destruction, value)
-        is OpBlock, is OpMake ->  DestructiveFunctionParam(asDestruction())
+
+        is OpDestructAssign -> DestructiveFunctionParam(destruction, value)
+        is OpBlock,
+        is OpMake -> DestructiveFunctionParam(asDestruction())
+
         else -> throw SyntaxError("Invalid function declaration")
     }
 }

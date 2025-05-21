@@ -136,7 +136,7 @@ internal class JSArrayFunction : JSFunction(
 
             val pos = toNumber(args[0]).toInt()
             val remove = toNumber(args.argOrElse(1) { (value.size-pos).js() }).toInt()
-            val rest = args.drop(2)
+            val rest =  args[2] as List<JsAny?>
 
             val deleted = buildList {
                 repeat(remove) {
@@ -156,7 +156,7 @@ internal class JSArrayFunction : JSFunction(
             val value = thisRef<List<JsAny?>>().toMutableList()
             val pos = toNumber(args[0]).toInt()
             val remove = toNumber(args.argOrElse(1) { (value.size-pos).js() }).toInt()
-            val rest = args.drop(2)
+            val rest =  args[2] as List<JsAny?>
 
             repeat(remove) {
                 value.removeAt(pos)
@@ -165,17 +165,79 @@ internal class JSArrayFunction : JSFunction(
             value.addAll(pos, rest)
             value.js()
         }
-        "at".js() eq At(mutableListOf())
-        "includes".js() eq Includes(mutableListOf())
-        "join".js() eq Join(mutableListOf())
-        "push".js() eq Push(mutableListOf())
-        "pop".js() eq Pop(mutableListOf())
-        "shift".js() eq Shift(mutableListOf())
-        "unshift".js() eq Unshift(mutableListOf())
-        "concat".js() eq Concat(mutableListOf())
-        "copyWithin".js() eq CopyWithin(mutableListOf())
-        "flat".js() eq Flat(mutableListOf())
-        "flatMap".js() eq FlatMap(mutableListOf())
+        "at".js().func("idx"){
+            thisRef.get(it[0], this)
+        }
+        "includes".js().func("item"){
+            val v = it[0]
+            val fromIndex = it.getOrNull(1)?.let { toNumber(it) }?.toInt() ?: 0
+            (thisRef<List<*>>().indexOf(v) > fromIndex).js()
+        }
+        "join".js().func("separator") {
+            val sep = JSStringFunction.toString(it.getOrElse(0) { "," }, this)
+            thisRef<List<JsAny?>>().joinToString(separator = sep).js()
+        }
+        "push".js().func("items".vararg()) {
+            val items = it[0] as List<JsAny?>
+            thisRef<MutableList<JsAny?>>().addAll(items)
+            items.size.js()
+        }
+        "pop".js().func {
+            val value = thisRef<MutableList<JsAny?>>()
+            if (value.isEmpty()) Undefined else value.removeLast()
+        }
+        "shift".js().func {
+            val value = thisRef<MutableList<JsAny?>>()
+            if (value.isEmpty()) Undefined else value.removeLast()
+        }
+        "unshift".js().func("items".vararg()) {
+            val value = thisRef<MutableList<JsAny?>>()
+            val items = it[0] as List<JsAny?>
+            value.addAll(0, items)
+            items.size.js()
+        }
+        "concat".js().func("items".vararg()) {
+            buildList {
+                addAll(thisRef<List<JsAny?>>())
+                (it[0] as List<JsAny?>).forEach {
+                    when (it) {
+                        is List<*> -> addAll(it as List<JsAny?>)
+                        else -> add(it)
+                    }
+                }
+            }.js()
+        }
+        "copyWithin".js().func(
+            FunctionParam("to"),
+            FunctionParam("from"),
+            "num" defaults OpArgOmitted
+        ) {
+            val to = toNumber(it[0]).toInt()
+            val from = toNumber(it[1]).toInt()
+            val value = thisRef<MutableList<JsAny?>>()
+            val num = it.argOrNull(2)?.let { toNumber(it) }?.toInt() ?: value.size
+
+            for (i in 0 until num.coerceAtMost(min(value.size - to, value.size - from))){
+                value[to + i] = value[from + i]
+            }
+            value.js()
+        }
+        "flat".js().func("depth" defaults OpArgOmitted) {
+            val depth = it.argOrNull(0)
+                ?.let { toNumber(it) }
+                ?.toInt()
+                ?.coerceAtLeast(0)
+                ?: 1
+            thisRef<List<JsAny?>>().flat(depth).js()
+        }
+        "flatMap".js().func("block") {
+            val value = thisRef<MutableList<JsAny?>>()
+            op(it) { callable ->
+                value.fastMap {
+                    callable.invoke(listOf(it), this)
+                }
+            }.flat(1).js()
+        }
         "toString".js().func{
             thisRef<List<*>>().joinToString(separator = ",").js()
         }
@@ -206,161 +268,6 @@ internal class JSArrayFunction : JSFunction(
     override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
         return invoke(args, runtime)
     }
-
-    @JvmInline
-    private value class At(val value: MutableList<JsAny?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            val idx = runtime.toNumber(args[0]).toInt()
-            return value.valueAtIndexOrUnit(idx)
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return At((thisArg as? MutableList<JsAny?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Includes(val value: MutableList<Any?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            val v = args[0]
-            val fromIndex = args.getOrNull(1)?.let { runtime.toNumber(it) }?.toInt() ?: 0
-            return (value.indexOf(v) > fromIndex).js()
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return Includes((thisArg as? MutableList<Any?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Join(val value: MutableList<JsAny?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            val sep = JSStringFunction.toString(args.getOrElse(0) { "," }, runtime)
-            return value.joinToString(separator = sep).js()
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return Join((thisArg as? MutableList<JsAny?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Push(val value: MutableList<JsAny?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            value.addAll(args)
-            return args.size.js()
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return Push((thisArg as? MutableList<JsAny?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Pop(val value: MutableList<JsAny?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            return if (value.isEmpty()) {
-                Undefined
-            } else {
-                value.removeLast()
-            }
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return Pop((thisArg as? MutableList<JsAny?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Shift(val value: MutableList<JsAny?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            return if (value.isEmpty()) {
-                Undefined
-            } else {
-                value.removeFirst()
-            }
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return Shift((thisArg as? MutableList<JsAny?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Unshift(val value: MutableList<JsAny?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            value.addAll(0, args)
-            return args.size.js()
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return Unshift((thisArg as? MutableList<JsAny?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Concat(val value: MutableList<JsAny?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            return buildList {
-                addAll(value)
-                args.forEach {
-                    when (it) {
-                        is List<*> -> addAll(it as List<JsAny?>)
-                        else -> add(it)
-                    }
-                }
-            }.js()
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return Concat((thisArg as? MutableList<JsAny?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class CopyWithin(val value: MutableList<JsAny?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            val to = runtime.toNumber(args[0]).toInt()
-            val from = runtime.toNumber(args[1]).toInt()
-
-            val num = if (args.size >= 3) {
-                runtime.toNumber(args[2]).toInt()
-            } else {
-                value.size
-            }
-
-            for (i in 0 until num.coerceAtMost(min(value.size - to, value.size - from))){
-                value[to + i] = value[from + i]
-            }
-            return value.js()
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return CopyWithin((thisArg as? MutableList<JsAny?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class Flat(val value: MutableList<JsAny?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            val depth = args.getOrNull(0)
-                ?.let { runtime.toNumber(it) }
-                ?.toInt()
-                ?.coerceAtLeast(0)
-                ?: 1
-            return value.flat(depth).js()
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return Flat((thisArg as? MutableList<JsAny?>) ?: mutableListOf())
-        }
-    }
-
-    @JvmInline
-    private value class FlatMap(val value: MutableList<JsAny?>) : Callable {
-        override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-            return with(runtime) {
-                op(args) { callable ->
-                    value.fastMap {
-                        callable.invoke(listOf(it), runtime)
-                    }
-                }.flat(1)
-            }.js()
-        }
-        override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
-            return FlatMap((thisArg as? MutableList<JsAny?>) ?: mutableListOf())
-        }
-    }
 }
 
 private fun List<JsAny?>.flat(depth : Int, collector : MutableList<JsAny?> = mutableListOf()) : List<JsAny?> {
@@ -375,12 +282,10 @@ private fun List<JsAny?>.flat(depth : Int, collector : MutableList<JsAny?> = mut
     return collector
 }
 
-private suspend fun <R> ScriptRuntime.op(
+private suspend inline fun <R> ScriptRuntime.op(
     arguments: List<JsAny?>,
-    op: suspend (Callable) -> R
-) : R {
-    return op(arguments[0].callableOrThrow(this))
-}
+    op: (Callable) -> R
+) : R = op(arguments[0].callableOrThrow(this))
 
 private suspend fun List<*>.indexOf(
     context: ScriptRuntime,

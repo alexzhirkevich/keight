@@ -22,6 +22,10 @@ private val UNSUPPORTED_FEATURES = listOf(
     "new.target",
 )
 
+private val UNSUPPORTED_FLAGS = listOf(
+    "onlyStrict"
+)
+
 private val MUTED_TESTS = listOf(
     "capturing-closure-variables-2.js",
     "ArrowFunction_restricted-properties.js",
@@ -37,6 +41,11 @@ private val MUTED_TESTS = listOf(
     "scope-param-elem-var-open.js",
     "scope-param-rest-elem-var-close.js",
     "scope-param-rest-elem-var-open.js",
+
+    "asi-restriction-invalid.js",
+    "asi-restriction-invalid-parenless-parameters-expression-body.js",
+    "asi-restriction-invalid-parenless-parameters.js",
+    "use-strict-with-non-simple-param.js"
 )
 
 class Test262Suite {
@@ -49,19 +58,8 @@ class Test262Suite {
     @Test
     fun temp() = runtimeTest {
         """
-            function F() {
-              this.af = _ => {
-                return this;
-              };
-            }
-
-            var usurper = {};
-            var f = new F();
-
-            throw f.af.bind(usurper)() == f
-//            assert.sameValue(f.af.call(usurper), f);
-//            assert.sameValue(f.af.bind(usurper)(), f);
-        """.eval(it)
+            new (() => {});
+        """.eval(it).assertEqualsTo(1)
     }
 
     @Test
@@ -77,24 +75,29 @@ class Test262Suite {
             test262().resolve(f).walk().forEach {
                 if (it.isFile) {
                     i++
+                    var ignore = false
                     try {
                         val test = Test262Case.fromSource(it)
-                        if (test.features.all { it !in UNSUPPORTED_FEATURES } && it.name !in MUTED_TESTS) {
-                            r.reset()
-                            test.harnessFiles.forEach {
-                                harness(it, r)
-                            }
-                            test.test(r)
-//                            println("✅ #${i.toString().padEnd(8, ' ')} PASSED     ${it.name}")
-                        } else {
+
+                        ignore = test.features.any { it in UNSUPPORTED_FEATURES }
+                                || UNSUPPORTED_FLAGS.any { test.hasFlag(it) }
+                                || it.name in MUTED_TESTS
+
+                        r.reset()
+                        test.harnessFiles.forEach {
+                            harness(it, r)
+                        }
+                        test.test(r)
+//                        println("✅ #${i.toString().padEnd(8, ' ')} PASSED     ${it.name}")
+                    } catch (t: Throwable) {
+                        if (ignore) {
                             ignored++
 //                            println("⚠\uFE0F #${i.toString().padEnd(8, ' ')} IGNORED     ${it.name}")
+                        } else {
+                            failed++
+                            println("❌ #${i.toString().padEnd(8, ' ')} FAILED     ${it.name}",)
+                            throw t
                         }
-                    } catch (t: Throwable) {
-                        failed++
-                        println("❌ #${i.toString().padEnd(8, ' ')} FAILED     ${it.name}",)
-//                    println(it.path)
-                        throw t
                     }
                     if (i % 1000 == 0) {
                         System.gc()

@@ -18,13 +18,35 @@ import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import io.github.alexzhirkevich.keight.js.js
 import kotlin.reflect.KClass
 
-internal fun interface Destruction {
+internal fun Destruction(
+    variables : List<String>,
+    block : suspend (obj: JsAny?, variableType: VariableType?, runtime: ScriptRuntime, default: Getter<*>?) -> Unit
+) = object  : Destruction {
+
+    override val variables: List<String> get() = variables
+
+    override suspend fun destruct(
+        obj: JsAny?,
+        variableType: VariableType?,
+        runtime: ScriptRuntime,
+        default: Getter<*>?
+    ) {
+        block(obj, variableType, runtime, default)
+    }
+
+}
+
+internal interface Destruction {
+
+    val variables : List<String>
 
     class Group(
         val items: List<Destruction>,
         val context: DestructionContext?,
         val itemsContext : KClass<out DestructionContext>?
     ) : Destruction {
+
+        override val variables: List<String> = items.flatMap { it.variables }
 
         init {
             if (items.isNotEmpty() && items.any { it is SpreadDestruction } && items.last() !is SpreadDestruction) {
@@ -63,7 +85,7 @@ internal fun interface Destruction {
     )
 }
 
-private val EmptyDestruction = Destruction { _, _, _, _ ->  }
+private val EmptyDestruction = Destruction(emptyList()) { _, _, _, _ ->  }
 
 internal sealed interface DestructionContext {
 
@@ -154,7 +176,7 @@ internal fun Expression.asDestruction(
 //            }
         }
         is OpAssign -> {
-            Destruction { obj, variableType, runtime, default ->
+            Destruction(listOf(this.variableName)) { obj, variableType, runtime, default ->
                 OpAssign.invoke(
                     variableName = variableName,
                     receiver = receiver,
@@ -195,7 +217,7 @@ internal fun Expression.asDestruction(
             syntaxCheck(receiver == null || context is DestructionContext.Array){
                 "Invalid destruction syntax"
             }
-            Destruction { obj, variableType, runtime, default ->
+            Destruction(listOf(this.name)) { obj, variableType, runtime, default ->
                 OpAssign.invoke(
                     variableName = name,
                     receiver = receiver,
@@ -219,7 +241,7 @@ internal fun Expression.asDestruction(
             syntaxCheck(context is DestructionContext.Array){
                 "Invalid destruction syntax"
             }
-            Destruction { obj, _, runtime, default ->
+            Destruction(emptyList()) { obj, _, runtime, default ->
                 OpAssignByIndex.invoke(
                     index = index,
                     receiver = receiver,
@@ -257,7 +279,7 @@ internal fun Expression.asDestruction(
         )
         is OpKeyValuePair -> {
             value.asDestruction().let {
-                Destruction { obj, variableType, runtime, default ->
+                Destruction(it.variables + key) { obj, variableType, runtime, default ->
                     it.destruct(
                         obj = DestructionContext.Object.property(key, obj, runtime, default),
                         variableType = variableType,
@@ -291,6 +313,10 @@ private class SpreadDestruction(
     private val value: Destruction,
     private val context: DestructionContext.Array
 ) : Destruction {
+
+    override val variables: List<String>
+        get() = value.variables
+
     override suspend fun destruct(
         obj: JsAny?,
         variableType: VariableType?,
@@ -320,6 +346,10 @@ private class DestructionWithDefault(
     private val context: DestructionContext?,
     var defaultValue : Expression
 ) : Destruction {
+
+    override val variables: List<String>
+        get() = destruction.variables
+
     override suspend fun destruct(
         obj: JsAny?,
         variableType: VariableType?,

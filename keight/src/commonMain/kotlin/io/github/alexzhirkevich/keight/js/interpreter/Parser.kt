@@ -61,6 +61,7 @@ import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
 import io.github.alexzhirkevich.keight.js.toFunctionParam
+import io.github.alexzhirkevich.keight.js.validateFunctionParams
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlin.collections.List
@@ -508,7 +509,11 @@ private fun ListIterator<Token>.parseFactor(
             parseStatement(
                 blockType = ExpectedBlockType.Object,
             )
-        )
+        ).also {
+            if (it.value is OpFunctionInit && it.value.function.isArrow){
+                throw SyntaxError("Unexpected token '...'")
+            }
+        }
         Token.Operator.Arithmetic.Inc,
         Token.Operator.Arithmetic.Dec -> {
             val isInc = next is Token.Operator.Arithmetic.Inc
@@ -1308,6 +1313,8 @@ private fun ListIterator<Token>.parseArrowFunction(blockContext: List<BlockConte
         else -> listOf(args)
     }.map(Expression::toFunctionParam)
 
+    validateFunctionParams(fArgs,true)
+
     val lambda = parseBlock(
         type = ExpectedBlockType.Block,
         blockContext = blockContext + BlockContext.Function,
@@ -1346,6 +1353,8 @@ private fun ListIterator<Token>.parseFunction(
     }
 
     val args = touple.expressions.map(Expression::toFunctionParam)
+
+    validateFunctionParams(args, false)
 
     val block = parseBlock(
         scoped = false,
