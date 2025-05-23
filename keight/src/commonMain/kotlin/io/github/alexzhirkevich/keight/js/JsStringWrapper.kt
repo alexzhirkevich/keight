@@ -20,6 +20,8 @@ internal class JsStringObject(
     }
 
     override fun toString(): String = value.toString()
+
+    override fun toKotlin(runtime: ScriptRuntime): Any = value.toKotlin(runtime)
 }
 
 @JvmInline
@@ -49,6 +51,8 @@ internal value class JsStringWrapper(
     override fun compareTo(other: JsStringWrapper): Int {
         return value.compareTo(other.value)
     }
+
+    override fun toKotlin(runtime: ScriptRuntime): Any = value
 }
 
 

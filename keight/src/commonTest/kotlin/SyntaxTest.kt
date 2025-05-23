@@ -192,7 +192,7 @@ class SyntaxTest {
 
         "'str' + /* commment */ 'ing'".eval().assertEqualsTo("string")
 
-        val func = "/**/function /**/name/**/(/**/arg1,/**/arg2/**/){/**/}; name".eval() as JSFunction
+        val func = "/**/function /**/name/**/(/**/arg1,/**/arg2/**/){/**/}; name".evalRaw() as JSFunction
         func.name.assertEqualsTo("name")
         func.parameters.let {
             (it[0] as SimpleFunctionParam).name.assertEqualsTo("arg1")

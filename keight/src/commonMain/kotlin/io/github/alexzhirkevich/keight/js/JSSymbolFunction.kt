@@ -12,6 +12,6 @@ internal class JSSymbolFunction : JSFunction(
     }
 
     override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
-        runtime.typeError { "Symbol is not a constructor" }
+        runtime.typeError { "Symbol is not a constructor".js() }
     }
 }

@@ -19,4 +19,6 @@ internal value class JSPromiseWrapper(
     override fun toString(): String {
         return "Promise"
     }
+
+    override fun toKotlin(runtime: ScriptRuntime): Any = value
 }

@@ -54,9 +54,9 @@ private fun TryCatchFinally(
     } catch (t: Throwable) {
         val t = when  {
             t is ReferenceError && t.get(CONSTRUCTOR, r) !== (r.findRoot() as JSRuntime).ReferenceError ->
-                r.makeReferenceError { t.message.orEmpty()  }
+                r.makeReferenceError { t.message.orEmpty().js()  }
             t is TypeError && t.get(CONSTRUCTOR, r) !== (r.findRoot() as JSRuntime).TypeError ->
-                r.makeTypeError { t.message.orEmpty()  }
+                r.makeTypeError { t.message.orEmpty().js()  }
             else -> t
         }
         if (catchVariableName != null) {

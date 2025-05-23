@@ -32,7 +32,7 @@ internal class OpGetProperty(
             receiver == null -> if (property in runtime) {
                 runtime.get(property)
             } else {
-                runtime.referenceError { "$property is not defined" }
+                runtime.referenceError { "$property is not defined".js() }
             }
             else -> invoke(receiver, isOptional, property, runtime)
         }
@@ -44,7 +44,7 @@ internal class OpGetProperty(
                 receiver is Expression -> invoke(receiver(runtime), isOptional, property, runtime)
                 isOptional && (receiver == null || receiver == Undefined || receiver == Unit) -> Undefined
                 receiver is JsAny -> receiver.get(property, runtime)
-                else -> runtime.typeError { "Cannot get properties of $receiver" }
+                else -> runtime.typeError { "Cannot get properties of $receiver".js() }
             }
         }
     }

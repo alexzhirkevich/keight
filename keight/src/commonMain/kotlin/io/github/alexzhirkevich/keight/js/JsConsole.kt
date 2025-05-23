@@ -2,6 +2,7 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Console
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.fastMap
 
 internal fun JsConsole(io: () -> Console) = Object("console") {
     "log".js().func("msg".vararg()) { out(it, io()::verbose) }
@@ -17,9 +18,9 @@ private fun ScriptRuntime.out(message : List<Any?>, out : (Any?) -> Unit) : JsAn
     }
     val args = message[0] as List<JsAny?>
     if (args.size == 1) {
-        out(toKotlin(args[0]))
+        out(args[0]?.toKotlin(this))
     } else {
-        out(args.map(::toKotlin))
+        out(args.fastMap { it?.toKotlin(this) })
     }
     return Undefined
 }

@@ -21,7 +21,7 @@ internal class KeightScriptContext(
         val r = if (scope == ScriptContext.GLOBAL_SCOPE) factory.globalRuntime else runtime
         r.reset()
         runBlocking {
-            bindings?.forEach { (k, v) -> r.set(k.js(), runtime.fromKotlin(v), VariableType.Global) }
+            bindings?.forEach { (k, v) -> r.set(k.js(), fromKotlin(v), VariableType.Global) }
         }
     }
 
@@ -36,9 +36,9 @@ internal class KeightScriptContext(
     override fun setAttribute(name: String?, value: Any?, scope: Int) {
         runBlocking {
             if (scope == ScriptContext.GLOBAL_SCOPE) {
-                factory.globalRuntime.set(name?.js(), runtime.fromKotlin(value), VariableType.Global)
+                factory.globalRuntime.set(name?.js(), fromKotlin(value), VariableType.Global)
             } else {
-                runtime.set(name?.js(), runtime.fromKotlin(value), VariableType.Local)
+                runtime.set(name?.js(), fromKotlin(value), VariableType.Local)
             }
         }
     }

@@ -76,10 +76,10 @@ internal class JSDateFunction : JSFunction(
         "toJSON".js().func { thisDate.toString().js() }
 
         JSSymbol.toPrimitive.func("hint" defaults OpConstant("default".js())) {
-            when (val t = toKotlin(it.getOrNull(0))) {
+            when (val t = it.getOrNull(0)?.toKotlin(this)) {
                 "string", "default" -> thisDate.toString().js()
                 "number" -> thisDateWrapper.toInstant().toEpochMilliseconds().js()
-                else -> typeError { "Invalid hint: $t" }
+                else -> typeError { "Invalid hint: $t".js() }
             }
         }
 
@@ -110,7 +110,7 @@ private suspend fun ScriptRuntime.constructDate(args: List<JsAny?>) : JSDateWrap
         return JSDateWrapper(Clock.System.now().toLocalDateTime(tz), tz)
     }
 
-    return when (val  a = toKotlin(args[0])) {
+    return when (val  a = args[0]?.toKotlin(this)) {
         is String -> JSDateWrapper(LocalDateTime.parse(a), tz)
         is LocalDateTime -> JSDateWrapper(a, tz)
         else -> {

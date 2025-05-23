@@ -22,7 +22,7 @@ internal class OpIn(
         }
         val o = inObject(runtime)
         runtime.typeCheck(o is JsAny) {
-            "$o is not an object (can't use with 'in' operator)"
+            "$o is not an object (can't use with 'in' operator)".js()
         }
         return o.contains(property(runtime), runtime).js()
     }

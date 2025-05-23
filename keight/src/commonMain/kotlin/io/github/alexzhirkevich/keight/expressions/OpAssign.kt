@@ -66,7 +66,7 @@ internal class OpAssign(
             } else {
                 when (r) {
                     is JSObject -> r.set(variableName.js(), v, runtime)
-                    else -> runtime.typeError { "Cannot set properties of $r" }
+                    else -> runtime.typeError { "Cannot set properties of $r".js() }
                 }
             }
 

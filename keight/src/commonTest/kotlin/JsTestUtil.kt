@@ -3,6 +3,7 @@ import io.github.alexzhirkevich.keight.Console
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.JavaScriptEngine
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.js.JsAny
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -30,8 +31,8 @@ internal suspend fun String.eval(runtime: ScriptRuntime = JSRuntime(Job())) : An
     return JavaScriptEngine(runtime).evaluate(this)
 }
 
-internal suspend fun String.eval2() : Any? {
-    return JavaScriptEngine(JSRuntime(Job())).evaluate(this)
+internal suspend fun String.evalRaw(runtime: ScriptRuntime = JSRuntime(Job())) : JsAny? {
+    return JavaScriptEngine(runtime).compile(this).invoke()
 }
 
 internal suspend fun String.eval(io : Console = DefaultConsole, runtime: ScriptRuntime =

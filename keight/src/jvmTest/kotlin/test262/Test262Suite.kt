@@ -2,11 +2,12 @@ package test262
 
 import assertEqualsTo
 import eval
-import io.github.alexzhirkevich.keight.JSRuntime
-import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.Object
+import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.delay
 import runtimeTest
-import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -57,9 +58,11 @@ class Test262Suite {
 
     @Test
     fun temp() = runtimeTest {
-        """
-            new (() => {});
-        """.eval(it).assertEqualsTo(1)
+
+//        val callable : Callable = "(a,b) => a + b".eval(it) as Callable
+        val func = "(function(obj) { return obj.name })".eval(it) as suspend (List<JsAny>) -> Any?
+
+        func(listOf(Object { "name".js() eq "peter".js() })).assertEqualsTo("peter")
     }
 
     @Test

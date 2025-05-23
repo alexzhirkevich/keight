@@ -14,7 +14,7 @@ public abstract class ScriptEngine {
     public abstract fun compile(script: String) : Script
 
     public open suspend fun evaluate(script: String) : Any? {
-        return runtime.toKotlin(compile(script).invoke())
+        return compile(script).invoke()?.toKotlin(runtime)
     }
 
     /**

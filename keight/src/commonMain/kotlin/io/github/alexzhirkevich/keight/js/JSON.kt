@@ -110,7 +110,7 @@ private suspend fun JSObject.stringify(runtime: ScriptRuntime) : String {
             append(k)
             append('"')
             append(':')
-            append(runtime.fromKotlin(get(k, runtime)).stringify(runtime))
+            append(get(k, runtime).stringify(runtime))
             append(',')
         }
     }.removeSuffix(",") + "}"

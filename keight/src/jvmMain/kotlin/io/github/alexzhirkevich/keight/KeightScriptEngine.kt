@@ -41,7 +41,7 @@ internal class KeightScriptEngine(
 
     override fun put(name: String?, value: Any?) {
         runBlocking {
-            engine.runtime.set(name?.js(), engine.runtime.fromKotlin(value), VariableType.Global)
+            engine.runtime.set(name?.js(), fromKotlin(value), VariableType.Global)
         }
     }
 
@@ -66,14 +66,14 @@ internal class KeightScriptEngine(
                 bindings.forEach { (k, v) ->
                     factory.globalRuntime.set(
                         k.js(),
-                        engine.runtime.fromKotlin(v),
+                        fromKotlin(v),
                         VariableType.Global
                     )
                 }
             } else {
                 engine.reset()
                 bindings.forEach { (k, v) ->
-                    engine.runtime.set(k.js(), engine.runtime.fromKotlin(v), VariableType.Global)
+                    engine.runtime.set(k.js(), fromKotlin(v), VariableType.Global)
                 }
             }
         }
@@ -99,7 +99,7 @@ internal class KeightScriptEngine(
         }
         runBlocking {
             context.getBindings(ScriptContext.ENGINE_SCOPE).forEach { (k, v) ->
-                engine.runtime.set(k.js(), engine.runtime.fromKotlin(v), VariableType.Global)
+                engine.runtime.set(k.js(), fromKotlin(v), VariableType.Global)
             }
         }
     }

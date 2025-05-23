@@ -80,7 +80,7 @@ internal class SimpleFunctionParam(
                     property = name.js(),
                     value = JSPropertyAccessor.BackedField(
                         getter = Callable {
-                            runtime.referenceError { "Cannot access '$name' before initialization" }
+                            runtime.referenceError { "Cannot access '$name' before initialization".js() }
                         }
                     ),
                     type = VariableType.Local
@@ -301,7 +301,7 @@ public open class JSFunction(
             suspend fun assertSuperInitialized() {
                 if (mustHaveSuperInitialized && !superInitialized) {
                     runtime.referenceError {
-                        "Must call super constructor in derived class before accessing 'this' or returning from derived constructor"
+                        "Must call super constructor in derived class before accessing 'this' or returning from derived constructor".js()
                     }
                 }
             }
@@ -318,7 +318,7 @@ public open class JSFunction(
                             Callable {
                                 superConstructor.call(o, it, runtime).also {
                                     runtime.referenceCheck(!superInitialized) {
-                                        "Super constructor may only be called once"
+                                        "Super constructor may only be called once".js()
                                     }
                                     superInitialized = true
                                 }

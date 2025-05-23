@@ -21,4 +21,6 @@ internal value class JSBooleanWrapper(
     override fun toString(): String {
         return value.toString()
     }
+
+    override fun toKotlin(runtime: ScriptRuntime): Any = value
 }

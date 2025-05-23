@@ -21,7 +21,7 @@ internal class JSPromiseFunction : JSFunction(
         "catch".js().func("onrejected") { args ->
             val arg = args.getOrNull(0)
             val callable = arg.callableOrThrow(this)
-            val job = toKotlin(thisRef) as Job
+            val job = thisRef.toKotlin(this) as Job
 
             async {
                 try {
@@ -43,7 +43,7 @@ internal class JSPromiseFunction : JSFunction(
             FunctionParam("onrejected", default = OpArgOmitted),
         ) { args ->
             val onFulfilled = args.getOrNull(0)
-            val job = toKotlin(thisRef) as Job
+            val job = thisRef.toKotlin(this) as Job
 
             async {
                 try {
@@ -67,9 +67,9 @@ internal class JSPromiseFunction : JSFunction(
         "finally".js().func("handle") { args ->
             val arg = args.getOrNull(0)
             val callable = arg?.callableOrNull()
-            val value = fromKotlin(thisRef) as Job
+            val value = thisRef as Job
             typeCheck(callable is Callable) {
-                "$arg is not a function"
+                "$arg is not a function".js()
             }
 
             async {
@@ -98,8 +98,8 @@ internal class JSPromiseFunction : JSFunction(
         "all".func("values".vararg()) { args ->
             async {
                 (args[0] as Iterable<JsAny?>).map {
-                    val job = toKotlin(it)
-                    typeCheck(job is Job){ "$job is not a Promise" }
+                    val job = it?.toKotlin(this@func)
+                    typeCheck(job is Job){ "$job is not a Promise".js() }
                     if (job is Deferred<*>) {
                         job.await() as JsAny
                     } else {
@@ -113,7 +113,7 @@ internal class JSPromiseFunction : JSFunction(
 ) {
 
     override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
-        runtime.typeError { "Promise constructor cannot be invoked without 'new'" }
+        runtime.typeError { "Promise constructor cannot be invoked without 'new'".js() }
     }
 
     override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {

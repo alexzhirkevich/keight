@@ -34,7 +34,7 @@ public interface JSPropertyAccessor : JsAny {
 
         override suspend fun set(value: JsAny?, runtime: ScriptRuntime) {
             runtime.typeCheck(setter != null || !runtime.isStrict){
-                "Cannot set property of which has only a getter"
+                "Cannot set property of which has only a getter".js()
             }
 
             setter?.invoke(value.listOf(), runtime)

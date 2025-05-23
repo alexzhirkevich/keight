@@ -64,7 +64,7 @@ internal interface Destruction {
             // const f = ({} = null) => {};
             // assert.throws(TypeError, function() { f(); }
             if (itemsContext == DestructionContext.Object::class && (obj !is JsAny) && default == null){
-                runtime.typeError { "cannot read properties of $obj" }
+                runtime.typeError { "cannot read properties of $obj".js() }
             }
 
             items.fastForEach {
@@ -107,7 +107,7 @@ internal sealed interface DestructionContext {
                     }
                 }*/
                 default != null -> property(name, default.get(runtime), runtime, null)
-                else -> runtime.typeError { "can't get properties of $obj" }
+                else -> runtime.typeError { "can't get properties of $obj".js() }
             }
         }
     }
@@ -124,7 +124,7 @@ internal sealed interface DestructionContext {
                 obj.getOrElse(index) { Undefined }
             } else {
                 if (obj == null) {
-                    runtime.typeError { "null is not iterable" }
+                    runtime.typeError { "null is not iterable".js() }
                 } else {
                     Undefined
                 }
@@ -335,7 +335,7 @@ private class SpreadDestruction(
             }
             default != null -> destruct(default.get(runtime), variableType, runtime, null)
             else -> runtime.typeError {
-                "${JSStringFunction.toString(obj, runtime)} is not iterable"
+                "${JSStringFunction.toString(obj, runtime)} is not iterable".js()
             }
         }
     }

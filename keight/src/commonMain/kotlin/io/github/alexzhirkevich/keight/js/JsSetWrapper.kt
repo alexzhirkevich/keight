@@ -15,4 +15,5 @@ internal value class JsSetWrapper(
         return (runtime.findRoot() as JSRuntime).Set.get(PROTOTYPE, runtime)
     }
 
+    override fun toKotlin(runtime: ScriptRuntime): Any = value.map { it?.toKotlin(runtime) }.toSet()
 }

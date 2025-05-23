@@ -13,7 +13,7 @@ internal class KeightBindings(
     }
 
     override fun put(key: String?, value: Any?): Any? {
-        runBlocking { runtime.set(key?.js(), runtime.fromKotlin(value), VariableType.Local) }
+        runBlocking { runtime.set(key?.js(), fromKotlin(value), VariableType.Local) }
         return value
     }
 

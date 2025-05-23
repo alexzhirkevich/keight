@@ -83,13 +83,13 @@ internal class JSObjectFunction : JSFunction(
             val obj = args.getOrNull(0)
 
             typeCheck(obj is Iterable<*>) {
-                "$obj is not iterable"
+                "$obj is not iterable".js()
             }
 
             obj as Iterable<JsAny?>
 
             val callback = args.getOrNull(1)?.callableOrNull()
-                ?: typeError { "${args.getOrNull(1)} is not function" }
+                ?: typeError { "${args.getOrNull(1)} is not function".js() }
 
             val props =  obj
                 .groupBy { callback.invoke(it.listOf(), this) }
@@ -103,7 +103,7 @@ internal class JSObjectFunction : JSFunction(
             val obj = args.getOrNull(0)
 
             typeCheck(obj is JSObject) {
-                "$obj is not a object"
+                "$obj is not a object".js()
             }
 
             val name = args.getOrElse(1) {
@@ -120,7 +120,7 @@ internal class JSObjectFunction : JSFunction(
             val obj = args.getOrNull(0)
 
             typeCheck(obj is JSObject) {
-                "$obj is not a object"
+                "$obj is not a object".js()
             }
 
             val props = args.getOrNull(1) as? JSObject ?: return@func Undefined
@@ -129,7 +129,7 @@ internal class JSObjectFunction : JSFunction(
                 val prop = props.get(key, this)
 
                 typeCheck(prop is JsAny){
-                    "$key property of $obj is not an object"
+                    "$key property of $obj is not an object".js()
                 }
 
                 obj.define(this, key, prop)
@@ -141,7 +141,7 @@ internal class JSObjectFunction : JSFunction(
             val obj = args.getOrNull(0)
 
             typeCheck(obj is JSObject) {
-                "$obj is not a object"
+                "$obj is not a object".js()
             }
 
             val name = args.getOrElse(1) { return@func Undefined }
@@ -152,7 +152,7 @@ internal class JSObjectFunction : JSFunction(
         "getOwnPropertyDescriptors".func( "object") { args ->
             val obj = args.getOrNull(0)
             typeCheck(obj is JSObject) {
-                "$obj is not a object"
+                "$obj is not a object".js()
             }
 
             JSObjectImpl(
@@ -162,21 +162,21 @@ internal class JSObjectFunction : JSFunction(
 
         "getOwnPropertyNames".func( "object") { args ->
             val obj = args.getOrNull(0)
-            typeCheck(obj is JsAny) { "$obj is not an object" }
+            typeCheck(obj is JsAny) { "$obj is not an object".js() }
             obj.keys(this).fastMap { it.toString().js() }.js()
         },
 
         "getPrototypeOf".func( "object") {
             val obj = it.getOrNull(0)
 
-            typeCheck(obj is JsAny) { "$obj is not an object" }
+            typeCheck(obj is JsAny) { "$obj is not an object".js() }
 
             obj.get(PROTO, this) ?: Undefined
         },
 
         "preventExtensions".func( "object") {
             val obj = it.getOrNull(0)
-            typeCheck(obj is JSObject) { "$obj is not an object" }
+            typeCheck(obj is JSObject) { "$obj is not an object".js() }
             obj.preventExtensions()
             obj
         },
@@ -212,8 +212,8 @@ internal class JSObjectFunction : JSFunction(
                 return@func true.js()
             }
 
-            val ka = toKotlin(a)
-            val kb = toKotlin(b)
+            val ka = a?.toKotlin(this)
+            val kb = b?.toKotlin(this)
 
             (ka is Double && ka.isNaN() && kb is Double && kb.isNaN()).js()
         }

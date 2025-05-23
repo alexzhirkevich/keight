@@ -802,7 +802,7 @@ private fun ListIterator<Token>.parseNew() : Expression {
     return Expression { runtime ->
         val constructor = runtime.get(next.identifier.js())
         runtime.typeCheck(constructor is Constructor) {
-            "'${next.identifier}' is not a constructor"
+            "'${next.identifier}' is not a constructor".js()
         }
         constructor.construct(args.fastMap { it(runtime) }, runtime)
     }
@@ -1264,9 +1264,9 @@ private fun ListIterator<Token>.parseAwait(): Expression {
             throw JSError("Await is not allowed in current context")
         }
 
-        val job = it.toKotlin(subject(it))
+        val job = subject(it)?.toKotlin(it)
         it.typeCheck(job is Job){
-            "$job is not a Promise"
+            "$job is not a Promise".js()
         }
 
         if (job is Deferred<*>){
@@ -1553,7 +1553,7 @@ internal inline fun syntaxCheck(value: Boolean, lazyMessage: () -> Any) {
 }
 
 @OptIn(ExperimentalContracts::class)
-internal suspend inline fun ScriptRuntime.typeCheck(value: Boolean, lazyMessage: () -> Any) {
+internal suspend inline fun ScriptRuntime.typeCheck(value: Boolean, lazyMessage: () -> JsAny) {
     contract { returns() implies value }
 
     if (!value) {
@@ -1561,12 +1561,12 @@ internal suspend inline fun ScriptRuntime.typeCheck(value: Boolean, lazyMessage:
     }
 }
 
-internal suspend inline fun ScriptRuntime.typeError(lazyMessage: () -> Any) : Nothing {
+internal suspend inline fun ScriptRuntime.typeError(lazyMessage: () -> JsAny) : Nothing {
     throw makeTypeError(lazyMessage)
 }
 
 @OptIn(ExperimentalContracts::class)
-internal suspend inline fun ScriptRuntime.referenceCheck(value: Boolean, lazyMessage: () -> Any) {
+internal suspend inline fun ScriptRuntime.referenceCheck(value: Boolean, lazyMessage: () -> JsAny) {
     contract { returns() implies value }
 
     if (!value) {
@@ -1574,18 +1574,18 @@ internal suspend inline fun ScriptRuntime.referenceCheck(value: Boolean, lazyMes
     }
 }
 
-internal suspend inline fun ScriptRuntime.referenceError(lazyMessage: () -> Any) : Nothing {
+internal suspend inline fun ScriptRuntime.referenceError(lazyMessage: () -> JsAny) : Nothing {
     throw makeReferenceError(lazyMessage)
 }
 
-internal suspend inline fun ScriptRuntime.makeReferenceError(lazyMessage: () -> Any) : ReferenceError {
+internal suspend inline fun ScriptRuntime.makeReferenceError(lazyMessage: () -> JsAny) : ReferenceError {
     return (findRoot() as JSRuntime).ReferenceError
-        .construct(fromKotlin(lazyMessage()).listOf(), this) as ReferenceError
+        .construct(lazyMessage().listOf(), this) as ReferenceError
 }
 
-internal suspend inline fun ScriptRuntime.makeTypeError(lazyMessage: () -> Any) : Throwable {
+internal suspend inline fun ScriptRuntime.makeTypeError(lazyMessage: () -> JsAny) : Throwable {
     return (findRoot() as JSRuntime).TypeError
-        .construct(fromKotlin(lazyMessage()).listOf(), this) as Throwable
+        .construct(lazyMessage().listOf(), this) as Throwable
 }
 
 

@@ -1,7 +1,6 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.get
 
 public interface JsAny {
@@ -33,6 +32,8 @@ public interface JsAny {
 
     public suspend fun contains(property: JsAny?, runtime: ScriptRuntime): Boolean =
         get(property, runtime) != Undefined
+
+    public fun toKotlin(runtime: ScriptRuntime): Any = this
 }
 
 internal suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime) : Boolean {

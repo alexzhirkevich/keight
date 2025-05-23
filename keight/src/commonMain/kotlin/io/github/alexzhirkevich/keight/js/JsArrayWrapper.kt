@@ -42,7 +42,7 @@ internal value class JsArrayWrapper(
     }
 
     override suspend fun hasOwnProperty(name: JsAny?, runtime: ScriptRuntime): Boolean {
-        val idx = (runtime.toKotlin(name) as? String)?.toIntOrNull()
+        val idx = (name?.toKotlin(runtime) as? String)?.toIntOrNull()
             ?: return super.hasOwnProperty(name, runtime)
 
         return idx in value.indices || super.hasOwnProperty(name, runtime)
@@ -71,5 +71,7 @@ internal value class JsArrayWrapper(
     override fun toString(): String {
         return value.joinToString(separator = ",")
     }
+
+    override fun toKotlin(runtime: ScriptRuntime): Any = value.map { it?.toKotlin(runtime) }
 }
 

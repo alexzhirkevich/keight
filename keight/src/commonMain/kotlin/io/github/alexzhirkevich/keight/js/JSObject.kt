@@ -4,7 +4,6 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
@@ -162,7 +161,7 @@ public open class JSObjectImpl(
             }
             .keys
             .groupBy {
-                val v = runtime.toKotlin(it)
+                val v = it?.toKotlin(runtime)
                 v is Long && v > 0
             }
             .let {
@@ -238,11 +237,11 @@ public open class JSObjectImpl(
     ) {
 
         runtime.typeCheck(map[property]?.writable != false || !runtime.isStrict) {
-            "Cannot assign to read only property '$property' of object $this"
+            "Cannot assign to read only property '$property' of object $this".js()
         }
 
         runtime.typeCheck(isExtensible || contains(property, runtime)) {
-            "Cannot add property $property, object is not extensible"
+            "Cannot add property $property, object is not extensible".js()
         }
 
         if (!isExtensible && property == PROTO){

@@ -13,6 +13,8 @@ internal class JsNumberObject(
     override fun toString(): String {
         return number.toString()
     }
+
+    override fun toKotlin(runtime: ScriptRuntime): Any = number.toKotlin(runtime)
 }
 
 @JvmInline
@@ -33,4 +35,6 @@ internal value class JsNumberWrapper(
     override fun compareTo(other: Wrapper<Number>): Int {
         return value.toDouble().compareTo(other.value.toDouble())
     }
+
+    override fun toKotlin(runtime: ScriptRuntime): Any = value
 }

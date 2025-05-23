@@ -91,14 +91,12 @@ public abstract class ScriptRuntime : CoroutineScope {
 
     public abstract suspend fun toNumber(a: JsAny?): Number
 
-    public abstract fun fromKotlin(a: Any?): JsAny?
-    public abstract fun toKotlin(a: JsAny?): Any?
 }
 
 
 
 public suspend fun ScriptRuntime.set(property: JsAny?, value: JsAny?): Unit =
-    set(property, fromKotlin(value), null)
+    set(property, value, null)
 
 
 
@@ -135,11 +133,11 @@ public abstract class DefaultRuntime : ScriptRuntime() {
         }
 
         typeCheck(current?.first != VariableType.Const) {
-            "Assignment to constant variable ('$property')"
+            "Assignment to constant variable ('$property')".js()
         }
 
         referenceCheck(type != null || !isStrict || contains(property)) {
-            "Unresolved reference $property"
+            "Unresolved reference $property".js()
         }
         variables[property] = (type ?: current?.first) to value
     }
@@ -245,8 +243,6 @@ private class StrictRuntime(
     override suspend fun neg(a: JsAny?): JsAny? = delegate.neg(a)
     override suspend fun pos(a: JsAny?): JsAny? = delegate.pos(a)
     override suspend fun toNumber(a: JsAny?): Number = delegate.toNumber(a)
-    override fun fromKotlin(a: Any?): JsAny? = delegate.fromKotlin(a)
-    override fun toKotlin(a: JsAny?): Any? = delegate.toKotlin(a)
 }
 
 private class ScopedRuntime(
@@ -327,8 +323,6 @@ private class ScopedRuntime(
     override suspend fun neg(a: JsAny?): JsAny? = parent.neg(a)
     override suspend fun pos(a: JsAny?): JsAny? = parent.pos(a)
     override suspend fun toNumber(a: JsAny?): Number = parent.toNumber(a)
-    override fun fromKotlin(a: Any?): JsAny? = parent.fromKotlin(a)
-    override fun toKotlin(a: JsAny?): Any? = parent.toKotlin(a)
 }
 
 private tailrec fun ScriptRuntime.closestFunctionScope() : ScriptRuntime {

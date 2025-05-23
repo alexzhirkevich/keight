@@ -30,4 +30,8 @@ internal value class JsMapWrapper(
     override fun toString(): String {
         return value.toString()
     }
+
+    override fun toKotlin(runtime: ScriptRuntime): Any {
+        return value.map { it.key?.toKotlin(runtime) to it.value?.toKotlin(runtime) }.toMap()
+    }
 }

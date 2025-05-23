@@ -160,7 +160,7 @@ public open class JSRuntime(
         regClearJob("Interval")
 
         variables["eval".js()] = null to "eval".func("script" defaults OpArgOmitted) {
-            val script = toKotlin(it.argOrElse(0) { return@func Undefined }).toString()
+            val script = it.argOrElse(0) { return@func Undefined }?.toKotlin(this).toString()
             JavaScriptEngine(this).compile(script).invoke()
         }
     }
@@ -192,8 +192,8 @@ public open class JSRuntime(
 
     override suspend fun isComparable(a: JsAny?, b: JsAny?): Boolean {
 
-        val ka = toKotlin(a)
-        val kb = toKotlin(b)
+        val ka = a?.toKotlin(this)
+        val kb = b?.toKotlin(this)
 
         if (ka is Number && kb is CharSequence || kb is Number && ka is CharSequence){
             return isComparable(toNumber(a).js(), toNumber(b).js())
@@ -210,8 +210,8 @@ public open class JSRuntime(
 
     override suspend fun compare(a: JsAny?, b: JsAny?): Int {
 
-        val ka = toKotlin(a)
-        val kb = toKotlin(b)
+        val ka = a?.toKotlin(this)
+        val kb = b?.toKotlin(this)
 
         return if (ka is Number || kb is Number) {
             toNumber(a).toDouble().compareTo(toNumber(b).toDouble())
@@ -278,39 +278,6 @@ public open class JSRuntime(
 
     override suspend fun toNumber(a: JsAny?): Number {
         return a.ToNumber()
-    }
-
-    override fun fromKotlin(a: Any?): JsAny? {
-        return when (a) {
-            null -> null
-            is JsAny -> a
-            is Boolean -> JSBooleanWrapper(a)
-            is Number -> JsNumberWrapper(a)
-            is UByte -> JsNumberWrapper(a.toLong())
-            is UShort -> JsNumberWrapper(a.toLong())
-            is UInt -> JsNumberWrapper(a.toLong())
-            is ULong -> JsNumberWrapper(a.toLong())
-            is Map<*, *> -> JsMapWrapper(
-                a.map { fromKotlin(it.key) to fromKotlin(it.value) }.toMap().toMutableMap()
-            )
-
-            is Set<*> -> JsSetWrapper(a.map(::fromKotlin).toMutableSet())
-            is List<*> -> JsArrayWrapper(a.map(::fromKotlin).toMutableList())
-            is CharSequence -> JsStringWrapper(a.toString())
-            is Job -> JSPromiseWrapper(a)
-            is Throwable -> if (a is JSError) a else JSKotlinError(a)
-            else -> error("Failed to convert $a to JS")
-        }
-    }
-
-    override fun toKotlin(a: JsAny?): Any? {
-        return when (a) {
-            is JsMapWrapper -> a.value.map { toKotlin(it.key) to toKotlin(it.value) }.toMap()
-            is JsSetWrapper -> a.value.map(::toKotlin).toSet()
-            is JsArrayWrapper -> a.value.fastMap(::toKotlin)
-            is Wrapper<*> -> if (a.value is JsAny) { toKotlin(a.value as JsAny) } else a.value
-            else -> a
-        }
     }
 
     private suspend fun JsAny.numberOrThis(
@@ -380,7 +347,7 @@ public open class JSRuntime(
     private suspend fun JsAny.toNumericOrThis(): JsAny? {
 
         if (this is JSSymbol){
-            typeError { "Symbol cannot be converted to a number" }
+            typeError { "Symbol cannot be converted to a number".js() }
         }
 
         get("valueOf".js(), this@JSRuntime)?.callableOrNull()
@@ -431,7 +398,7 @@ public open class JSRuntime(
             is Float -> toDouble()
             is Long -> this
             is Double -> this
-            is JSSymbol -> typeError { "Symbol cannot be converted to a number" }
+            is JSSymbol -> typeError { "Symbol cannot be converted to a number".js() }
             is Unit, is Undefined -> return Double.NaN
             null, false -> +0L
             true -> 1L
@@ -526,7 +493,7 @@ public open class JSRuntime(
         return when(this){
             is Wrapper<*> -> value.ToString()
             is CharSequence -> toString()
-            is JSSymbol -> typeError { "Symbol cannot be converted to a string" }
+            is JSSymbol -> typeError { "Symbol cannot be converted to a string".js() }
             Unit -> "undefined"
             null, true, false, Number -> toString()
             is JSObject -> ToPrimitive(S_STRING).ToString()
@@ -572,7 +539,7 @@ public open class JSRuntime(
                 if (exoticToPrim != null){
                     val hint = type ?: S_DEFAULT
                     val result = exoticToPrim.call(this, hint.js().listOf(), this@JSRuntime)
-                    typeCheck(result !is JSObject){ "Cannot convert object to primitive value" }
+                    typeCheck(result !is JSObject){ "Cannot convert object to primitive value".js() }
                     return result
                 }
 
@@ -621,7 +588,7 @@ public open class JSRuntime(
         }
 
         typeError {
-            "Cannot convert object to primitive value"
+            "Cannot convert object to primitive value".js()
         }
     }
 
@@ -653,14 +620,14 @@ public open class JSRuntime(
             ?.call(this, listOfNotNull(type), this@JSRuntime)
             ?.let {
                 typeCheck(it !is JSObject){
-                    "Cannot convert object to primitive value"
+                    "Cannot convert object to primitive value".js()
                 }
                 return it
             }
 
         return if (!symbolOnly) {
             if (this is JSSymbol){
-                typeError { "Symbol cannot be converted to a number" }
+                typeError { "Symbol cannot be converted to a number".js() }
             }
 
             get("valueOf".js(), this@JSRuntime)?.callableOrNull()

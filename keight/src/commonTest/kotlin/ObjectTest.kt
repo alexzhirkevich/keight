@@ -27,8 +27,8 @@ class ObjectTest {
 
         val obj = "{ name : 'test', x : 1 }".eval(runtime) as JSObject
 
-        runtime.toKotlin(obj.get("name".js(), runtime)).assertEqualsTo("test")
-        runtime.toKotlin(obj.get("x".js(),runtime)).assertEqualsTo(1L)
+        obj.get("name".js(), runtime)?.toKotlin(runtime).assertEqualsTo("test")
+        obj.get("x".js(),runtime)?.toKotlin(runtime).assertEqualsTo(1L)
 
 
         "typeof {}".eval().assertEqualsTo("object")

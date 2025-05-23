@@ -31,7 +31,7 @@ internal fun OpCall(
             }
 
             r.typeCheck(receiver != null) {
-                "Can't get properties of $receiver"
+                "Can't get properties of $receiver".js()
             }
 
             receiver.call(
@@ -51,7 +51,7 @@ internal fun OpCall(
             }
 
             r.typeCheck(receiver != null) {
-                "Can't get properties (${callable.name}) of $receiver"
+                "Can't get properties (${callable.name}) of $receiver".js()
             }
 
             receiver.call(
@@ -87,7 +87,7 @@ internal suspend fun JsAny.call(
         return Undefined
     }
     runtime.typeCheck(callable != null) {
-        "$func is not a function"
+        "$func is not a function".js()
     }
     return callable.call(thisRef, args, runtime)
 }
@@ -101,9 +101,9 @@ private tailrec suspend fun OpCallImpl(
     return when {
         callable is Expression -> OpCallImpl(runtime, callable(runtime), arguments, isOptional)
         callable is Callable -> callable.invoke(arguments, runtime)
-        callable is Function<*> -> execKotlinFunction(runtime, callable, arguments.fastMap(runtime::toKotlin))
+        callable is Function<*> -> execKotlinFunction(runtime, callable, arguments.fastMap { it?.toKotlin(runtime) })
         isOptional && (callable == null || callable == Undefined) -> Undefined
-        else -> runtime.typeError { "$callable is not a function" }
+        else -> runtime.typeError { "$callable is not a function".js() }
     }
 }
 
