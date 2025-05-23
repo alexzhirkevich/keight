@@ -261,7 +261,9 @@ public open class JSFunction(
         isAsync = isAsync,
         superConstructor = superConstructor,
         prototype = prototype,
-    )
+    ).apply {
+        closure = this@JSFunction.closure
+    }
 
     override suspend fun call(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
         return invoke(

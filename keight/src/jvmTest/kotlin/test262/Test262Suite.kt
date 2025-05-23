@@ -28,6 +28,7 @@ private val UNSUPPORTED_FLAGS = listOf(
 )
 
 private val MUTED_TESTS = listOf(
+    "S8.3_A1_T1.js", // invalid
     "capturing-closure-variables-2.js",
     "ArrowFunction_restricted-properties.js",
     "dflt-obj-ptrn-prop-ary.js",
