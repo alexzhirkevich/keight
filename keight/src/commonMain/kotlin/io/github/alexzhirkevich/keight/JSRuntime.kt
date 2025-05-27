@@ -161,7 +161,7 @@ public open class JSRuntime(
 
         variables["eval".js()] = null to "eval".func("script" defaults OpArgOmitted) {
             val script = it.argOrElse(0) { return@func Undefined }?.toKotlin(this).toString()
-            JavaScriptEngine(this).compile(script).invoke()
+            JavaScriptEngine(this).compile(script).invoke(this)
         }
     }
 

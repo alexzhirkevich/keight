@@ -32,7 +32,7 @@ internal suspend fun String.eval(runtime: ScriptRuntime = JSRuntime(Job())) : An
 }
 
 internal suspend fun String.evalRaw(runtime: ScriptRuntime = JSRuntime(Job())) : JsAny? {
-    return JavaScriptEngine(runtime).compile(this).invoke()
+    return JavaScriptEngine(runtime).compile(this).invoke(runtime)
 }
 
 internal suspend fun String.eval(io : Console = DefaultConsole, runtime: ScriptRuntime =

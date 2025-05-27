@@ -1,8 +1,4 @@
 
-plugins {
-    id("module.android")
-    id("module.multiplatform")
-}
 
 kotlin {
     sourceSets {

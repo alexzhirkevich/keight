@@ -20,6 +20,7 @@ import io.github.alexzhirkevich.keight.expressions.OpSpread
 import io.github.alexzhirkevich.keight.expressions.asDestruction
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastForEachIndexed
+import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.fastMapNotNull
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.interpreter.makeReferenceError
@@ -67,93 +68,26 @@ public fun FunctionParam(
     default : Expression? = null
 ) : FunctionParam = SimpleFunctionParam(name, isVararg, default)
 
-internal class SimpleFunctionParam(
-    val name : String,
-    val isVararg : Boolean = false,
-    override val default : Expression? = null
-) : FunctionParam {
 
-    private suspend fun defaultOrUnit(runtime: ScriptRuntime) : JsAny? {
-        return if (default != null) {
-            runtime.withScope {
-                it.set(
-                    property = name.js(),
-                    value = JSPropertyAccessor.BackedField(
-                        getter = Callable {
-                            runtime.referenceError { "Cannot access '$name' before initialization".js() }
-                        }
-                    ),
-                    type = VariableType.Local
-                )
-                default.invoke(it)
-            }
-        } else {
-            Undefined
+public fun JSFunction(
+    vararg parameters: FunctionParam,
+    name: String = "",
+    body : suspend ScriptRuntime.(List<JsAny?>) -> JsAny?
+): JSFunction = JSFunction(parameters.toList(), name, body)
+
+public fun JSFunction(
+    parameters: List<FunctionParam>,
+    name: String = "",
+    body : suspend ScriptRuntime.(List<JsAny?>) -> JsAny?
+): JSFunction = JSFunction(
+    name = name,
+    parameters = parameters.toList(),
+    body = Expression { r ->
+        with(r) {
+            body(parameters.fastMap { it.get(r) })
         }
     }
-
-    override suspend fun set(
-        index: Int,
-        arguments: List<JsAny?>,
-        runtime: ScriptRuntime
-    ) {
-        val value = when {
-            isVararg -> arguments.drop(index).js()
-            index in arguments.indices -> arguments.argOrElse(index) { Undefined }.let {
-                if (it == Undefined) {
-                    defaultOrUnit(runtime)
-                } else {
-                    it
-                }
-            }
-            else -> defaultOrUnit(runtime)
-        }
-
-        runtime.set(name.js(), value, VariableType.Local)
-    }
-
-    override suspend fun get(runtime: ScriptRuntime): JsAny? {
-       return runtime.get(name.js())
-    }
-}
-
-internal class DestructiveFunctionParam(
-    val destruction: Destruction,
-    override val default: Expression? = null,
-) : FunctionParam {
-    override suspend fun set(
-        index: Int,
-        arguments: List<JsAny?>,
-        runtime: ScriptRuntime
-    ) {
-        val arg = arguments.getOrElse(index) {
-            return destruction.destruct(default?.invoke(runtime), null, runtime, null)
-        }
-        destruction.destruct(
-            obj = arg,
-            variableType = null,
-            runtime = runtime,
-            default = default?.let { LazyGetter(it::invoke) }
-        )
-    }
-
-    override suspend fun get(runtime: ScriptRuntime): JsAny? = Undefined
-}
-
-internal fun String.vararg() = FunctionParam(this, isVararg = true)
-
-internal infix fun String.defaults(default: Expression?) : FunctionParam {
-    return FunctionParam(this, false, default)
-}
-
-internal class OpFunctionInit(
-    val function : JSFunction
-) : Expression() {
-    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
-        function.closure = runtime
-        return function
-    }
-}
+)
 
 public open class JSFunction(
     final override var name : String = "",
@@ -414,6 +348,95 @@ public open class JSFunction(
         return "[function $name]"
     }
 }
+
+internal class SimpleFunctionParam(
+    val name : String,
+    val isVararg : Boolean = false,
+    override val default : Expression? = null
+) : FunctionParam {
+
+    private suspend fun defaultOrUnit(runtime: ScriptRuntime) : JsAny? {
+        return if (default != null) {
+            runtime.withScope {
+                it.set(
+                    property = name.js(),
+                    value = JSPropertyAccessor.BackedField(
+                        getter = Callable {
+                            runtime.referenceError { "Cannot access '$name' before initialization".js() }
+                        }
+                    ),
+                    type = VariableType.Local
+                )
+                default.invoke(it)
+            }
+        } else {
+            Undefined
+        }
+    }
+
+    override suspend fun set(
+        index: Int,
+        arguments: List<JsAny?>,
+        runtime: ScriptRuntime
+    ) {
+        val value = when {
+            isVararg -> arguments.drop(index).js()
+            index in arguments.indices -> arguments.argOrElse(index) { Undefined }.let {
+                if (it == Undefined) {
+                    defaultOrUnit(runtime)
+                } else {
+                    it
+                }
+            }
+            else -> defaultOrUnit(runtime)
+        }
+
+        runtime.set(name.js(), value, VariableType.Local)
+    }
+
+    override suspend fun get(runtime: ScriptRuntime): JsAny? {
+        return runtime.get(name.js())
+    }
+}
+
+internal class DestructiveFunctionParam(
+    val destruction: Destruction,
+    override val default: Expression? = null,
+) : FunctionParam {
+    override suspend fun set(
+        index: Int,
+        arguments: List<JsAny?>,
+        runtime: ScriptRuntime
+    ) {
+        val arg = arguments.getOrElse(index) {
+            return destruction.destruct(default?.invoke(runtime), null, runtime, null)
+        }
+        destruction.destruct(
+            obj = arg,
+            variableType = null,
+            runtime = runtime,
+            default = default?.let { LazyGetter(it::invoke) }
+        )
+    }
+
+    override suspend fun get(runtime: ScriptRuntime): JsAny? = Undefined
+}
+
+internal fun String.vararg() = FunctionParam(this, isVararg = true)
+
+internal infix fun String.defaults(default: Expression?) : FunctionParam {
+    return FunctionParam(this, false, default)
+}
+
+internal class OpFunctionInit(
+    val function : JSFunction
+) : Expression() {
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
+        function.closure = runtime
+        return function
+    }
+}
+
 
 internal fun validateFunctionParams(
     params : List<FunctionParam>,

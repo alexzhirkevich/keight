@@ -15,7 +15,6 @@ public abstract class Expression {
     public suspend operator fun invoke(runtime: ScriptRuntime): JsAny? {
         currentCoroutineContext().ensureActive()
         return when (val res = execute(runtime)){
-            is Expression -> res.invoke(runtime)
             is Getter<*> -> res.get(runtime)
             else -> res
         }

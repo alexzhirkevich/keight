@@ -19,7 +19,7 @@ public interface Callable : JsAny {
         { invoke(it, runtime)?.toKotlin(runtime) }
 }
 
-internal fun Callable(body: suspend ScriptRuntime.(List<JsAny?>) -> JsAny?) = object :Callable {
+public fun Callable(body: suspend ScriptRuntime.(List<JsAny?>) -> JsAny?): Callable = object :Callable {
     override suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable {
         return this
     }

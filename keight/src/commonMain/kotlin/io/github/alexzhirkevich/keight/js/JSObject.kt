@@ -493,12 +493,8 @@ internal fun String.func(
     body: suspend ScriptRuntime.(args: List<JsAny?>) -> JsAny?
 ) = JSFunction(
     name = this,
-    parameters = args.toList(),
-    body = Expression { r ->
-        with(r) {
-            body(args.map { it.get(r) })
-        }
-    }
+    parameters = args,
+    body = body
 )
 
 internal fun JSObjectImpl.func(

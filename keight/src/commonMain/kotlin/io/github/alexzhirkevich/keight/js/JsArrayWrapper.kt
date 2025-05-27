@@ -21,6 +21,14 @@ internal value class JsArrayWrapper(
         return value.mapIndexed { index, v ->  listOf(index.js(), v) }
     }
 
+    override suspend fun keys(
+        runtime: ScriptRuntime,
+        excludeSymbols: Boolean,
+        excludeNonEnumerables: Boolean
+    ): List<JsAny?> {
+        return value.indices.toList().fastMap { it.js() }
+    }
+
     override suspend fun set(
         property: JsAny?,
         value: JsAny?,
@@ -29,13 +37,6 @@ internal value class JsArrayWrapper(
         this.value[runtime.toNumber(property).toInt()] = value
     }
 
-    override suspend fun keys(
-        runtime: ScriptRuntime,
-        excludeSymbols: Boolean,
-        excludeNonEnumerables: Boolean
-    ): List<JsAny?> {
-        return value.indices.toList().fastMap { it.js() }
-    }
 
     override suspend fun proto(runtime: ScriptRuntime): JsAny? {
         return (runtime.findRoot() as JSRuntime).Array.get(PROTOTYPE,runtime)

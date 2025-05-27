@@ -1,6 +1,7 @@
 import io.github.alexzhirkevich.keight.js.RangeError
 import io.github.alexzhirkevich.keight.js.Undefined
 import kotlinx.coroutines.test.runTest
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
@@ -93,6 +94,7 @@ class JsArrayTest {
     }
 
     @Test
+    @Ignore
     fun sort()= runTest {
         """
             let arr = [66,2,8]

@@ -5,7 +5,10 @@ import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.interpreter.parse
 import io.github.alexzhirkevich.keight.js.interpreter.tokenize
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.jvm.JvmInline
 
 public class JavaScriptEngine(
     override val runtime: ScriptRuntime,
@@ -22,25 +25,23 @@ public class JavaScriptEngine(
         return "{\n$script\n}"
             .tokenize()
             .parse()
-            .asScript(runtime)
+            .asScript()
     }
 }
 
-private fun Expression.asScript(runtime: ScriptRuntime): Script = object : Script {
-
-    override suspend fun invoke(): JsAny? {
-        return withContext(runtime.coroutineContext) {
-            try {
-                invoke(runtime)
-            } catch (c: CancellationException) {
-                throw c
-            } catch (t: Throwable) {
-                if (t is JSError) {
-                    throw t
-                } else {
-                    throw JSError(t.message, cause = t)
-                }
+public fun Expression.asScript(): Script = Script { runtime ->
+    withContext(runtime.coroutineContext) {
+        try {
+            this@asScript.invoke(runtime)
+        } catch (c: CancellationException) {
+            throw c
+        } catch (t: Throwable) {
+            if (t is JSError) {
+                throw t
+            } else {
+                throw JSError(t.message, cause = t)
             }
         }
     }
 }
+

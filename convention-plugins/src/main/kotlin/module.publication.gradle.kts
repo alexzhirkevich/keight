@@ -25,7 +25,7 @@ publishing {
         artifact(javadocJar)
         pom {
             name.set("Keight")
-            description.set("JavaScript runtime interpreter for Kotlin Multiplatform")
+            description.set("JavaScript runtime for Kotlin Multiplatform")
             url.set("https://github.com/alexzhirkevich/keight")
 
             licenses {

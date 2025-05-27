@@ -333,7 +333,7 @@ private tailrec fun ScriptRuntime.closestFunctionScope() : ScriptRuntime {
     }
 }
 
-internal tailrec fun ScriptRuntime.findRoot() : ScriptRuntime {
+public tailrec fun ScriptRuntime.findRoot() : ScriptRuntime {
     return when (this){
         is ScopedRuntime -> parent.findRoot()
         is StrictRuntime -> delegate.findRoot()
