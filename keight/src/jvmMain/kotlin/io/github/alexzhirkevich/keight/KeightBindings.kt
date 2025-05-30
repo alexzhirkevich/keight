@@ -26,7 +26,7 @@ internal class KeightBindings(
     }
 
     override fun containsKey(k: String?): Boolean {
-        return k?.js() in runtime
+        return runBlocking { runtime.contains(k?.js()) }
     }
 
     override fun containsValue(value: Any?): Boolean {

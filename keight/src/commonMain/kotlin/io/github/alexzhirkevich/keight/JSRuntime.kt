@@ -61,11 +61,7 @@ public open class JSRuntime(
 ) : DefaultRuntime() {
 
     override val coroutineContext: CoroutineContext =
-        context + SupervisorJob(context[Job]).also {
-            if (!isSuspendAllowed) {
-                it.cancel()
-            }
-        } + CoroutineName("JS coroutine")
+        context + SupervisorJob(context[Job]) + CoroutineName("JS coroutine")
 
     internal lateinit var Number: JSNumberFunction
     internal lateinit var Object: JSObjectFunction

@@ -29,7 +29,7 @@ internal class OpGetProperty(
 
     private suspend fun getImpl(res: Any?, property : JsAny?, runtime: ScriptRuntime): JsAny? {
         return when {
-            receiver == null -> if (property in runtime) {
+            receiver == null -> if (runtime.contains(property)) {
                 runtime.get(property)
             } else {
                 runtime.referenceError { "$property is not defined".js() }

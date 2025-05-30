@@ -70,10 +70,13 @@ internal class KeightScriptContext(
     }
 
     override fun getAttributesScope(name: String?): Int {
-        return when (name?.js()) {
-            in runtime -> ScriptContext.ENGINE_SCOPE
-            in factory.globalRuntime -> ScriptContext.GLOBAL_SCOPE
-            else -> 0
+        val n = name?.js()
+        return runBlocking {
+            when {
+                runtime.contains(n) -> ScriptContext.ENGINE_SCOPE
+                factory.globalRuntime.contains(n) -> ScriptContext.GLOBAL_SCOPE
+                else -> 0
+            }
         }
     }
 

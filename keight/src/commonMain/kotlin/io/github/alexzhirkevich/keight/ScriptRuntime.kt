@@ -11,6 +11,9 @@ import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.mapThisArg
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.sync.Mutex
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.CoroutineContext
+import kotlin.jvm.JvmInline
 
 
 public enum class VariableType {
@@ -33,7 +36,7 @@ public abstract class ScriptRuntime : CoroutineScope {
 
     public abstract suspend fun delete(property: JsAny?, ignoreConstraints: Boolean = false): Boolean
 
-    public abstract operator fun contains(property: JsAny?): Boolean
+    public abstract suspend fun contains(property: JsAny?): Boolean
 
     public abstract suspend fun get(property: JsAny?): JsAny?
 
@@ -99,12 +102,37 @@ public suspend fun ScriptRuntime.set(property: JsAny?, value: JsAny?): Unit =
     set(property, value, null)
 
 
+public fun <T> ScriptRuntime.runSync(block : suspend ScriptRuntime.() -> T) : T {
+    check(!isSuspendAllowed) {
+        "Synchronous invocation is only available in runtimes with suspending calls disabled. See ScriptRuntime.isSuspendAllowed"
+    }
+    val res = try {
+        @Suppress("UNCHECKED_CAST")
+        (block as Function2<ScriptRuntime, Continuation<*>, T>)
+            .invoke(this, EmptyContinuation(coroutineContext))
+    } catch (t : ClassCastException){
+        throw Exception("Synchronous invocation is not compatible with your version of kotlinx.coroutines. Please report this issue", t)
+    }
+
+    check(res !== SUSPENDED) {
+        "Runtime with disallowed suspension was suspended. That should never happen. Please report this issue"
+    }
+
+    return res
+}
+
+private val SUSPENDED : Any get()  =  kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+
+@JvmInline
+private value class EmptyContinuation(override val context: CoroutineContext) : Continuation<Any?> {
+    override fun resumeWith(result: Result<Any?>) {}
+}
 
 public abstract class DefaultRuntime : ScriptRuntime() {
 
     protected val variables: MutableMap<JsAny?, Pair<VariableType?, JsAny?>> = ObjectMap(mutableMapOf())
 
-    override fun contains(property: JsAny?): Boolean {
+    override suspend fun contains(property: JsAny?): Boolean {
         return property in variables
     }
 
@@ -202,7 +230,7 @@ private class StrictRuntime(
         throw SyntaxError("Delete of an unqualified identifier in strict mode.")
     }
 
-    override fun contains(property: JsAny?): Boolean = delegate.contains(property)
+    override suspend fun contains(property: JsAny?): Boolean = delegate.contains(property)
     override suspend fun get(property: JsAny?): JsAny? = delegate.get(property)
     override suspend fun set(property: JsAny?, value: JsAny?, type: VariableType?) {
         if (type == null && !contains(property)) {
@@ -260,14 +288,8 @@ private class ScopedRuntime(
         get() = mapThisArg(field, isStrict)
 
     override suspend fun get(property: JsAny?): JsAny? {
-
-//        val t = thisRef
-//        if (t is JsAny && t.contains(property, this)){
-//            return t.get(property, this)
-//        }
-
         return when {
-            property in variables -> super.get(property)
+            super.contains(property)-> super.get(property)
             else -> parent.get(property)
         }
     }
@@ -286,7 +308,7 @@ private class ScopedRuntime(
         }
     }
 
-    override fun contains(property: JsAny?): Boolean {
+    override suspend fun contains(property: JsAny?): Boolean {
         return super.contains(property) || parent.contains(property)
     }
 

@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.callableOrNull
+import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.SyntaxError
@@ -64,12 +65,13 @@ internal fun OpCall(
         }
 
         else -> Expression { r ->
-            OpCallImpl(
-                runtime = r,
-                callable = callable,
-                arguments = arguments.fastMap { it(r) },
-                isOptional = isOptional
-            )
+            callable.invoke(r).let {
+                if (isOptional && (it == null || it is Undefined)) {
+                    Undefined
+                } else {
+                    it.callableOrThrow(r).invoke(arguments.fastMap { it(r) }, r)
+                }
+            }
         }
     }
 }
@@ -90,21 +92,6 @@ internal suspend fun JsAny.call(
         "$func is not a function".js()
     }
     return callable.call(thisRef, args, runtime)
-}
-
-private tailrec suspend fun OpCallImpl(
-    runtime: ScriptRuntime,
-    callable: Any?,
-    arguments: List<JsAny?>,
-    isOptional: Boolean
-) : JsAny? {
-    return when {
-        callable is Expression -> OpCallImpl(runtime, callable(runtime), arguments, isOptional)
-        callable is Callable -> callable.invoke(arguments, runtime)
-        callable is Function<*> -> execKotlinFunction(runtime, callable, arguments.fastMap { it?.toKotlin(runtime) })
-        isOptional && (callable == null || callable == Undefined) -> Undefined
-        else -> runtime.typeError { "$callable is not a function".js() }
-    }
 }
 
 internal fun Function<*>.asCallable() : Callable = KotlinCallable(this)
