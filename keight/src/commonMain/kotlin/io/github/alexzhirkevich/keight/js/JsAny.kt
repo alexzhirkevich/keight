@@ -19,9 +19,10 @@ public interface JsAny {
 
     public suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
 
-        if (property is JsStringWrapper && property.toString() == "__proto__"){
+        if (property == PROTO){
             return proto(runtime)?.get(runtime)
         }
+
         return when(val proto = proto(runtime)) {
             is Undefined -> Undefined
             is JsAny -> proto.get(property, runtime)
@@ -39,6 +40,8 @@ public interface JsAny {
 internal suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime) : Boolean {
     return isPrototypeOf(obj, runtime, true)
 }
+
+internal object Uninitialized : JsAny by Undefined
 
 private suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime, isFirst : Boolean) : Boolean {
     return when {

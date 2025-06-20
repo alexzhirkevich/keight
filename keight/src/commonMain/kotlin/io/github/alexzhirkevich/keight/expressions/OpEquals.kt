@@ -20,7 +20,7 @@ internal fun OpEquals(
     b : Expression,
     isTyped : Boolean
 ) = Expression {
-    OpEqualsImpl(a(it), b(it), isTyped, it).js()
+    OpEqualsImpl(a(it), b(it), isTyped, it).js
 }
 
 internal fun OpNotEquals(
@@ -29,9 +29,9 @@ internal fun OpNotEquals(
     isTyped : Boolean
 ) = Expression {
     if (isTyped){
-        OpEqualsImpl(a(it), b(it), isTyped, it).not().js()
+        OpEqualsImpl(a(it), b(it), isTyped, it).not().js
     } else {
-        OpEqualsImpl(a(it), b(it), isTyped, it).not().js()
+        OpEqualsImpl(a(it), b(it), isTyped, it).not().js
     }
 }
 
@@ -100,8 +100,8 @@ private tailrec suspend fun OpLooselyEqualsImpl(a : JsAny?, b : JsAny?,  runtime
 
         //If one of the operands is a Boolean but the other is not, convert the boolean to a number:
         // true is converted to 1, and false is converted to 0. Then compare the two operands loosely again.
-        a is JSBooleanWrapper -> OpLooselyEqualsImpl(if (a.value) 1.js() else 0.js(), b, runtime)
-        b is JSBooleanWrapper -> OpLooselyEqualsImpl(a, if (b.value) 1.js() else 0.js(), runtime)
+        a is JSBooleanWrapper -> OpLooselyEqualsImpl(if (a.value) 1.js else 0.js, b, runtime)
+        b is JSBooleanWrapper -> OpLooselyEqualsImpl(a, if (b.value) 1.js else 0.js, runtime)
 
         // Number to String: convert the string to a number. Conversion failure results in NaN, which will guarantee the equality to be false.
         a is JsNumberWrapper && b is JsStringWrapper || b is JsNumberWrapper && a is JsStringWrapper -> {

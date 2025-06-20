@@ -15,8 +15,8 @@ internal fun fromKotlin(a: Any?): JsAny? {
     return when (a) {
         null -> null
         is JsAny -> a
-        is Boolean -> a.js()
-        is Number -> a.js()
+        is Boolean -> a.js
+        is Number -> a.js
         is UByte -> JsNumberWrapper(a.toLong())
         is UShort -> JsNumberWrapper(a.toLong())
         is UInt -> JsNumberWrapper(a.toLong())
@@ -27,7 +27,7 @@ internal fun fromKotlin(a: Any?): JsAny? {
 
         is Set<*> -> JsSetWrapper(a.map(::fromKotlin).toMutableSet())
         is List<*> -> JsArrayWrapper(a.map(::fromKotlin).toMutableList())
-        is CharSequence -> a.js()
+        is CharSequence -> a.js
         is Job -> JSPromiseWrapper(a)
         is Throwable -> JSKotlinError(a)
         else -> error("Failed to convert $a to JS")

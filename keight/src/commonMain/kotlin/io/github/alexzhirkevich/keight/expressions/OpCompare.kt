@@ -13,14 +13,14 @@ internal fun OpCompare(
     val tb = b(it)
 
     if (it.isComparable(ta, tb)) {
-        result(it.compare(ta, tb)).js()
+        result(it.compare(ta, tb)).js
     } else {
-        false.js()
+        false.js
     }
 }
 
 internal fun OpNot(
     condition : Expression,
 ) = Expression {
-    it.isFalse(condition(it)).js()
+    it.isFalse(condition(it)).js
 }

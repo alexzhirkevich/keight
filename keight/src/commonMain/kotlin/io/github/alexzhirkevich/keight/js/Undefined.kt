@@ -12,6 +12,6 @@ public object Undefined : JsAny {
     }
 
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
-        runtime.referenceError { "Can't read properties of undefined".js() }
+        runtime.referenceError { "Can't read properties of undefined".js }
     }
 }

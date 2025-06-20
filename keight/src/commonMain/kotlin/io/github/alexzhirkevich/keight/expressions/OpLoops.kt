@@ -80,7 +80,7 @@ internal class OpForInLoop(
 
             for (k in keys) {
                 try {
-                    assign(it, k.js())
+                    assign(it, k.js)
                     body(it)
                 } catch (t: BlockContinue) {
                     if (t.label == label) {

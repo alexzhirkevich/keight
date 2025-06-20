@@ -21,10 +21,12 @@ public value class JSSymbol(public val value : String) : JsAny {
     public companion object {
         public val toPrimitive: JSSymbol = JSSymbol("Symbol.toPrimitive",)
         public val toStringTag: JSSymbol = JSSymbol("Symbol.toStringTag")
+        public val iterator: JSSymbol = JSSymbol("Symbol.iterator")
 
         internal val defaults = mapOf(
             "toPrimitive" to toPrimitive,
-            "toStringTag" to toStringTag
+            "toStringTag" to toStringTag,
+            "iterator" to iterator,
         )
     }
 }

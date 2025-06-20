@@ -54,15 +54,15 @@ private fun TryCatchFinally(
     } catch (t: Throwable) {
         val t = when  {
             t is ReferenceError && t.get(CONSTRUCTOR, r) !== (r.findRoot() as JSRuntime).ReferenceError ->
-                r.makeReferenceError { t.message.orEmpty().js()  }
+                r.makeReferenceError { t.message.orEmpty().js  }
             t is TypeError && t.get(CONSTRUCTOR, r) !== (r.findRoot() as JSRuntime).TypeError ->
-                r.makeTypeError { t.message.orEmpty().js()  }
+                r.makeTypeError { t.message.orEmpty().js  }
             else -> t
         }
         if (catchVariableName != null) {
-            val throwable = if (t is ThrowableValue) t.value else t.js()
+            val throwable = if (t is ThrowableValue) t.value else t.js
             r.withScope {
-                it.set(catchVariableName.js(), throwable, VariableType.Local)
+                it.set(catchVariableName.js, throwable, VariableType.Local)
                 catchBlock.invoke(it)
             }
         } else {

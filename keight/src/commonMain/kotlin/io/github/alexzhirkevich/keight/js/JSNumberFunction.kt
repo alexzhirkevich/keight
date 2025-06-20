@@ -10,34 +10,34 @@ import kotlin.math.roundToLong
 internal fun numberMethods() : List<JSFunction> {
     return listOf(
         "isFinite".func("number") {
-            val arg = it.getOrNull(0) ?: return@func false.js()
+            val arg = it.getOrNull(0) ?: return@func false.js
             val num = toNumber(arg).toDouble()
             if (num.isNaN())
-                return@func false.js()
-            num.isFinite().js()
+                return@func false.js
+            num.isFinite().js
         },
         "isInteger".func("number") {
-            val arg = it.getOrNull(0) ?: return@func false.js()
+            val arg = it.getOrNull(0) ?: return@func false.js
             val num = toNumber(arg)
-            (num is Long || num is Int || num is Short || num is Byte).js()
+            (num is Long || num is Int || num is Short || num is Byte).js
         },
         "parseInt".func(
             FunctionParam("number"),
-            "radix" defaults OpConstant(10L.js())
+            "radix" defaults OpConstant(10L.js)
         ) {
-            val arg = it.getOrNull(0) ?: return@func false.js()
+            val arg = it.getOrNull(0) ?: return@func false.js
             val radix = it.getOrNull(1)?.let { toNumber(it) }
                 ?.takeIf { !it.toDouble().isNaN() && it.toDouble().isFinite() }
                 ?.toInt() ?: 10
 
-            JSStringFunction.toString(arg, this).trim().trimParseInt(radix)?.js()
+            JSStringFunction.toString(arg, this).trim().trimParseInt(radix)?.js
         },
         "isSafeInteger".func("number") {
-            val arg = it.getOrNull(0) ?: return@func false.js()
-            (toNumber(arg) is Long).js()
+            val arg = it.getOrNull(0) ?: return@func false.js
+            (toNumber(arg) is Long).js
         },
         "parseFloat".func("number") {
-            val arg = it.getOrNull(0) ?: return@func false.js()
+            val arg = it.getOrNull(0) ?: return@func false.js
 
             var dotCnt = 0
             var eCount = 0
@@ -47,11 +47,11 @@ internal fun numberMethods() : List<JSFunction> {
                     if (c == 'e') eCount++
                 }
             }
-            (num.toDoubleOrNull() ?: 0L).js()
+            (num.toDoubleOrNull() ?: 0L).js
         },
         "isNaN".func("number") {
-            val arg = it.getOrNull(0) ?: return@func false.js()
-            toNumber(arg).toDouble().isNaN().js()
+            val arg = it.getOrNull(0) ?: return@func false.js
+            toNumber(arg).toDouble().isNaN().js
         },
     )
 }
@@ -59,46 +59,46 @@ internal fun numberMethods() : List<JSFunction> {
 internal class JSNumberFunction : JSFunction(
     name = "Number",
     prototype =  Object {
-        "toFixed".js().func(
-            "digits" defaults OpConstant(0.js())
+        "toFixed".js.func(
+            "digits" defaults OpConstant(0.js)
         ) { args ->
             val digits = args.getOrNull(0)?.let { toNumber(it) }?.toInt() ?: 0
 
-            toNumber(thisRef).toFixed(digits, this).js()
+            toNumber(thisRef).toFixed(digits, this).js
         }
-        "toPrecision".js().func("digits" defaults OpArgOmitted) { args ->
+        "toPrecision".js.func("digits" defaults OpArgOmitted) { args ->
             val value = toNumber(thisRef)
-            val digits = args.argOrElse(0) { return@func value.js() }
-            value.toDouble().roundTo(toNumber(digits).toInt() - 1).js()
+            val digits = args.argOrElse(0) { return@func value.js }
+            value.toDouble().roundTo(toNumber(digits).toInt() - 1).js
         }
-        "toString".js().func("radix" defaults OpConstant(10.js())) { args ->
+        "toString".js.func("radix" defaults OpConstant(10.js)) { args ->
 
             val radix = if (args.isEmpty())
                 10
             else args.getOrNull(0)?.let { toNumber(it) }?.toInt() ?: 10
 
             when(val number = toNumber(thisRef)){
-                is Long -> number.toString(radix).js()
-                else -> number.toString().js()
+                is Long -> number.toString(radix).js
+                else -> number.toString().js
             }
         }
-        "valueOf".js().func {
+        "valueOf".js.func {
             when (val t = thisRef) {
-                is JsNumberWrapper -> t.value.js()
-                is JsNumberObject -> t.value.js()
+                is JsNumberWrapper -> t.value.js
+                is JsNumberObject -> t.value.js
                 else -> t
             }
         }
     },
     parameters = listOf(FunctionParam("num")),
     body = Expression {
-        it.toNumber(it.get("num".js())).js()
+        it.toNumber(it.get("num".js)).js
     },
 ) {
     init {
         numberMethods().forEach {
             defineOwnProperty(
-                property = it.name.js(),
+                property = it.name.js,
                 value = it,
                 writable = false,
                 configurable = false,
@@ -106,56 +106,56 @@ internal class JSNumberFunction : JSFunction(
             )
         }
         defineOwnProperty(
-            "EPSILON".js(),
+            "EPSILON".js,
             JsNumberWrapper(Double.MIN_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "MAX_SAFE_INTEGER".js(),
+            "MAX_SAFE_INTEGER".js,
             JsNumberWrapper(Long.MAX_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "MAX_VALUE".js(),
+            "MAX_VALUE".js,
             JsNumberWrapper(Double.MAX_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "MIN_VALUE".js(),
+            "MIN_VALUE".js,
             JsNumberWrapper(Double.MIN_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "MIN_SAFE_INTEGER".js(),
+            "MIN_SAFE_INTEGER".js,
             JsNumberWrapper(Long.MIN_VALUE),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "NaN".js(),
+            "NaN".js,
             JsNumberWrapper(Double.NaN),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "NEGATIVE_INFINITY".js(),
+            "NEGATIVE_INFINITY".js,
             JsNumberWrapper(Double.NEGATIVE_INFINITY),
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
-            "POSITIVE_INFINITY".js(),
+            "POSITIVE_INFINITY".js,
             JsNumberWrapper(Double.POSITIVE_INFINITY),
             writable = false,
             configurable = false,

@@ -5,7 +5,7 @@ import io.github.alexzhirkevich.keight.callableOrThrow
 internal class JSFunctionFunction : JSFunction(
     name = "Function",
     prototype = Object {
-        "call".js().func(
+        "call".js.func(
             FunctionParam("thisArg"),
             "argArray".vararg()
         ) {
@@ -18,7 +18,7 @@ internal class JSFunctionFunction : JSFunction(
                 )
         }
 
-        "bind".js().func(
+        "bind".js.func(
             FunctionParam("thisArg"),
             "argArray".vararg()
         ) {
@@ -31,7 +31,7 @@ internal class JSFunctionFunction : JSFunction(
                 )
         }
 
-        "apply".js().func(
+        "apply".js.func(
             FunctionParam("thisArg"),
             "argArray" defaults OpArgOmitted
         ) {

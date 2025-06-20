@@ -41,10 +41,10 @@ internal class OpAssign(
             val r = receiver?.invoke(runtime)
 
             val current = if (receiver == null) {
-                runtime.get(variableName.js())
+                runtime.get(variableName.js)
             } else {
                 when (r){
-                    is JsAny -> r.get(variableName.js(), runtime)
+                    is JsAny -> r.get(variableName.js, runtime)
                     else -> null
                 }
             }
@@ -59,14 +59,14 @@ internal class OpAssign(
 
             if (receiver == null) {
                 runtime.set(
-                    property = variableName.js(),
+                    property = variableName.js,
                     value = v,
                     type = type
                 )
             } else {
                 when (r) {
-                    is JSObject -> r.set(variableName.js(), v, runtime)
-                    else -> runtime.typeError { "Cannot set properties of $r".js() }
+                    is JSObject -> r.set(variableName.js, v, runtime)
+                    else -> runtime.typeError { "Cannot set properties of $r".js }
                 }
             }
 

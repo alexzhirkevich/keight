@@ -14,6 +14,10 @@ internal class JsNumberObject(
         return number.toString()
     }
 
+    override fun hashCode(): Int {
+        return number.hashCode()
+    }
+
     override fun toKotlin(runtime: ScriptRuntime): Any = number.toKotlin(runtime)
 }
 

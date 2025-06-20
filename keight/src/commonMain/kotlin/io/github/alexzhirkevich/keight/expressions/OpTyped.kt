@@ -11,7 +11,7 @@ internal fun OpLongInt(
     val an = it.toNumber(a(it)).toLong()
     val bn = it.toNumber(b(it)).toInt()
 
-    op(an, bn).js()
+    op(an, bn).js
 }
 
 internal fun OpLongLong(
@@ -22,5 +22,5 @@ internal fun OpLongLong(
     val an = it.toNumber(a(it)).toLong()
     val bn = it.toNumber(b(it)).toLong()
 
-    op(an, bn).js()
+    op(an, bn).js
 }

@@ -3,7 +3,6 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.Getter
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.LazyGetter
 import io.github.alexzhirkevich.keight.ScriptRuntime
@@ -23,11 +22,9 @@ import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.fastMapNotNull
 import io.github.alexzhirkevich.keight.findRoot
-import io.github.alexzhirkevich.keight.js.interpreter.makeReferenceError
 import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
 import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
-import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import kotlinx.coroutines.async
 import kotlin.collections.List
 import kotlin.collections.Map
@@ -102,7 +99,7 @@ public open class JSFunction(
 
     override val type: String get() = "function"
 
-    private var thisRef : JsAny? = null
+    private var thisRef : JsAny? = Uninitialized
     private var isMutableThisRef = !isArrow
     private var bindedArgs = emptyList<JsAny?>()
     internal var closure : ScriptRuntime? = null
@@ -152,14 +149,14 @@ public open class JSFunction(
         }
 
         defineOwnProperty(
-            property = "length".js(),
-            value = length.js(),
+            property = "length".js,
+            value = length.js,
             writable = false,
             enumerable = false,
             configurable = true
         )
 
-        if ("name".js() !in this.properties) {
+        if ("name".js !in this.properties) {
             defineName(name)
         }
     }
@@ -167,8 +164,8 @@ public open class JSFunction(
     internal fun defineName(name: String){
         this.name = name
         defineOwnProperty(
-            property = "name".js(),
-            value = name.js(),
+            property = "name".js,
+            value = name.js,
             configurable = true,
             writable = false,
             enumerable = false
@@ -178,8 +175,6 @@ public open class JSFunction(
     override suspend fun fallbackProto(runtime: ScriptRuntime): JsAny? {
        return (runtime.findRoot() as JSRuntime).Function.get(PROTOTYPE, runtime)
     }
-
-    private fun thisRef() = this
 
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
         return super<JSObjectImpl>.get(property, runtime)
@@ -237,7 +232,7 @@ public open class JSFunction(
             suspend fun assertSuperInitialized() {
                 if (mustHaveSuperInitialized && !superInitialized) {
                     runtime.referenceError {
-                        "Must call super constructor in derived class before accessing 'this' or returning from derived constructor".js()
+                        "Must call super constructor in derived class before accessing 'this' or returning from derived constructor".js
                     }
                 }
             }
@@ -254,7 +249,7 @@ public open class JSFunction(
                             Callable {
                                 superConstructor.call(o, it, runtime).also {
                                     runtime.referenceCheck(!superInitialized) {
-                                        "Super constructor may only be called once".js()
+                                        "Super constructor may only be called once".js
                                     }
                                     superInitialized = true
                                 }
@@ -289,11 +284,11 @@ public open class JSFunction(
                     p.set(i, allArgs, r)
                 }
                 extraArgs.forEach {
-                    r.set(it.key.js(), it.value.second, it.value.first)
+                    r.set(it.key.js, it.value.second, it.value.first)
                 }
                 if (!isArrow) {
                     r.set(
-                        "arguments".js(),
+                        "arguments".js,
                         JsArrayWrapper(allArgs.toMutableList()),
 //                        LazyGetter {
 //                            r.typeCheck(!isArrow && !isAsync && !it.isStrict) {
@@ -309,7 +304,7 @@ public open class JSFunction(
         }
 
         return if (isAsync){
-            invokeRuntime.async { doInvoke() }.js()
+            invokeRuntime.async { doInvoke() }.js
         } else {
             doInvoke()
         }
@@ -332,7 +327,7 @@ public open class JSFunction(
 
                 it.withScope(
                     isFunction = true,
-                    thisRef = thisRef ?: it.thisRef,
+                    thisRef = if (thisRef is Uninitialized) it.thisRef else thisRef,
                     isSuspendAllowed = isAsync,
                 ){
                     body.invoke(it)
@@ -359,10 +354,10 @@ internal class SimpleFunctionParam(
         return if (default != null) {
             runtime.withScope {
                 it.set(
-                    property = name.js(),
+                    property = name.js,
                     value = JSPropertyAccessor.BackedField(
                         getter = Callable {
-                            runtime.referenceError { "Cannot access '$name' before initialization".js() }
+                            runtime.referenceError { "Cannot access '$name' before initialization".js }
                         }
                     ),
                     type = VariableType.Local
@@ -380,7 +375,7 @@ internal class SimpleFunctionParam(
         runtime: ScriptRuntime
     ) {
         val value = when {
-            isVararg -> arguments.drop(index).js()
+            isVararg -> arguments.drop(index).js
             index in arguments.indices -> arguments.argOrElse(index) { Undefined }.let {
                 if (it == Undefined) {
                     defaultOrUnit(runtime)
@@ -391,11 +386,11 @@ internal class SimpleFunctionParam(
             else -> defaultOrUnit(runtime)
         }
 
-        runtime.set(name.js(), value, VariableType.Local)
+        runtime.set(name.js, value, VariableType.Local)
     }
 
     override suspend fun get(runtime: ScriptRuntime): JsAny? {
-        return runtime.get(name.js())
+        return runtime.get(name.js)
     }
 }
 
@@ -492,7 +487,7 @@ internal fun Expression.toFunctionParam() : FunctionParam {
     }
 }
 
-internal fun mapThisArg(arg : JsAny, strict : Boolean) : JsAny {
+internal fun mapThisArg(arg : JsAny?, strict : Boolean) : JsAny? {
     return if (strict) {
         arg
     } else {

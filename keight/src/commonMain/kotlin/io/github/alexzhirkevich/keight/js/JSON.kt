@@ -9,13 +9,13 @@ import io.github.alexzhirkevich.keight.js.interpreter.string
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 
 internal fun JSON() = Object("JSON") {
-    "parse".js().func("string") {
+    "parse".js.func("string") {
         JSStringFunction.toString(it[0], this)
             .toList().listIterator().parseJSON()
     }
 
-    "stringify".js().func("object") {
-        it[0].stringify(this).js()
+    "stringify".js.func("object") {
+        it[0].stringify(this).js
     }
 }
 
@@ -60,7 +60,7 @@ private fun ListIterator<Char>.parseObject() : JSObject {
                 }
             }
             syntaxCheck(eat(':')) { "Invalid JSON - ':' was expected at ${nextIndex()}" }
-            key.js() eq parseJSON()
+            key.js eq parseJSON()
             eat(',')
         }
     }

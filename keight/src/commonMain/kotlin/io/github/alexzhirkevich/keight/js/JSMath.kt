@@ -9,59 +9,59 @@ import kotlin.math.*
 import kotlin.random.Random
 
 internal fun JSMath() : JSObject = Object("Math") {
-    "PI".js().eq(JsNumberWrapper(PI), writable = false, configurable = false)
-    "E".js().eq(JsNumberWrapper(E), writable = false, configurable = false)
-    "LN10".js().eq(JsNumberWrapper(2.302585092994046), writable = false, configurable = false)
-    "LN2".js().eq(JsNumberWrapper(0.6931471805599453), writable = false, configurable = false)
-    "LOG10E".js().eq(JsNumberWrapper(0.4342944819032518), writable = false, configurable = false)
-    "LOG2E".js().eq(JsNumberWrapper(1.4426950408889634), writable = false, configurable = false)
-    "SQRT1_2".js().eq(JsNumberWrapper(0.7071067811865476), writable = false, configurable = false)
-    "SQRT2".js().eq(JsNumberWrapper(1.4142135623730951), writable = false, configurable = false)
+    "PI".js.eq(JsNumberWrapper(PI), writable = false, configurable = false)
+    "E".js.eq(JsNumberWrapper(E), writable = false, configurable = false)
+    "LN10".js.eq(JsNumberWrapper(2.302585092994046), writable = false, configurable = false)
+    "LN2".js.eq(JsNumberWrapper(0.6931471805599453), writable = false, configurable = false)
+    "LOG10E".js.eq(JsNumberWrapper(0.4342944819032518), writable = false, configurable = false)
+    "LOG2E".js.eq(JsNumberWrapper(1.4426950408889634), writable = false, configurable = false)
+    "SQRT1_2".js.eq(JsNumberWrapper(0.7071067811865476), writable = false, configurable = false)
+    "SQRT2".js.eq(JsNumberWrapper(1.4142135623730951), writable = false, configurable = false)
 
-    "abs".js().func("x") { op1(it, ::acos) }
-    "asoc".js().func("x") { op1(it, ::acos) }
-    "asoch".js().func("x") { op1(it, ::acosh) }
-    "asin".js().func("x") { op1(it, ::asin) }
-    "asinh".js().func("x") { op1(it, ::asinh) }
-    "atan".js().func("x") { op1(it, ::atan) }
-    "atan2".js().func("y", "x") { op2(it, ::atan2) }
-    "atanh".js().func("x") { op1(it, ::atanh) }
-    "cbrt".js().func("x") { op1(it, ::cbrt) }
-    "ceil".js().func("x") { op1(it, ::ceil) }
-    "cos".js().func("x") { op1(it, ::cos) }
-    "cosh".js().func("x") { op1(it, ::cosh) }
-    "exp".js().func("x") { op1(it, ::exp) }
-    "expm1".js().func("x") { op1(it, ::expm1) }
-    "floor".js().func("x") { op1(it, ::floor) }
-    "hypot".js().func(
+    "abs".js.func("x") { op1(it, ::acos) }
+    "asoc".js.func("x") { op1(it, ::acos) }
+    "asoch".js.func("x") { op1(it, ::acosh) }
+    "asin".js.func("x") { op1(it, ::asin) }
+    "asinh".js.func("x") { op1(it, ::asinh) }
+    "atan".js.func("x") { op1(it, ::atan) }
+    "atan2".js.func("y", "x") { op2(it, ::atan2) }
+    "atanh".js.func("x") { op1(it, ::atanh) }
+    "cbrt".js.func("x") { op1(it, ::cbrt) }
+    "ceil".js.func("x") { op1(it, ::ceil) }
+    "cos".js.func("x") { op1(it, ::cos) }
+    "cosh".js.func("x") { op1(it, ::cosh) }
+    "exp".js.func("x") { op1(it, ::exp) }
+    "expm1".js.func("x") { op1(it, ::expm1) }
+    "floor".js.func("x") { op1(it, ::floor) }
+    "hypot".js.func(
         "values",
         params = { it.vararg() }
     ) { opVararg(it, { 0 }, ::hypotN) }
-    "imul".js().func("x", "y",) { op2(it, ::imul) }
-    "log".js().func("x") { op1(it, ::ln) }
-    "log10".js().func("x") { op1(it, ::log10) }
-    "log1p ".js().func("x") { op1(it, ::ln1p) }
-    "log2".js().func("x") { op1(it, ::log2) }
-    "max".js().func(
+    "imul".js.func("x", "y",) { op2(it, ::imul) }
+    "log".js.func("x") { op1(it, ::ln) }
+    "log10".js.func("x") { op1(it, ::log10) }
+    "log1p ".js.func("x") { op1(it, ::ln1p) }
+    "log2".js.func("x") { op1(it, ::log2) }
+    "max".js.func(
         "values",
         params = { it.vararg() }
     ) {
         opVararg(it, { Double.NEGATIVE_INFINITY }, List<Double>::max)
     }
-    "min".js().func(
+    "min".js.func(
         "values",
         params = { it.vararg() }
     ) { opVararg(it, { Double.POSITIVE_INFINITY }, List<Double>::min) }
-    "pow".js().func("x", "y",) { op2(it, Double::pow) }
-    "random".js().func("x") {  Random.nextDouble().js() }
-    "round".js().func("x") { op1(it, ::round) }
-    "sign".js().func("x") { op1(it, ::sign) }
-    "sin".js().func("x") { Sin(it.firstOrNull() ?: Undefined).js() }
-    "sinh".js().func("x") { op1(it, ::sinh) }
-    "sqrt".js().func("x") { op1(it, ::sqrt) }
-    "tan".js().func("x") { op1(it, ::tan) }
-    "tanh".js().func("x") { op1(it, ::tanh) }
-    "trunc".js().func("x") { op1(it, ::truncate) }
+    "pow".js.func("x", "y",) { op2(it, Double::pow) }
+    "random".js.func("x") {  Random.nextDouble().js }
+    "round".js.func("x") { op1(it, ::round) }
+    "sign".js.func("x") { op1(it, ::sign) }
+    "sin".js.func("x") { Sin(it.firstOrNull() ?: Undefined).js }
+    "sinh".js.func("x") { op1(it, ::sinh) }
+    "sqrt".js.func("x") { op1(it, ::sqrt) }
+    "tan".js.func("x") { op1(it, ::tan) }
+    "tanh".js.func("x") { op1(it, ::tanh) }
+    "trunc".js.func("x") { op1(it, ::truncate) }
 }
 
 /**
@@ -86,7 +86,7 @@ private suspend fun ScriptRuntime.op1(
     args: List<JsAny?>,
     func: (Double) -> Number
 ): JsAny? {
-    return func(toNumber(args.getOrElse(0) { 0.js() }).toDouble()).js()
+    return func(toNumber(args.getOrElse(0) { 0.js }).toDouble()).js
 }
 
 private suspend fun  ScriptRuntime.op2(
@@ -97,7 +97,7 @@ private suspend fun  ScriptRuntime.op2(
 
     val a = toNumber(args[0]).toDouble()
     val b = toNumber(args[1]).toDouble()
-    return func(a, b).js()
+    return func(a, b).js
 }
 
 private suspend fun ScriptRuntime.opVararg(
@@ -107,12 +107,12 @@ private suspend fun ScriptRuntime.opVararg(
 ): JsAny {
 
     if (args.isEmpty() || (args[0] as List<*>).isEmpty()){
-        return onEmpty().js()
+        return onEmpty().js
     }
     val a = (args[0] as List<JsAny?>).fastMap {
         toNumber(it).toDouble()
     }
-    return func(a).js()
+    return func(a).js
 }
 
 private fun hypotN(args : List<Double>): Double {

@@ -10,5 +10,5 @@ internal fun OpExp(
 ) = Expression {
     val xn = it.toNumber(x(it)).toDouble()
     val degreeN = it.toNumber(degree(it)).toDouble()
-    xn.pow(degreeN).js()
+    xn.pow(degreeN).js
 }

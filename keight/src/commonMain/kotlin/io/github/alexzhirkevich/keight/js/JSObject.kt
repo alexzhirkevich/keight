@@ -48,9 +48,9 @@ public interface JSObject : JsAny {
     }
 }
 
-internal val PROTOTYPE = "prototype".js()
-internal val PROTO = "__proto__".js()
-internal val CONSTRUCTOR = "constructor".js()
+internal val PROTOTYPE = "prototype".js
+internal val PROTO = "__proto__".js
+internal val CONSTRUCTOR = "constructor".js
 
 internal fun JSObjectImpl.setPrototype(prototype : Any?) {
     (prototype as JSObjectImpl).defineOwnProperty(
@@ -237,11 +237,11 @@ public open class JSObjectImpl(
     ) {
 
         runtime.typeCheck(map[property]?.writable != false || !runtime.isStrict) {
-            "Cannot assign to read only property '$property' of object $this".js()
+            "Cannot assign to read only property '$property' of object $this".js
         }
 
         runtime.typeCheck(isExtensible || contains(property, runtime)) {
-            "Cannot add property $property, object is not extensible".js()
+            "Cannot add property $property, object is not extensible".js
         }
 
         if (!isExtensible && property == PROTO){
@@ -483,7 +483,7 @@ internal fun JSObjectImpl.func(
             }
         }
     ).also {
-        setOverwrite(name.js(), it)
+        setOverwrite(name.js, it)
     }
 }
 
@@ -506,7 +506,7 @@ internal fun JSObjectImpl.func(
         params = params,
         body = body
     ).also {
-        setOverwrite(name.js(), it,)
+        setOverwrite(name.js, it,)
     }
 }
 

@@ -64,7 +64,7 @@ internal interface Destruction {
             // const f = ({} = null) => {};
             // assert.throws(TypeError, function() { f(); }
             if (itemsContext == DestructionContext.Object::class && (obj !is JsAny) && default == null){
-                runtime.typeError { "cannot read properties of $obj".js() }
+                runtime.typeError { "cannot read properties of $obj".js }
             }
 
             items.fastForEach {
@@ -99,7 +99,7 @@ internal sealed interface DestructionContext {
             default: Getter<*>?
         ): JsAny? {
             return when {
-                obj is JsAny && name != null -> obj.get(name.js(), runtime)/*.let {
+                obj is JsAny && name != null -> obj.get(name.js, runtime)/*.let {
                     if (it is Unit && default != null) {
                         property(name, default.get(runtime), runtime, null)
                     } else {
@@ -107,7 +107,7 @@ internal sealed interface DestructionContext {
                     }
                 }*/
                 default != null -> property(name, default.get(runtime), runtime, null)
-                else -> runtime.typeError { "can't get properties of $obj".js() }
+                else -> runtime.typeError { "can't get properties of $obj".js }
             }
         }
     }
@@ -124,7 +124,7 @@ internal sealed interface DestructionContext {
                 obj.getOrElse(index) { Undefined }
             } else {
                 if (obj == null) {
-                    runtime.typeError { "null is not iterable".js() }
+                    runtime.typeError { "null is not iterable".js }
                 } else {
                     Undefined
                 }
@@ -198,7 +198,7 @@ internal fun Expression.asDestruction(
                             if ((assignableValue is OpConstant || assignableValue is OpClassInit
                                 || (assignableValue is OpTouple && assignableValue.singleRecursiveOrNull() != null))
                                 && defaultValue is JSFunction
-                                && JSStringFunction.toString(defaultValue.get("name".js(), runtime),runtime).isEmpty()
+                                && JSStringFunction.toString(defaultValue.get("name".js, runtime),runtime).isEmpty()
                             ) {
                                 defaultValue.defineName(variableName)
                             }
@@ -277,7 +277,7 @@ internal fun Expression.asDestruction(
             context = context,
             itemsContext = DestructionContext.Object::class
         )
-        is OpKeyValuePair -> {
+        is OpColonAssignment -> {
             value.asDestruction().let {
                 Destruction(it.variables + key) { obj, variableType, runtime, default ->
                     it.destruct(
@@ -335,7 +335,7 @@ private class SpreadDestruction(
             }
             default != null -> destruct(default.get(runtime), variableType, runtime, null)
             else -> runtime.typeError {
-                "${JSStringFunction.toString(obj, runtime)} is not iterable".js()
+                "${JSStringFunction.toString(obj, runtime)} is not iterable".js
             }
         }
     }

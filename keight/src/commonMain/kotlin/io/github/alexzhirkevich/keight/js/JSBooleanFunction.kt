@@ -9,6 +9,6 @@ internal class JSBooleanFunction : JSFunction(name = "Boolean") {
     }
 
     override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
-        return runtime.isFalse(args.getOrNull(0)).not().js()
+        return runtime.isFalse(args.getOrNull(0)).not().js
     }
 }

@@ -7,6 +7,7 @@ import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
+import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.mapThisArg
 import kotlinx.coroutines.CoroutineScope
@@ -30,7 +31,7 @@ public abstract class ScriptRuntime : CoroutineScope {
     internal val lock: Mutex = Mutex()
 
     @PublishedApi
-    internal abstract val thisRef : JsAny
+    internal abstract val thisRef: JsAny?
 
     public abstract fun isEmpty(): Boolean
 
@@ -43,7 +44,7 @@ public abstract class ScriptRuntime : CoroutineScope {
     public abstract suspend fun set(property: JsAny?, value: JsAny?, type: VariableType?)
 
     public abstract suspend fun <T> withScope(
-        thisRef: JsAny = this.thisRef,
+        thisRef: JsAny? = this.thisRef,
         extraProperties: Map<String, Pair<VariableType, JsAny?>> = emptyMap(),
         isSuspendAllowed: Boolean = this.isSuspendAllowed,
         isFunction: Boolean = false,
@@ -121,6 +122,22 @@ public fun <T> ScriptRuntime.runSync(block : suspend ScriptRuntime.() -> T) : T 
     return res
 }
 
+internal suspend inline fun ScriptRuntime.requireThisRef(caller : String? = null) : JsAny {
+    val t = thisRef
+    typeCheck(t != null && t !is Undefined) {
+        "${caller ?: "function"} called on null or undefined".js
+    }
+    return t
+}
+
+internal suspend inline fun <reified T > ScriptRuntime.thisRef() : T {
+    return try {
+        thisRef as T
+    } catch (t: ClassCastException){
+        typeError { "Cannot convert $thisRef to ${T::class}".js }
+    }
+}
+
 private val SUSPENDED : Any get()  =  kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 
 @JvmInline
@@ -161,11 +178,11 @@ public abstract class DefaultRuntime : ScriptRuntime() {
         }
 
         typeCheck(current?.first != VariableType.Const) {
-            "Assignment to constant variable ('$property')".js()
+            "Assignment to constant variable ('$property')".js
         }
 
         referenceCheck(type != null || !isStrict || contains(property)) {
-            "Unresolved reference $property".js()
+            "Unresolved reference $property".js
         }
         variables[property] = (type ?: current?.first) to value
     }
@@ -178,7 +195,7 @@ public abstract class DefaultRuntime : ScriptRuntime() {
     }
 
     final override suspend fun <T> withScope(
-        thisRef: JsAny,
+        thisRef: JsAny?,
         extraProperties: Map<String, Pair<VariableType, JsAny?>>,
         isSuspendAllowed: Boolean,
         isFunction: Boolean,
@@ -193,7 +210,7 @@ public abstract class DefaultRuntime : ScriptRuntime() {
             isSuspendAllowed = isSuspendAllowed
         )
         extraProperties.forEach { (n, v) ->
-            child.set(n.js(), v.second, v.first)
+            child.set(n.js, v.second, v.first)
         }
         return block(child)
     }
@@ -221,7 +238,7 @@ private class StrictRuntime(
 ) : ScriptRuntime(),
     CoroutineScope by delegate {
 
-    override val thisRef: JsAny get() = mapThisArg(delegate.thisRef, true)
+    override val thisRef: JsAny? get() = mapThisArg(delegate.thisRef, true)
     override val isStrict: Boolean get() = true
     override val isSuspendAllowed: Boolean get() = delegate.isSuspendAllowed
     override fun isEmpty(): Boolean = delegate.isEmpty()
@@ -240,7 +257,7 @@ private class StrictRuntime(
     }
 
     override suspend fun <T> withScope(
-        thisRef: JsAny,
+        thisRef: JsAny?,
         extraProperties: Map<String, Pair<VariableType, JsAny?>>,
         isSuspendAllowed: Boolean,
         isFunction: Boolean,
@@ -277,14 +294,14 @@ private class ScopedRuntime(
     val parent: ScriptRuntime,
     val isFunction: Boolean,
     private val strict: Boolean,
-    mThisRef: JsAny = parent.thisRef,
+    mThisRef: JsAny? = parent.thisRef,
     override val isSuspendAllowed: Boolean = parent.isSuspendAllowed
 ) : DefaultRuntime(),
     CoroutineScope by parent {
 
     override val isStrict get() = strict || parent.isStrict
 
-    override val thisRef: JsAny = mThisRef
+    override val thisRef: JsAny? = mThisRef
         get() = mapThisArg(field, isStrict)
 
     override suspend fun get(property: JsAny?): JsAny? {

@@ -4,17 +4,18 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.SyntaxError
 
 
 internal interface Labeled {
     var label: String?
 }
 
-
-internal class OpKeyValuePair(
+internal class OpColonAssignment(
     val key : String,
     val value : Expression
 ) : Expression() {
+
 
     init {
         if (value is Labeled){

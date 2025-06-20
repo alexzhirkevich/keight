@@ -18,25 +18,25 @@ internal class JSObjectFunction : JSFunction(
     ),
     body = Expression {
         with(it) {
-            constructObject(it.get("obj".js()))
+            constructObject(it.get("obj".js))
         }
     },
     prototype = JSObjectImpl(
         properties = listOf(
-            "toString".func { thisRef.toString().js() },
+            "toString".func { thisRef.toString().js },
             "isPrototypeOf".func("object") {
-                ((thisRef as? JsAny)?.isPrototypeOf(it[0],this) == true).js()
+                (thisRef?.isPrototypeOf(it[0],this) == true).js
             },
             "hasOwnProperty".func("name" defaults OpArgOmitted) { args ->
-                val name = args.getOrElse(0) { return@func false.js() }
-                thisRef<JSObject>().hasOwnProperty(name, this).js()
+                val name = args.getOrElse(0) { return@func false.js }
+                thisRef<JSObject>().hasOwnProperty(name, this).js
             },
             "propertyIsEnumerable".func("v" defaults OpArgOmitted) {
-                val name = it.argOrElse(0) { return@func false.js() }
+                val name = it.argOrElse(0) { return@func false.js }
 
-                thisRef<JSObject>().propertyIsEnumerable(name, this).js()
+                thisRef<JSObject>().propertyIsEnumerable(name, this).js
             }
-        ).associateBy { it.name.js() }
+        ).associateBy { it.name.js }
     ).apply {
         setProto(null)
     },
@@ -61,8 +61,8 @@ internal class JSObjectFunction : JSFunction(
         },
         "entries".func( "object") {
             (it.firstOrNull() as? JSObject)?.entries(this)
-                ?.map { it.js() }?.js()
-                ?: emptyList<JsAny?>().js()
+                ?.map { it.js }?.js
+                ?: emptyList<JsAny?>().js
         },
         "fromEntries".func("object") { args ->
             val entries = (args.getOrNull(0) as? List<List<JsAny?>>).orEmpty()
@@ -71,29 +71,29 @@ internal class JSObjectFunction : JSFunction(
 
         "keys".func("object") {
             it.firstOrNull()?.keys(this)
-                ?.fastMap { JSStringFunction.toString(it, this).js() }?.js()
-                ?: emptyList<JsAny?>().js()
+                ?.fastMap { JSStringFunction.toString(it, this).js }?.js
+                ?: emptyList<JsAny?>().js
         },
         "values".func( "object") {
-            (it.firstOrNull() as? JSObject)?.values(this)?.js()
-                ?: emptyList<JsAny?>().js()
+            (it.firstOrNull() as? JSObject)?.values(this)?.js
+                ?: emptyList<JsAny?>().js
         },
 
         "groupBy".func( "objects", "callback") { args ->
             val obj = args.getOrNull(0)
 
             typeCheck(obj is Iterable<*>) {
-                "$obj is not iterable".js()
+                "$obj is not iterable".js
             }
 
             obj as Iterable<JsAny?>
 
             val callback = args.getOrNull(1)?.callableOrNull()
-                ?: typeError { "${args.getOrNull(1)} is not function".js() }
+                ?: typeError { "${args.getOrNull(1)} is not function".js }
 
             val props =  obj
                 .groupBy { callback.invoke(it.listOf(), this) }
-                .mapValues { it.value.js() }
+                .mapValues { it.value.js }
                 .toMutableMap()
 
             JSObjectImpl(properties = props)
@@ -103,7 +103,7 @@ internal class JSObjectFunction : JSFunction(
             val obj = args.getOrNull(0)
 
             typeCheck(obj is JSObject) {
-                "$obj is not a object".js()
+                "$obj is not a object".js
             }
 
             val name = args.getOrElse(1) {
@@ -120,7 +120,7 @@ internal class JSObjectFunction : JSFunction(
             val obj = args.getOrNull(0)
 
             typeCheck(obj is JSObject) {
-                "$obj is not a object".js()
+                "$obj is not a object".js
             }
 
             val props = args.getOrNull(1) as? JSObject ?: return@func Undefined
@@ -129,7 +129,7 @@ internal class JSObjectFunction : JSFunction(
                 val prop = props.get(key, this)
 
                 typeCheck(prop is JsAny){
-                    "$key property of $obj is not an object".js()
+                    "$key property of $obj is not an object".js
                 }
 
                 obj.define(this, key, prop)
@@ -141,7 +141,7 @@ internal class JSObjectFunction : JSFunction(
             val obj = args.getOrNull(0)
 
             typeCheck(obj is JSObject) {
-                "$obj is not a object".js()
+                "$obj is not a object".js
             }
 
             val name = args.getOrElse(1) { return@func Undefined }
@@ -152,7 +152,7 @@ internal class JSObjectFunction : JSFunction(
         "getOwnPropertyDescriptors".func( "object") { args ->
             val obj = args.getOrNull(0)
             typeCheck(obj is JSObject) {
-                "$obj is not a object".js()
+                "$obj is not a object".js
             }
 
             JSObjectImpl(
@@ -162,21 +162,21 @@ internal class JSObjectFunction : JSFunction(
 
         "getOwnPropertyNames".func( "object") { args ->
             val obj = args.getOrNull(0)
-            typeCheck(obj is JsAny) { "$obj is not an object".js() }
-            obj.keys(this).fastMap { it.toString().js() }.js()
+            typeCheck(obj is JsAny) { "$obj is not an object".js }
+            obj.keys(this).fastMap { it.toString().js }.js
         },
 
         "getPrototypeOf".func( "object") {
             val obj = it.getOrNull(0)
 
-            typeCheck(obj is JsAny) { "$obj is not an object".js() }
+            typeCheck(obj is JsAny) { "$obj is not an object".js }
 
             obj.get(PROTO, this) ?: Undefined
         },
 
         "preventExtensions".func( "object") {
             val obj = it.getOrNull(0)
-            typeCheck(obj is JSObject) { "$obj is not an object".js() }
+            typeCheck(obj is JSObject) { "$obj is not an object".js }
             obj.preventExtensions()
             obj
         },
@@ -184,9 +184,9 @@ internal class JSObjectFunction : JSFunction(
         "isExtensible".func( "object") {
             val t = thisRef
             if (t !is JSObject){
-                return@func false.js()
+                return@func false.js
             }
-            t.isExtensible.js()
+            t.isExtensible.js
         },
 
         "seal".func( "object") {
@@ -209,15 +209,15 @@ internal class JSObjectFunction : JSFunction(
             val b = args[1]
 
             if (OpEqualsImpl(a,b, true, this)){
-                return@func true.js()
+                return@func true.js
             }
 
             val ka = a?.toKotlin(this)
             val kb = b?.toKotlin(this)
 
-            (ka is Double && ka.isNaN() && kb is Double && kb.isNaN()).js()
+            (ka is Double && ka.isNaN() && kb is Double && kb.isNaN()).js
         }
-    ).associateBy { it.name.js() }.toMutableMap()
+    ).associateBy { it.name.js }.toMutableMap()
 ) {
 
     override suspend fun isInstance(obj: JsAny?, runtime: ScriptRuntime): Boolean {
@@ -249,12 +249,12 @@ private suspend fun ScriptRuntime.constructObject(param : Any?) : JSObjectImpl {
 
 private suspend fun JSObject.define(runtime: ScriptRuntime, name : JsAny?, property : JsAny) {
     val p = when {
-        property.contains("value".js(), runtime) ->
-            JSPropertyAccessor.Value(property.get("value".js(), runtime))
+        property.contains("value".js, runtime) ->
+            JSPropertyAccessor.Value(property.get("value".js, runtime))
 
-        property.contains("get".js(), runtime) -> JSPropertyAccessor.BackedField(
-            property.get("get".js(), runtime)?.callableOrNull(),
-            property.get("set".js(), runtime)?.callableOrNull()
+        property.contains("get".js, runtime) -> JSPropertyAccessor.BackedField(
+            property.get("get".js, runtime)?.callableOrNull(),
+            property.get("set".js, runtime)?.callableOrNull()
         )
 
         else -> JSPropertyAccessor.Value(get(name, runtime))
@@ -264,14 +264,14 @@ private suspend fun JSObject.define(runtime: ScriptRuntime, name : JsAny?, prope
         property = name,
         value = p,
         runtime = runtime,
-        enumerable = if (property.contains("enumerable".js(), runtime)) {
-            !runtime.isFalse(property.get("enumerable".js(), runtime))
+        enumerable = if (property.contains("enumerable".js, runtime)) {
+            !runtime.isFalse(property.get("enumerable".js, runtime))
         } else null,
-        configurable = if (property.contains("configurable".js(), runtime)) {
-            !runtime.isFalse(property.get("configurable".js(), runtime))
+        configurable = if (property.contains("configurable".js, runtime)) {
+            !runtime.isFalse(property.get("configurable".js, runtime))
         } else null,
-        writable = if (property.contains("writable".js(), runtime)) {
-            !runtime.isFalse(property.get("writable".js(), runtime))
+        writable = if (property.contains("writable".js, runtime)) {
+            !runtime.isFalse(property.get("writable".js, runtime))
         } else null,
     )
 }

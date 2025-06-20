@@ -9,7 +9,10 @@ import kotlin.jvm.JvmInline
 @JvmInline
 internal value class JsMapWrapper(
     override val value: MutableMap<JsAny?, JsAny?>
-) : JsAny, Wrapper<MutableMap<JsAny?, JsAny?>>, Iterable<List<*>> {
+) : JsAny,
+    Wrapper<MutableMap<JsAny?, JsAny?>>,
+    Iterable<List<*>>,
+    MutableMap<JsAny?, JsAny?> by value {
 
     override suspend fun keys(
         runtime: ScriptRuntime,
@@ -17,6 +20,13 @@ internal value class JsMapWrapper(
         excludeNonEnumerables: Boolean
     ): List<JsAny?> {
         return value.keys.toList()
+    }
+
+    override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
+        return when(property?.toString()){
+            "size" -> value.size.js
+            else -> super.get(property, runtime)
+        }
     }
 
     override suspend fun proto(runtime: ScriptRuntime): JsAny? {

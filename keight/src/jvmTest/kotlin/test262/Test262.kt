@@ -46,7 +46,7 @@ suspend fun harness(name : String, runtime: JSRuntime) {
         if (isNegative && result != null) {
             if (expectedError != null) {
                 if (result is JSError) {
-                    val name = result.get("name".js(), runtime)
+                    val name = result.get("name".js, runtime)
 
                     assertEquals(expectedError, name.toString(), result.stackTraceToString())
                 } else {
@@ -56,8 +56,8 @@ suspend fun harness(name : String, runtime: JSRuntime) {
         } else {
             if (result != null) {
                 val msg = if (result is ThrowableValue && result.value is JsAny) {
-                    if (result.value.contains("message".js(), runtime)) {
-                        result.value.get("message".js(), runtime)
+                    if (result.value.contains("message".js, runtime)) {
+                        result.value.get("message".js, runtime)
                     } else {
                         JSStringFunction.toString(result.value, runtime)
                     }

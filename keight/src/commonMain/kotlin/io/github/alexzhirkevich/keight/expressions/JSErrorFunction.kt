@@ -18,14 +18,14 @@ import io.github.alexzhirkevich.keight.js.setProto
 internal open class JSErrorFunction(
     name : String = "Error",
     prototype : JSObject = Object {
-        "message".js() eq "".js()
+        "message".js eq "".js
     },
     private val make : (Any?) -> JSError = { JSError(it) }
 ) : JSFunction(
     name = name,
     prototype = prototype,
-    parameters = listOf(FunctionParam("msg" , default =  OpConstant("Uncaught $name".js()))),
-    body = Expression { make(it.get("msg".js())) }
+    parameters = listOf(FunctionParam("msg" , default =  OpConstant("Uncaught $name".js))),
+    body = Expression { make(it.get("msg".js)) }
 ) {
     override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JSObject {
         return make(args.getOrElse(0) { "Uncaught $name" })

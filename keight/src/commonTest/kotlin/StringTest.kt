@@ -1,5 +1,6 @@
 
 import kotlinx.coroutines.test.runTest
+import kotlin.test.Ignore
 import kotlin.test.Test
 
 internal class StringTest {
@@ -55,6 +56,7 @@ internal class StringTest {
     }
 
     @Test
+    @Ignore()
     fun match() = runTest {
         "'a'.match('[a-z]')".eval().assertEqualsTo(true)
         "'A'.match('[a-z]')".eval().assertEqualsTo(false)

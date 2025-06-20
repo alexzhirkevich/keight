@@ -56,14 +56,14 @@ class Test262Suite {
 
     var failed = 0
     var ignored = 0
+    var passed = 0
 
     @Test
     fun temp() = runtimeTest {
-
-//        val callable : Callable = "(a,b) => a + b".eval(it) as Callable
-        val func = "(function(obj) { return obj.name })".eval(it) as suspend (List<JsAny>) -> Any?
-
-        func(listOf(Object { "name".js() eq "peter".js() })).assertEqualsTo("peter")
+        """
+            var a,b;
+            a > 0 ? b *= 1 : b *= 1
+        """.trimIndent().eval(it)
     }
 
     @Test
@@ -73,6 +73,12 @@ class Test262Suite {
             "language/types",
             "language/comments",
             "language/expressions",
+            "language/statements",
+            "language/block-scope",
+            "language/function-code",
+            "language/global-code",
+            "language/identifiers",
+            "language/keywords",
         )
 
         order.forEach { f ->
@@ -92,6 +98,7 @@ class Test262Suite {
                             harness(it, r)
                         }
                         test.test(r)
+                        passed++
 //                        println("✅ #${i.toString().padEnd(8, ' ')} PASSED     ${it.name}")
                     } catch (t: Throwable) {
                         if (ignore) {
@@ -99,7 +106,7 @@ class Test262Suite {
 //                            println("⚠\uFE0F #${i.toString().padEnd(8, ' ')} IGNORED     ${it.name}")
                         } else {
                             failed++
-                            println("❌ #${i.toString().padEnd(8, ' ')} FAILED     ${it.name}",)
+                            println("❌ #${i.toString().padEnd(8, ' ')} FAILED     ${it.name}; IGNORED: $ignored; PASSED: $passed",)
                             throw t
                         }
                     }
@@ -110,7 +117,7 @@ class Test262Suite {
                 }
             }
         }
-        assertTrue(failed == 0,"Passed ${i-failed} of total $i tests; ${i - failed - ignored} success, $ignored ignored, $failed failed")
+        assertTrue(failed == 0,"Passed $passed of total $i tests; $ignored ignored, $failed failed")
 //        resources().resolve("language/types/boolean")
 //            .listFiles(FileFilter { it.isFile })!!
 //            .forEach {

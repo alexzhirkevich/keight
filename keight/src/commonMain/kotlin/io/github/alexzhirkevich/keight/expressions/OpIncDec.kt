@@ -38,6 +38,6 @@ internal fun OpIncDecAssign(
     }
 
     return Expression { ctx ->
-        ctx.toNumber(variable(ctx)).also { assignment(ctx) }.js()
+        ctx.toNumber(variable(ctx)).also { assignment(ctx) }.js
     }
 }

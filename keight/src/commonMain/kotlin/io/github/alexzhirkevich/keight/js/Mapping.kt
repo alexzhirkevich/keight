@@ -4,20 +4,28 @@ import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 
-public fun Deferred<JsAny?>.js() : JsAny {
-    return if (this is JsAny) this else JSPromiseWrapper(this)
-}
-
-public fun Job.js() : JsAny {
-    return if (this is JsAny) this else JSPromiseWrapper(this)
-}
+public val Deferred<JsAny?>.js : JsAny
+    get() = if (this is JsAny) this else JSPromiseWrapper(this)
 
 
-public fun List<JsAny?>.js() : JsAny = if (this is JsAny) this else JsArrayWrapper(toMutableList())
-public fun Set<JsAny?>.js() : JsAny = if (this is JsAny) this else JsSetWrapper(toMutableSet())
-public fun Map<JsAny?, JsAny?>.js() : JsAny = if (this is JsAny) this else JsMapWrapper(toMutableMap())
+public val Job.js : JsAny
+    get() = if (this is JsAny) this else JSPromiseWrapper(this)
 
-public fun Number.js() : JsAny = if (this is JsAny) this else JsNumberWrapper(
+public val Iterator<JsAny?>.js : JsAny
+    get() = if (this is JsAny) this else JSIteratorWrapper(this)
+
+
+public val List<JsAny?>.js : JsAny
+    get() = if (this is JsAny) this else JsArrayWrapper(toMutableList())
+
+public val Set<JsAny?>.js : JsAny
+    get() = if (this is JsAny) this else JsSetWrapper(toMutableSet())
+
+
+public val Map<JsAny?, JsAny?>.js : JsAny
+    get() = if (this is JsAny) this else JsMapWrapper(toMutableMap())
+
+public val Number.js : JsAny get() = if (this is JsAny) this else JsNumberWrapper(
     when(this){
         is Int -> toLong()
         is Short -> toLong()
@@ -27,11 +35,11 @@ public fun Number.js() : JsAny = if (this is JsAny) this else JsNumberWrapper(
     }
 )
 
-public fun CharSequence.js() : JsAny = if (this is JsAny) this else JsStringWrapper(toString())
+public val CharSequence.js : JsAny get() = if (this is JsAny) this else JsStringWrapper(toString())
 
-public fun Boolean.js() : JsAny = JSBooleanWrapper(this)
+public val Boolean.js : JsAny get() = JSBooleanWrapper(this)
 
-public fun Throwable.js() : JsAny?  = when (this) {
+public val Throwable.js : JsAny? get() = when (this) {
     is ThrowableValue -> value
     is JSError -> this
     else -> JSError(message, cause = this)

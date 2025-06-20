@@ -32,7 +32,7 @@ internal fun OpCall(
             }
 
             r.typeCheck(receiver != null) {
-                "Can't get properties of $receiver".js()
+                "Can't get properties of $receiver".js
             }
 
             receiver.call(
@@ -52,11 +52,11 @@ internal fun OpCall(
             }
 
             r.typeCheck(receiver != null) {
-                "Can't get properties (${callable.name}) of $receiver".js()
+                "Can't get properties (${callable.name}) of $receiver".js
             }
 
             receiver.call(
-                func = callable.name.js(),
+                func = callable.name.js,
                 thisRef = receiver,
                 args = arguments.fastMap { it(r) },
                 isOptional = callable.isOptional,
@@ -89,7 +89,7 @@ internal suspend fun JsAny.call(
         return Undefined
     }
     runtime.typeCheck(callable != null) {
-        "$func is not a function".js()
+        "$func is not a function".js
     }
     return callable.call(thisRef, args, runtime)
 }
@@ -138,7 +138,7 @@ private suspend fun execKotlinFunction(
                             }
                         }.jsAnyOrUndefined()
                     }
-                }.js()
+                }.js
                 else -> notEnoughArgs()
             }
         }
@@ -155,7 +155,7 @@ private suspend fun execKotlinFunction(
                             }
                         }.jsAnyOrUndefined()
                     }
-                }.js()
+                }.js
                 else -> notEnoughArgs()
             }
         }
@@ -172,7 +172,7 @@ private suspend fun execKotlinFunction(
                             }
                         }
                     }.jsAnyOrUndefined()
-                }.js()
+                }.js
                 else -> notEnoughArgs()
             }
         }
@@ -189,7 +189,7 @@ private suspend fun execKotlinFunction(
                             }
                         }.jsAnyOrUndefined()
                     }
-                }.js()
+                }.js
 
                 else -> notEnoughArgs()
             }
@@ -208,7 +208,7 @@ private suspend fun execKotlinFunction(
                             }
                         }.jsAnyOrUndefined()
                     }
-                }.js()
+                }.js
 
                 else -> notEnoughArgs()
             }
@@ -227,7 +227,7 @@ private suspend fun execKotlinFunction(
                             }
                         }.jsAnyOrUndefined()
                     }
-                }.js()
+                }.js
 
                 else -> notEnoughArgs()
             }
@@ -245,7 +245,7 @@ private suspend fun execKotlinFunction(
                             }
                         }.jsAnyOrUndefined()
                     }
-                }.js()
+                }.js
 
                 else -> notEnoughArgs()
             }
@@ -264,7 +264,7 @@ private suspend fun execKotlinFunction(
                             }
                         }.jsAnyOrUndefined()
                     }
-                }.js()
+                }.js
 
                 else -> notEnoughArgs()
             }

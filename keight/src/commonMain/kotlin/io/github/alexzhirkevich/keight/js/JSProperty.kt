@@ -34,7 +34,7 @@ public interface JSPropertyAccessor : JsAny {
 
         override suspend fun set(value: JsAny?, runtime: ScriptRuntime) {
             runtime.typeCheck(setter != null || !runtime.isStrict){
-                "Cannot set property of which has only a getter".js()
+                "Cannot set property of which has only a getter".js
             }
 
             setter?.invoke(value.listOf(), runtime)
@@ -51,15 +51,15 @@ public interface JSProperty {
 
 public fun JSProperty.descriptor(): JSObject = Object {
     when (val v = value) {
-        is JSPropertyAccessor.Value -> "value".js() eq v
+        is JSPropertyAccessor.Value -> "value".js eq v
         is JSPropertyAccessor.BackedField -> {
             "get".func { v.get(this) }
             "set".func("v") { v.set(it[0], this); Undefined }
         }
     }
-    "writable".js() eq JSBooleanWrapper(writable != false)
-    "enumerable".js() eq JSBooleanWrapper(enumerable != false)
-    "configurable".js() eq JSBooleanWrapper(configurable != false)
+    "writable".js eq JSBooleanWrapper(writable != false)
+    "enumerable".js eq JSBooleanWrapper(enumerable != false)
+    "configurable".js eq JSBooleanWrapper(configurable != false)
 }
 
 internal class JSPropertyImpl(
@@ -70,15 +70,15 @@ internal class JSPropertyImpl(
 ) : JSProperty {
     fun descriptor(): JSObject = Object {
         when (val v = value) {
-            is JSPropertyAccessor.Value -> "value".js() eq v
+            is JSPropertyAccessor.Value -> "value".js eq v
             is JSPropertyAccessor.BackedField -> {
                 "get".func { v.get(this) }
                 "set".func("v") { v.set(it[0], this); Undefined }
             }
         }
-        "writable".js() eq JSBooleanWrapper(writable != false)
-        "enumerable".js() eq JSBooleanWrapper(enumerable != false)
-        "configurable".js() eq JSBooleanWrapper(configurable != false)
+        "writable".js eq JSBooleanWrapper(writable != false)
+        "enumerable".js eq JSBooleanWrapper(enumerable != false)
+        "configurable".js eq JSBooleanWrapper(configurable != false)
     }
 }
 

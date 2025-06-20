@@ -215,7 +215,7 @@ class SyntaxTest {
             let /**/ obj = /**/{ /**/name/**/ : /**/'test'/**/}
         """.trimIndent().eval(runtime).let {
             it as JSObject
-            it.get("name".js(),runtime).toString().assertEqualsTo("test")
+            it.get("name".js,runtime).toString().assertEqualsTo("test")
         }
 
         """
@@ -228,6 +228,24 @@ class SyntaxTest {
     fun ternary_operator() = runTest {
         "false ? 1 : 2".eval().assertEqualsTo(2L)
         "true ? 1 : 2".eval().assertEqualsTo(1L)
+    }
+
+    @Test
+    fun ternary_with_assignment() = runTest {
+        """
+           var b = 2;
+           true ? b *= 2 : b *= 4
+        """.trimIndent().eval().assertEqualsTo(4L)
+
+        """
+           var b = 2;
+           true ? b *= true ? 2 : 1 : b *= 4
+        """.trimIndent().eval().assertEqualsTo(4L)
+    }
+
+    @Test
+    fun double_assignment() = runTest {
+        "var a,b; a = b = 1; a+b".eval().assertEqualsTo(2L)
     }
 
     @Test

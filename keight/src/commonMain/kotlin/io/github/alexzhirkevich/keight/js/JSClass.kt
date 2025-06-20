@@ -29,7 +29,7 @@ internal class OpClassInit(
         val extendsConstructor = extends?.invoke(runtime)
 
         runtime.typeCheck(extendsConstructor is Constructor?) {
-            "$extendsConstructor is not a constructor".js()
+            "$extendsConstructor is not a constructor".js
         }
 
         return JSClass(

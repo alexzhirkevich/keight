@@ -26,7 +26,7 @@ internal class OpMakeArray(
                     add(value)
                 }
             }
-        }.toMutableList().js()
+        }.toMutableList().js
     }
 }
 
@@ -40,13 +40,13 @@ internal class OpMakeObject(
             val setters = items.filterIsInstance<OpSetter>().associateBy { it.value.name }
 
             (getters.keys + setters.keys).forEach {
-                setOverwrite(it.js(), JSPropertyAccessor.BackedField(getters[it]?.value, setters[it]?.value))
+                setOverwrite(it.js, JSPropertyAccessor.BackedField(getters[it]?.value, setters[it]?.value))
             }
 
             items.forEach { expr ->
                 when (expr) {
-                    is OpKeyValuePair -> {
-                        setOverwrite(expr.key.js(), expr.value.invoke(runtime))
+                    is OpColonAssignment -> {
+                        setOverwrite(expr.key.js, expr.value.invoke(runtime))
                     }
 
                     is PropertyAccessorFactory -> Unit

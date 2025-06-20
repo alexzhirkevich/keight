@@ -21,30 +21,25 @@ internal class OpGetProperty(
     val isOptional : Boolean = false
 ) : Expression() {
 
-    private val nameJs = name.js()
+    private val nameJs = name.js
 
     override suspend fun execute(runtime: ScriptRuntime, ): JsAny? {
-        return getImpl(receiver, nameJs, runtime)
-    }
-
-    private suspend fun getImpl(res: Any?, property : JsAny?, runtime: ScriptRuntime): JsAny? {
         return when {
-            receiver == null -> if (runtime.contains(property)) {
-                runtime.get(property)
+            receiver == null -> if (runtime.contains(nameJs)) {
+                runtime.get(nameJs)
             } else {
-                runtime.referenceError { "$property is not defined".js() }
+                runtime.referenceError { "$nameJs is not defined".js }
             }
-            else -> invoke(receiver, isOptional, property, runtime)
+            else -> invoke(receiver.invoke(runtime), isOptional, nameJs, runtime)
         }
     }
 
     companion object {
-        tailrec suspend fun invoke(receiver: Any?, isOptional: Boolean, property : JsAny?, runtime: ScriptRuntime): JsAny? {
+        suspend fun invoke(receiver: JsAny?, isOptional: Boolean, property : JsAny?, runtime: ScriptRuntime): JsAny? {
             return when {
-                receiver is Expression -> invoke(receiver(runtime), isOptional, property, runtime)
-                isOptional && (receiver == null || receiver == Undefined || receiver == Unit) -> Undefined
-                receiver is JsAny -> receiver.get(property, runtime)
-                else -> runtime.typeError { "Cannot get properties of $receiver".js() }
+                isOptional && (receiver == null || receiver == Undefined) -> Undefined
+                receiver != null -> receiver.get(property, runtime)
+                else -> runtime.typeError { "Cannot get properties of $receiver".js }
             }
         }
     }

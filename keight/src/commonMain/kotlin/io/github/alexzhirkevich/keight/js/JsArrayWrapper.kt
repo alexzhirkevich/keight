@@ -18,7 +18,7 @@ internal value class JsArrayWrapper(
     }
 
     override suspend fun entries(runtime: ScriptRuntime): List<List<JsAny?>> {
-        return value.mapIndexed { index, v ->  listOf(index.js(), v) }
+        return value.mapIndexed { index, v ->  listOf(index.js, v) }
     }
 
     override suspend fun keys(
@@ -26,7 +26,7 @@ internal value class JsArrayWrapper(
         excludeSymbols: Boolean,
         excludeNonEnumerables: Boolean
     ): List<JsAny?> {
-        return value.indices.toList().fastMap { it.js() }
+        return value.indices.toList().fastMap { it.js }
     }
 
     override suspend fun set(
@@ -37,33 +37,21 @@ internal value class JsArrayWrapper(
         this.value[runtime.toNumber(property).toInt()] = value
     }
 
-
     override suspend fun proto(runtime: ScriptRuntime): JsAny? {
         return (runtime.findRoot() as JSRuntime).Array.get(PROTOTYPE,runtime)
     }
 
     override suspend fun hasOwnProperty(name: JsAny?, runtime: ScriptRuntime): Boolean {
-        val idx = (name?.toKotlin(runtime) as? String)?.toIntOrNull()
-            ?: return super.hasOwnProperty(name, runtime)
-
-        return idx in value.indices || super.hasOwnProperty(name, runtime)
+        return isValidIndex(name, runtime) != null || super.hasOwnProperty(name, runtime)
     }
 
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
-        if (property.toString() == "length") {
-            return value.size.js()
+        if (property == length) {
+            return value.size.js
         }
 
-        val n = try {
-            runtime.toNumber(property)
-        } catch (t : Throwable){
-            return super.get(property, runtime)
-        }
-        if (!n.toDouble().isNaN()
-            && (abs(n.toLong().toDouble() - n.toDouble()) < Float.MIN_VALUE)
-            && n.toInt() in value.indices
-        ) {
-            return value[n.toInt()]
+        isValidIndex(property, runtime)?.let {
+            return value[it]
         }
 
         return super.get(property, runtime)
@@ -74,5 +62,29 @@ internal value class JsArrayWrapper(
     }
 
     override fun toKotlin(runtime: ScriptRuntime): Any = value.map { it?.toKotlin(runtime) }
+
+    private suspend fun isValidIndex(index : JsAny?, runtime: ScriptRuntime) : Int? {
+        if (index == null)
+            return null
+
+        val n = try {
+            runtime.toNumber(index)
+        } catch (t : Throwable){
+            return null
+        }
+
+        val nDouble = n.toDouble()
+        val nLong = n.toLong()
+        if (
+            nDouble.isNaN().not()
+            && (abs(nLong - nDouble) < Double.MIN_VALUE)
+            && nLong in value.indices
+        ) {
+            return n.toInt()
+        }
+        return null
+    }
 }
+
+private val length = "length".js
 
