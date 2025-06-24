@@ -1,6 +1,6 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.js.JSPropertyAccessor
+import io.github.alexzhirkevich.keight.js.JsPropertyAccessor
 import io.github.alexzhirkevich.keight.js.JsAny
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -28,7 +28,7 @@ public fun <T : JsAny?> LazyGetter(producer : suspend (ScriptRuntime) -> T): Get
 
 internal suspend fun Any.get(runtime: ScriptRuntime) : JsAny? = when (this) {
     is Getter<*> -> get(runtime)?.get(runtime)
-    is JSPropertyAccessor -> get(runtime)?.get(runtime)
+    is JsPropertyAccessor -> get(runtime)?.get(runtime)
     is JsAny -> this
     else -> error("$this is not a JS object")
 }

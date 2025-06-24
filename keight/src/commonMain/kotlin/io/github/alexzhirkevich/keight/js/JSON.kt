@@ -10,8 +10,7 @@ import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 
 internal fun JSON() = Object("JSON") {
     "parse".js.func("string") {
-        JSStringFunction.toString(it[0], this)
-            .toList().listIterator().parseJSON()
+        toString(it[0]).toList().listIterator().parseJSON()
     }
 
     "stringify".js.func("object") {
@@ -50,7 +49,7 @@ private fun ListIterator<Char>.parseJSON() : JsAny? {
     }
 }
 
-private fun ListIterator<Char>.parseObject() : JSObject {
+private fun ListIterator<Char>.parseObject() : JsObject {
     return Object {
         while (!eat('}')) {
             syntaxCheck(eat('"')) { "Invalid JSON - '\"' was expected at ${nextIndex()}" }
@@ -94,15 +93,16 @@ private fun ListIterator<Char>.parsePrimitive() : JsAny? {
 
 private tailrec suspend fun Any?.stringify(runtime: ScriptRuntime) : String {
     return when (this) {
-        is JSObjectImpl -> stringify(runtime)
         is List<*> -> stringify(runtime)
+        is JsObject -> stringify(runtime)
         is Number -> toString()
         is Wrapper<*> -> value.stringify(runtime)
-        else -> "\"${JSStringFunction.toString(this, runtime).escape()}\""
+        is JsAny -> "\"${runtime.toString(this).escape()}\""
+        else -> "\"${toString().escape()}\""
     }
 }
 
-private suspend fun JSObject.stringify(runtime: ScriptRuntime) : String {
+private suspend fun JsObject.stringify(runtime: ScriptRuntime) : String {
     return buildString {
         append('{')
         for (k in keys(runtime)) {

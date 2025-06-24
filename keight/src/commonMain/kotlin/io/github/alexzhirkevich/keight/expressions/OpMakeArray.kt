@@ -3,9 +3,9 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.fastForEach
-import io.github.alexzhirkevich.keight.js.JSObject
-import io.github.alexzhirkevich.keight.js.JSObjectImpl
-import io.github.alexzhirkevich.keight.js.JSPropertyAccessor
+import io.github.alexzhirkevich.keight.js.JsObject
+import io.github.alexzhirkevich.keight.js.JsObjectImpl
+import io.github.alexzhirkevich.keight.js.JsPropertyAccessor
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.js
 
@@ -35,12 +35,12 @@ internal class OpMakeObject(
 ) : OpMake() {
 
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
-        return JSObjectImpl().apply {
+        return JsObjectImpl().apply {
             val getters = items.filterIsInstance<OpGetter>().associateBy { it.value.name }
             val setters = items.filterIsInstance<OpSetter>().associateBy { it.value.name }
 
             (getters.keys + setters.keys).forEach {
-                setOverwrite(it.js, JSPropertyAccessor.BackedField(getters[it]?.value, setters[it]?.value))
+                setOverwrite(it.js, JsPropertyAccessor.BackedField(getters[it]?.value, setters[it]?.value))
             }
 
             items.forEach { expr ->
@@ -54,7 +54,7 @@ internal class OpMakeObject(
                     is OpSpread -> {
                         val any = expr.value.invoke(runtime)
 
-                        if (any is JSObject) {
+                        if (any is JsObject) {
                             any.keys(
                                 runtime = runtime,
                                 excludeSymbols = false

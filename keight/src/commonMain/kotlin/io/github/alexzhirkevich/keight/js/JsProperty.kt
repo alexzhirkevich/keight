@@ -4,13 +4,13 @@ import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 
-public interface JSPropertyAccessor : JsAny {
+public interface JsPropertyAccessor : JsAny {
 
     public suspend fun get(runtime: ScriptRuntime): JsAny?
 
     public suspend fun set(value: JsAny?, runtime: ScriptRuntime)
 
-    public class Value(internal var field: JsAny?) : JSPropertyAccessor {
+    public class Value(internal var field: JsAny?) : JsPropertyAccessor {
 
         override suspend fun get(runtime: ScriptRuntime): JsAny? = field
 
@@ -22,7 +22,7 @@ public interface JSPropertyAccessor : JsAny {
     public class BackedField(
         private val getter: Callable?,
         private val setter: Callable? = null
-    ) : JSPropertyAccessor, JsAny  {
+    ) : JsPropertyAccessor, JsAny  {
 
         override suspend fun get(runtime: ScriptRuntime): JsAny? {
             return if (getter != null) {
@@ -42,17 +42,17 @@ public interface JSPropertyAccessor : JsAny {
     }
 }
 
-public interface JSProperty {
-    public val value: JSPropertyAccessor
+public interface JsProperty {
+    public val value: JsPropertyAccessor
     public val writable: Boolean?
     public val enumerable: Boolean?
     public val configurable: Boolean?
 }
 
-public fun JSProperty.descriptor(): JSObject = Object {
+public fun JsProperty.descriptor(): JsObject = Object {
     when (val v = value) {
-        is JSPropertyAccessor.Value -> "value".js eq v
-        is JSPropertyAccessor.BackedField -> {
+        is JsPropertyAccessor.Value -> "value".js eq v
+        is JsPropertyAccessor.BackedField -> {
             "get".func { v.get(this) }
             "set".func("v") { v.set(it[0], this); Undefined }
         }
@@ -63,15 +63,15 @@ public fun JSProperty.descriptor(): JSObject = Object {
 }
 
 internal class JSPropertyImpl(
-    override var value : JSPropertyAccessor,
+    override var value : JsPropertyAccessor,
     override var writable : Boolean? = null,
     override var enumerable : Boolean? = null,
     override var configurable : Boolean? = null,
-) : JSProperty {
-    fun descriptor(): JSObject = Object {
+) : JsProperty {
+    fun descriptor(): JsObject = Object {
         when (val v = value) {
-            is JSPropertyAccessor.Value -> "value".js eq v
-            is JSPropertyAccessor.BackedField -> {
+            is JsPropertyAccessor.Value -> "value".js eq v
+            is JsPropertyAccessor.BackedField -> {
                 "get".func { v.get(this) }
                 "set".func("v") { v.set(it[0], this); Undefined }
             }
@@ -80,5 +80,9 @@ internal class JSPropertyImpl(
         "enumerable".js eq JSBooleanWrapper(enumerable != false)
         "configurable".js eq JSBooleanWrapper(configurable != false)
     }
+}
+
+internal fun JSProperty(value : suspend ScriptRuntime.() -> JsAny?) : JsPropertyAccessor {
+    return JsPropertyAccessor.BackedField(getter = Callable { value(this) })
 }
 

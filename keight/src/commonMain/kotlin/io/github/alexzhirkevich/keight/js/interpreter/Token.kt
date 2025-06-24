@@ -27,6 +27,9 @@ internal sealed interface Token {
     value class Str(val value : String) : Token
 
     @JvmInline
+    value class Regex(val value : String) : Token
+
+    @JvmInline
     value class TemplateString(val tokens : List<TemplateStringToken>) : Token
 
     class Num(

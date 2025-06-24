@@ -26,7 +26,7 @@ private fun ListIterator<Char>.tokenize(
                     '+' -> plus()
                     '-' -> minus()
                     '*' -> mul() // +exp
-                    '/' -> div().also { // +comment
+                    '/' -> div(lastOrNull()).also { // +comment, regex
                         if (it is Token.Comment && (it.isSingleLine || it.value.any { it.code in LSEP })) {
                             add(Token.NewLine)
                         }
@@ -196,16 +196,39 @@ private fun ListIterator<Char>.exp() : Token.Operator {
     }
 }
 
-private fun ListIterator<Char>.div() : Token {
+private fun ListIterator<Char>.div(prev : Token?) : Token {
     if (!hasNext()) {
         return Token.Operator.Arithmetic.Div
     }
 
-    return when (next()) {
-        '=' -> Token.Operator.Assign.DivAssign
+    return when (val next = next()) {
         '/' -> comment(isSingleLine = true)
         '*' -> comment(isSingleLine = false)
-        else -> Token.Operator.Arithmetic.Div.also { previous() }
+        else -> when (prev) {
+            null,
+            is Token.NewLine,
+            is Token.Operator.Logical,
+            is Token.Operator.Arithmetic,
+            is Token.Operator.Compare,
+            is Token.Operator.Assign,
+            is Token.Operator.Comma,
+            is Token.Operator.Colon,
+            is Token.Operator.SemiColon,
+            is Token.Operator.Arrow,
+            is Token.Operator.QuestionMark,
+            is Token.Operator.NullishCoalescing,
+            is Token.Operator.Bracket.RoundOpen,
+            is Token.Operator.Bracket.CurlyOpen,
+            is Token.Operator.Bracket.SquareOpen -> {
+                previous()
+                regex()
+            }
+
+            else -> when (next) {
+                '=' -> Token.Operator.Assign.DivAssign
+                else -> Token.Operator.Arithmetic.Div.also { previous() }
+            }
+        }
     }
 }
 
@@ -363,6 +386,30 @@ private fun ListIterator<Char>.hashbangComment() : Token.Comment {
 
     return comment(isSingleLine = true)
 }
+
+private val REGEX_FLAGS = setOf('d','g','i','m','s','u','v','y')
+
+private fun ListIterator<Char>.regex() : Token.Regex {
+    return Token.Regex(buildString {
+        append('/')
+        var isAtFlags = false
+        while (hasNext()) {
+            val next = next()
+
+            if (isAtFlags && next !in REGEX_FLAGS){
+                previous()
+                break
+            }
+
+            append(next)
+
+            if (next == '/') {
+                isAtFlags = true
+            }
+        }
+    })
+}
+
 private fun ListIterator<Char>.comment(isSingleLine : Boolean) : Token.Comment {
     val value = buildString {
         if (isSingleLine) {

@@ -1,6 +1,5 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Named
@@ -47,7 +46,7 @@ internal class OpClassInit(
             if (extendsConstructor != null) {
                 setProto(runtime, extendsConstructor)
                 val prototype = get(PROTOTYPE, runtime)
-                if (prototype is JSObject) {
+                if (prototype is JsObject) {
                     prototype.setProto(runtime, extendsConstructor.get(PROTOTYPE, runtime))
                 }
             }
@@ -65,7 +64,7 @@ internal class JSClass(
     name = name,
     parameters = construct?.parameters ?: emptyList(),
     body = construct?.body ?: Expression { Undefined },
-    prototype = JSObjectImpl(properties = properties.toMutableMap()),
+    prototype = JsObjectImpl(properties = properties.toMutableMap()),
     properties = static.toMutableMap(),
     superConstructor = extends
 ) {

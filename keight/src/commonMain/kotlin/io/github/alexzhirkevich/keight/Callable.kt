@@ -17,8 +17,10 @@ public interface Callable : JsAny {
 
     public suspend fun bind(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): Callable
 
-    override fun toKotlin(runtime: ScriptRuntime): suspend (List<JsAny?>) -> Any? =
-        { invoke(it, runtime)?.toKotlin(runtime) }
+    override fun toKotlin(runtime: ScriptRuntime) : Any {
+        val res: suspend (List<JsAny?>) -> Any? = { invoke(it, runtime)?.toKotlin(runtime) }
+        return res
+    }
 }
 
 public fun Callable(body: suspend ScriptRuntime.(List<JsAny?>) -> JsAny?): Callable =

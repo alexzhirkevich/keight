@@ -8,17 +8,16 @@ import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 import kotlin.math.abs
 
-@JvmInline
-internal value class JsArrayWrapper(
+internal class JsArrayWrapper(
     override val value : MutableList<JsAny?>
-) : JSObject, Wrapper<MutableList<JsAny?>>, MutableList<JsAny?> by value {
+) : JsObjectImpl(), Wrapper<MutableList<JsAny?>>, MutableList<JsAny?> by value {
 
     override suspend fun values(runtime: ScriptRuntime): List<JsAny?> {
-        return value.toList()
+        return super.values(runtime) + value.toList()
     }
 
     override suspend fun entries(runtime: ScriptRuntime): List<List<JsAny?>> {
-        return value.mapIndexed { index, v ->  listOf(index.js, v) }
+        return super.entries(runtime) + value.mapIndexed { index, v ->  listOf(index.js, v) }
     }
 
     override suspend fun keys(
@@ -34,7 +33,8 @@ internal value class JsArrayWrapper(
         value: JsAny?,
         runtime: ScriptRuntime
     ) {
-        this.value[runtime.toNumber(property).toInt()] = value
+        isValidIndex(property, runtime)?.let { this.value[it] = value }
+            ?: super.set(property, value, runtime)
     }
 
     override suspend fun proto(runtime: ScriptRuntime): JsAny? {

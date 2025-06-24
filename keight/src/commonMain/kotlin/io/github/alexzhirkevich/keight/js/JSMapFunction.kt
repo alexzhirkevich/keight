@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import io.github.alexzhirkevich.keight.thisRef
 
 internal class JSMapFunction : JSFunction(
@@ -55,18 +56,60 @@ internal class JSMapFunction : JSFunction(
             }
             Undefined
         }
+        JsSymbol.iterator.func {
+            thisRef<Map<JsAny?,JsAny?>>().entries
+                .map { listOf(it.key, it.value).js }
+                .iterator().js
+        }
     }
 ) {
     override suspend fun invoke(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
         return if (args.isEmpty()) {
-            emptyMap<JsAny?,JsAny?>().js
+            emptyMap<JsAny?, JsAny?>().js
         } else {
-            val entries = args[0] as List<List<JsAny?>>
-            entries.associate { it[0] to it[1] }.js
+            val entries = args[0]
+
+            val mapEntries = when {
+                entries is Map<*, *> -> {
+                    return LinkedHashMap(entries as Map<JsAny?, JsAny?>).js
+                }
+                entries is Iterable<*> -> {
+                    entries as Iterable<JsAny?>
+                    entries.mapNotNull {
+                        it?.pairOfFirstEntries(runtime)
+                    }
+                }
+
+                entries?.isIterator(runtime) == true -> buildList<Pair<JsAny?,JsAny?>> {
+                    entries.forEach(runtime) {
+                        it?.pairOfFirstEntries(runtime)?.let(::add)
+                    }
+                }
+
+                else -> runtime.typeError { "Failed to cast $entries to array-like".js }
+            }
+
+            mapEntries.toMap().js
         }
     }
 
     override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
         return invoke(args, runtime)
+    }
+}
+
+private suspend fun JsAny.pairOfFirstEntries(runtime : ScriptRuntime): Pair<JsAny?, JsAny?> {
+    return when {
+        this is Iterable<*> -> {
+            this as Iterable<JsAny?>
+            val iter = iterator()
+            iter.next() to iter.next()
+        }
+
+        isIterator(runtime) -> {
+            next(runtime).value(runtime) to next(runtime).value(runtime)
+        }
+
+        else -> runtime.typeError { "Failed to cast $this to array-like".js }
     }
 }

@@ -2,7 +2,7 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.Undefined
 
@@ -57,7 +57,7 @@ internal class OpAssignByIndex(
                     }
                     rec[index]
                 }
-                is JSObject -> {
+                is JsObject -> {
                     if (rec.contains(idx, runtime) && merge != null){
                         rec.set(
                             property = idx,

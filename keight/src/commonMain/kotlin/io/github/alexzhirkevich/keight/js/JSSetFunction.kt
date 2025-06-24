@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import io.github.alexzhirkevich.keight.thisRef
 
@@ -91,6 +92,9 @@ internal class JSSetFunction : JSFunction(
             }
             Undefined
         }
+        JsSymbol.iterator.func {
+            thisRef<Iterable<JsAny?>>().iterator().js
+        }
     }
 ) {
 
@@ -106,7 +110,15 @@ internal class JSSetFunction : JSFunction(
 
         return when {
             x is Iterable<*> -> (x as Iterable<JsAny?>).toSet().js
-//            x is JsWrapper<*> && x.value is Iterable<*> -> (x.value as Iterable<*>).toSet()
+            x?.isIterator(runtime) == true -> {
+                val list = x.get("toArray".js, runtime)
+                    .callableOrThrow(runtime)
+                    .call(x, emptyList(), runtime)
+                runtime.typeCheck(list is Iterable<*>){
+                    "Failed to cast $list to array-like".js
+                }
+                return construct(list.listOf(), runtime)
+            }
             else -> runtime.typeError { "$x is not iterable".js }
         }
     }

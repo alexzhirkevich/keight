@@ -1,4 +1,4 @@
-import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
@@ -101,7 +101,7 @@ class ClassesTest {
                    a(){ return 'a'}
                }
                let a = new A()
-            """.trimIndent().eval() is JSObject
+            """.trimIndent().eval() is JsObject
         }
 
         """

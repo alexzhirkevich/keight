@@ -1,5 +1,5 @@
 import io.github.alexzhirkevich.keight.js.JSFunction
-import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SimpleFunctionParam
 import io.github.alexzhirkevich.keight.js.SyntaxError
@@ -13,9 +13,7 @@ class SyntaxTest {
 
     @Test
     fun newline_property_chaining() = runTest {
-        """
-            Math.imul(3,4).toString()
-        """.trimIndent().eval().assertEqualsTo("12")
+        "Math.imul(3,4).toString()".eval().assertEqualsTo("12")
 
         """
             Math
@@ -214,7 +212,7 @@ class SyntaxTest {
         """
             let /**/ obj = /**/{ /**/name/**/ : /**/'test'/**/}
         """.trimIndent().eval(runtime).let {
-            it as JSObject
+            it as JsObject
             it.get("name".js,runtime).toString().assertEqualsTo("test")
         }
 

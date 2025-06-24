@@ -5,11 +5,7 @@ import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.expressions.OpConstant
-import io.github.alexzhirkevich.keight.fastAll
-import io.github.alexzhirkevich.keight.fastAny
-import io.github.alexzhirkevich.keight.fastFilter
-import io.github.alexzhirkevich.keight.fastForEach
-import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.requireThisRef
 import io.github.alexzhirkevich.keight.thisRef
@@ -111,17 +107,20 @@ internal class JSArrayFunction : JSFunction(
         "reverse".js.func { thisRef<MutableList<*>>().reverse(); Undefined }
         "toReversed".js.func { thisRef<Iterable<JsAny?>>().reversed().js }
 
-//        "sort".func {
-//            thisRef<MutableList<Any?>>().quickSort { a, b ->
-//                if (isComparable(a, b)) compare(a, b) else 0
-//            }
-//        }
-//
-//        "toSorted".func {
-//            thisRef<List<*>>().toMutableList().quickSort { a, b ->
-//                if (isComparable(a, b)) compare(a, b) else 0
-//            }
-//        }
+        "sort".js.func(
+            "comparator" defaults OpArgOmitted
+        ) {
+            val list = thisRef<MutableList<JsAny?>>()
+            val res = list.sorted(it.argOrNull(0), this)
+            res.fastForEachIndexed { i, v -> list[i] = v }
+            Undefined
+        }
+        "toSorted".js.func(
+            "comparator" defaults OpArgOmitted
+        ) {
+            thisRef<List<JsAny?>>()
+                .sorted(it.argOrNull(0), this).js
+        }
         "slice".js.func(
             "start" defaults OpConstant(0.js),
             "end" defaults OpArgOmitted
@@ -184,7 +183,7 @@ internal class JSArrayFunction : JSFunction(
             (thisRef<Iterable<*>>().indexOf(v) > fromIndex).js
         }
         "join".js.func("separator") {
-            val sep = JSStringFunction.toString(it.getOrElse(0) { "," }, this)
+            val sep = toString(it.getOrElse(0) { ",".js })
             thisRef<Iterable<JsAny?>>().joinToString(separator = sep).js
         }
         "push".js.func("items".vararg()) {
@@ -253,11 +252,11 @@ internal class JSArrayFunction : JSFunction(
             thisRef<Iterable<JsAny?>>().iterator().js
         }
 
-        "toString".js.func {
+        ToString.js.func {
             thisRef<Iterable<*>>().joinToString(separator = ",").js
         }
 
-        JSSymbol.iterator.func {
+        JsSymbol.iterator.func {
             thisRef<Iterable<JsAny?>>().iterator().js
         }
     }
@@ -280,7 +279,6 @@ internal class JSArrayFunction : JSFunction(
                 size is Double -> throw RangeError("Invalid array length")
             }
         }
-
         return args.js
     }
 
@@ -289,7 +287,10 @@ internal class JSArrayFunction : JSFunction(
     }
 }
 
-private fun Iterable<JsAny?>.flat(depth : Int, collector : MutableList<JsAny?> = mutableListOf()) : List<JsAny?> {
+private fun Iterable<JsAny?>.flat(
+    depth : Int,
+    collector : MutableList<JsAny?> = mutableListOf()
+) : List<JsAny?> {
     forEach {
         if (depth == 0 || it !is List<*>) {
             collector.add(it)
@@ -366,35 +367,46 @@ private suspend fun List<*>.lastIndexOf(
     return (-1).js
 }
 
-private suspend fun MutableList<Any?>.quickSort(
-    left: Int = 0,
-    right: Int = lastIndex,
-    compare : suspend (Any?, Any?) -> Int
-){
-    var start = left
-    var end = right
-    val pivot = this[(left + right) / 2]
-
-    while (start <= end) {
-        while (compare(this[start], pivot) < 0){
-            start++
+private suspend fun List<JsAny?>.sorted(comparator : JsAny?, runtime: ScriptRuntime): List<JsAny?> {
+    return if (comparator == null) {
+        mergeSort { a, b ->
+            runtime.toString(a).compareTo(runtime.toString(b)).toDouble()
         }
-        while (compare(this[start], pivot) > 0){
-            end--
+    } else {
+        val comp = comparator.callableOrThrow(runtime)
+        mergeSort { a, b ->
+            runtime
+                .toNumber(comp.invoke(listOf(a, b), runtime))
+                .toDouble().let { if (it.isNaN()) 0.0 else it }
         }
-        if (start <= end) {
-            val temp = this[start]
-            this[start] = this[end]
-            this[end] = temp
-            start++
-            end--
-        }
-    }
-
-    if (left < end) {
-        quickSort(left, end, compare)
-    }
-    if (start < right) {
-        quickSort( start, right, compare)
     }
 }
+
+private suspend fun merge(
+    left: List<JsAny?>,
+    right: List<JsAny?>,
+    compare: suspend (JsAny?, JsAny?) -> Double
+): List<JsAny?> {
+    var i = 0
+    var j = 0
+
+    return List(left.size + right.size) {
+        when {
+            i >= left.size -> right[j++]
+            j >= right.size -> left[i++]
+            compare(left[i], right[j]) <= 0 -> left[i++]
+            else -> right[j++]
+        }
+    }
+}
+
+private suspend fun List<JsAny?>.mergeSort(compare: suspend (JsAny?, JsAny?) -> Double): List<JsAny?> {
+    if (size <= 1) return this
+    val mid = size / 2
+    return merge(
+        take(mid).mergeSort(compare),
+        drop(mid).mergeSort(compare),
+        compare
+    )
+}
+

@@ -8,7 +8,7 @@ import kotlinx.coroutines.Job
 import kotlin.jvm.JvmInline
 
 @JvmInline
-internal value class JSPromiseWrapper(
+internal value class JsPromiseWrapper(
     override val value: Job
 ) : JsAny, Wrapper<Job>, Job by value {
 

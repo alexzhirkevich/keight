@@ -72,7 +72,7 @@ internal class OpForInLoop(
                 "$o is not iterable"
             }
 
-            val keys = o.keys(runtime).fastMap { JSStringFunction.toString(it, runtime) }
+            val keys = o.keys(runtime).fastMap { runtime.toString(it) }
 
             if (keys.isNotEmpty()){
                 prepare(it)

@@ -94,13 +94,33 @@ class JsArrayTest {
     }
 
     @Test
-    @Ignore
-    fun sort()= runTest {
+    fun sort() = runtimeTest {
         """
             let arr = [66,2,8]
             arr.sort()
             arr
-        """.trimIndent().eval().assertEqualsTo(listOf(2L,8L, 66L))
+        """.eval(it).assertEqualsTo(listOf(2L,66L,8L))
+
+        """
+           const array1 = [1, 30, 4, 21, 100000]
+           array1.sort()
+           array1
+        """.eval(it).assertEqualsTo(listOf(1L, 100000L, 21L, 30L, 4L))
+
+        """
+            const months = ["March", "Jan", "Feb", "Dec"];
+            months.sort();
+            months
+        """.eval(it).assertEqualsTo(listOf("Dec", "Feb", "Jan", "March"))
+    }
+
+    @Test
+    fun sort_with_comparator() = runtimeTest {
+        """
+           const array1 = [1, 30, 4, 21, 100000]
+           array1.sort((a,b) => a-b)
+           array1
+        """.eval(it).assertEqualsTo(listOf(1L, 4L, 21L, 30L, 100000L))
     }
 
     @Test

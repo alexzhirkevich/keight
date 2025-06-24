@@ -9,7 +9,7 @@ import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 
 
-public interface JSObject : JsAny {
+public interface JsObject : JsAny {
 
     public val isExtensible : Boolean  get() = true
 
@@ -27,7 +27,7 @@ public interface JSObject : JsAny {
 
     public suspend fun defineOwnProperty(
         property: JsAny?,
-        value: JSPropertyAccessor,
+        value: JsPropertyAccessor,
         runtime: ScriptRuntime,
         enumerable: Boolean? = null,
         configurable: Boolean? = null,
@@ -36,15 +36,15 @@ public interface JSObject : JsAny {
         set(property, value.get(runtime), runtime)
     }
 
-    public fun ownPropertyDescriptor(property: JsAny?) : JSProperty? = null
-    public fun ownPropertyDescriptors() : Map<JsAny?, JSProperty> = emptyMap()
+    public fun ownPropertyDescriptor(property: JsAny?) : JsProperty? = null
+    public fun ownPropertyDescriptors() : Map<JsAny?, JsProperty> = emptyMap()
 
     public suspend fun propertyIsEnumerable(name : JsAny?, runtime: ScriptRuntime) : Boolean {
         return true
     }
 
     public suspend fun hasOwnProperty(name : JsAny?, runtime: ScriptRuntime) : Boolean {
-        return (proto(runtime) as? JSObject?)?.hasOwnProperty(name, runtime) == true
+        return (proto(runtime) as? JsObject?)?.hasOwnProperty(name, runtime) == true
     }
 }
 
@@ -52,8 +52,8 @@ internal val PROTOTYPE = "prototype".js
 internal val PROTO = "__proto__".js
 internal val CONSTRUCTOR = "constructor".js
 
-internal fun JSObjectImpl.setPrototype(prototype : Any?) {
-    (prototype as JSObjectImpl).defineOwnProperty(
+internal fun JsObjectImpl.setPrototype(prototype : Any?) {
+    (prototype as JsObjectImpl).defineOwnProperty(
         property = CONSTRUCTOR,
         value = this,
         enumerable = false,
@@ -69,21 +69,21 @@ internal fun JSObjectImpl.setPrototype(prototype : Any?) {
 }
 
 
-internal suspend fun JSObject.setPrototype(prototype : JsAny?, runtime: ScriptRuntime) {
+internal suspend fun JsObject.setPrototype(prototype : JsAny?, runtime: ScriptRuntime) {
     defineOwnProperty(
         property = PROTOTYPE,
-        value = JSPropertyAccessor.Value(prototype),
+        value = JsPropertyAccessor.Value(prototype),
         runtime = runtime,
         configurable = false,
         enumerable = false
     )
 }
 
-internal suspend fun JSObject.setProto(runtime: ScriptRuntime, proto : JsAny?) {
+internal suspend fun JsObject.setProto(runtime: ScriptRuntime, proto : JsAny?) {
     if (isExtensible) {
         defineOwnProperty(
             property = PROTO,
-            value = JSPropertyAccessor.Value(proto),
+            value = JsPropertyAccessor.Value(proto),
             runtime = runtime,
             enumerable = false,
             configurable = false
@@ -91,11 +91,11 @@ internal suspend fun JSObject.setProto(runtime: ScriptRuntime, proto : JsAny?) {
     }
 }
 
-internal fun JSObjectImpl.setProto(proto : JsAny?) {
+internal fun JsObjectImpl.setProto(proto : JsAny?) {
     if (isExtensible) {
         defineOwnProperty(
             property = PROTO,
-            value = JSPropertyAccessor.Value(proto),
+            value = JsPropertyAccessor.Value(proto),
             enumerable = false,
             configurable = false
         )
@@ -130,10 +130,10 @@ internal class ObjectMap<V>(
     }
 }
 
-public open class JSObjectImpl(
+public open class JsObjectImpl(
     override val name : String = "Object",
     properties : Map<JsAny?, JsAny?> = mutableMapOf()
-) : JSObject, Named {
+) : JsObject, Named {
 
     override var isExtensible: Boolean = true
         internal set
@@ -141,7 +141,7 @@ public open class JSObjectImpl(
     internal val map = ObjectMap(
         properties.mapValues {
             JSPropertyImpl(
-                it.value as? JSPropertyAccessor? ?: JSPropertyAccessor.Value(it.value)
+                it.value as? JsPropertyAccessor? ?: JsPropertyAccessor.Value(it.value)
             )
         }.toMutableMap()
     )
@@ -156,7 +156,7 @@ public open class JSObjectImpl(
     ): List<JsAny?> {
         return map
             .filter {
-                (!excludeSymbols || it.key !is JSSymbol) &&
+                (!excludeSymbols || it.key !is JsSymbol) &&
                         (!excludeNonEnumerables || it.value.enumerable != false)
             }
             .keys
@@ -176,7 +176,7 @@ public open class JSObjectImpl(
                         v is JsNumberWrapper && v.value.toLong() > 0 -> v.value.toLong()
                         v is JsNumberObject && v.value.toLong() > 0 -> v.value.toLong()
                         v is JsStringWrapper || v is JsStringObject -> -1L
-                        v is JSSymbol -> -2L
+                        v is JsSymbol -> -2L
                         else -> -3L
                     }
                 }
@@ -256,7 +256,7 @@ public open class JSObjectImpl(
             }
         } else {
             map[property] = JSPropertyImpl(
-                value = value as? JSPropertyAccessor ?: JSPropertyAccessor.Value(value),
+                value = value as? JsPropertyAccessor ?: JsPropertyAccessor.Value(value),
                 writable = null,
                 enumerable = null,
                 configurable = null
@@ -268,7 +268,7 @@ public open class JSObjectImpl(
         property: JsAny?,
         value: JsAny?,
     ) {
-        val v = value as? JSPropertyAccessor ?: JSPropertyAccessor.Value(value)
+        val v = value as? JsPropertyAccessor ?: JsPropertyAccessor.Value(value)
         map[property] = JSPropertyImpl(
             value = v,
             writable = null,
@@ -279,7 +279,7 @@ public open class JSObjectImpl(
 
     override suspend fun defineOwnProperty(
         property: JsAny?,
-        value: JSPropertyAccessor,
+        value: JsPropertyAccessor,
         runtime: ScriptRuntime,
         enumerable: Boolean?,
         configurable: Boolean?,
@@ -306,7 +306,7 @@ public open class JSObjectImpl(
         configurable: Boolean? = null,
         writable: Boolean? = null
     ) {
-        val v = value as? JSPropertyAccessor? ?: JSPropertyAccessor.Value(value)
+        val v = value as? JsPropertyAccessor? ?: JsPropertyAccessor.Value(value)
 
         if (property in map) {
             map[property]?.value = v
@@ -347,11 +347,11 @@ public open class JSObjectImpl(
     }
 
 
-    override fun ownPropertyDescriptor(property: JsAny?): JSProperty? {
+    override fun ownPropertyDescriptor(property: JsAny?): JsProperty? {
         return map[property]
     }
 
-    override fun ownPropertyDescriptors(): Map<JsAny?, JSProperty> {
+    override fun ownPropertyDescriptors(): Map<JsAny?, JsProperty> {
         return map
     }
 
@@ -395,7 +395,7 @@ public sealed interface ObjectScope {
 @PublishedApi
 internal class ObjectScopeImpl(
     name: String,
-    val o : JSObjectImpl = JSObjectImpl(name)
+    val o : JsObjectImpl = JsObjectImpl(name)
 ) : ObjectScope {
 
     override fun JsAny?.eq(
@@ -433,11 +433,11 @@ internal class ObjectScopeImpl(
     }
 }
 
-public fun Object(name: String, contents : Map<JsAny?, JsAny?>) : JSObject {
-    return JSObjectImpl(name, contents)
+public fun Object(name: String, contents : Map<JsAny?, JsAny?>) : JsObject {
+    return JsObjectImpl(name, contents)
 }
 
-public inline fun Object(name: String = "Object", builder : ObjectScope.() -> Unit) : JSObject {
+public inline fun Object(name: String = "Object", builder : ObjectScope.() -> Unit) : JsObject {
     return ObjectScopeImpl(name).also(builder).o
 }
 
@@ -448,7 +448,7 @@ public inline fun Object(name: String = "Object", builder : ObjectScope.() -> Un
 //}
 
 
-internal fun JSObjectImpl.noArgsFunc(
+internal fun JsObjectImpl.noArgsFunc(
     name: String,
     body: suspend ScriptRuntime.(args: List<Any?>) -> JsAny?
 ) : JSFunction = func(
@@ -457,7 +457,7 @@ internal fun JSObjectImpl.noArgsFunc(
     body = body
 )
 
-internal fun JSObjectImpl.func(
+internal fun JsObjectImpl.func(
     name: String,
     vararg args: String,
     params: (String) -> FunctionParam = { FunctionParam(it) },
@@ -469,7 +469,7 @@ internal fun JSObjectImpl.func(
 )
 
 
-internal fun JSObjectImpl.func(
+internal fun JsObjectImpl.func(
     name: String,
     vararg args: FunctionParam,
     body: suspend ScriptRuntime.(args: List<Any?>) -> JsAny?
@@ -497,7 +497,7 @@ internal fun String.func(
     body = body
 )
 
-internal fun JSObjectImpl.func(
+internal fun JsObjectImpl.func(
     name: String,
     params: (String) -> FunctionParam = { FunctionParam(it) },
     body: ScriptRuntime.(args: List<JsAny?>) -> JsAny?

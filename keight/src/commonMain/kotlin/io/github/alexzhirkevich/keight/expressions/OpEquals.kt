@@ -3,12 +3,10 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.JSBooleanWrapper
-import io.github.alexzhirkevich.keight.js.JSObject
-import io.github.alexzhirkevich.keight.js.JSStringFunction
-import io.github.alexzhirkevich.keight.js.JSSymbol
+import io.github.alexzhirkevich.keight.js.JsObject
+import io.github.alexzhirkevich.keight.js.JsSymbol
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.JsStringWrapper
@@ -40,7 +38,7 @@ private suspend fun OpStrictEqualsImpl(a : JsAny?, b : JsAny?, runtime: ScriptRu
         return false
     }
 
-    if (a is JSObject && b is JSObject) {
+    if (a is JsObject && b is JsObject) {
         return a === b
     }
 
@@ -79,13 +77,13 @@ private tailrec suspend fun OpLooselyEqualsImpl(a : JsAny?, b : JsAny?,  runtime
             // Boolean: return true only if operands are both true or both false.
             is JSBooleanWrapper -> a == b
             // Symbol: return true only if both operands reference the same symbol.
-            is JSSymbol -> a.value == (b as JSSymbol).value
+            is JsSymbol -> a.value == (b as JsSymbol).value
             // Object: return true only if both operands reference the same object.
             else -> a === b
         }
         // If one of the operands is an object and the other is a primitive, convert the object to a primitive.
-        a is JSObject || b is JSObject -> with(runtime.findRoot() as JSRuntime) {
-            if (a is JSObject) {
+        a is JsObject || b is JsObject -> with(runtime.findRoot() as JSRuntime) {
+            if (a is JsObject) {
                 OpLooselyEqualsImpl(a.ToPrimitive(), b, runtime)
             } else {
                 OpLooselyEqualsImpl(a, b.ToPrimitive(), runtime)
@@ -96,7 +94,7 @@ private tailrec suspend fun OpLooselyEqualsImpl(a : JsAny?, b : JsAny?,  runtime
         // Symbol, and BigInt). The rest of the conversion is done case-by-case.
 
         // If one of the operands is a Symbol but the other is not, return false.
-        a is JSSymbol != b is JSSymbol -> false
+        a is JsSymbol != b is JsSymbol -> false
 
         //If one of the operands is a Boolean but the other is not, convert the boolean to a number:
         // true is converted to 1, and false is converted to 0. Then compare the two operands loosely again.
@@ -109,7 +107,7 @@ private tailrec suspend fun OpLooselyEqualsImpl(a : JsAny?, b : JsAny?,  runtime
             val bd = runtime.toNumber(b).toDouble()
             (ad == bd && !ad.isNaN())
         }
-        else -> JSStringFunction.toString(a, runtime) == JSStringFunction.toString(b, runtime)
+        else -> runtime.toString(a) == runtime.toString(b)
     }
 }
 

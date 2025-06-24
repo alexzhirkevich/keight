@@ -3,7 +3,7 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
-import io.github.alexzhirkevich.keight.js.JSObject
+import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import io.github.alexzhirkevich.keight.js.js
@@ -65,7 +65,7 @@ internal class OpAssign(
                 )
             } else {
                 when (r) {
-                    is JSObject -> r.set(variableName.js, v, runtime)
+                    is JsObject -> r.set(variableName.js, v, runtime)
                     else -> runtime.typeError { "Cannot set properties of $r".js }
                 }
             }

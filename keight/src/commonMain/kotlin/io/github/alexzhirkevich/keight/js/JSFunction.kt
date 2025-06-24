@@ -93,9 +93,9 @@ public open class JSFunction(
     internal val isAsync : Boolean = false,
     internal val isArrow : Boolean = false,
     private val superConstructor : Constructor? = null,
-    internal val prototype : JSObject? = JSObjectImpl(),
+    internal val prototype : JsObject? = JsObjectImpl(),
     properties : MutableMap<JsAny?, JsAny?> = mutableMapOf(),
-) : JSObjectImpl(name, properties), Callable, JSObject, Constructor {
+) : JsObjectImpl(name, properties), Callable, JsObject, Constructor {
 
     override val type: String get() = "function"
 
@@ -177,7 +177,7 @@ public open class JSFunction(
     }
 
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
-        return super<JSObjectImpl>.get(property, runtime)
+        return super<JsObjectImpl>.get(property, runtime)
     }
 
     internal fun copy(
@@ -214,7 +214,7 @@ public open class JSFunction(
     public open suspend fun constructObject(
         args: List<JsAny?>,
         runtime: ScriptRuntime
-    ) : JSObject = JSObjectImpl()
+    ) : JsObject = JsObjectImpl()
 
     override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
         syntaxCheck(isMutableThisRef) {
@@ -355,7 +355,7 @@ internal class SimpleFunctionParam(
             runtime.withScope {
                 it.set(
                     property = name.js,
-                    value = JSPropertyAccessor.BackedField(
+                    value = JsPropertyAccessor.BackedField(
                         getter = Callable {
                             runtime.referenceError { "Cannot access '$name' before initialization".js }
                         }

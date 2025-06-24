@@ -5,11 +5,11 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 
 public val Deferred<JsAny?>.js : JsAny
-    get() = if (this is JsAny) this else JSPromiseWrapper(this)
+    get() = if (this is JsAny) this else JsPromiseWrapper(this)
 
 
 public val Job.js : JsAny
-    get() = if (this is JsAny) this else JSPromiseWrapper(this)
+    get() = if (this is JsAny) this else JsPromiseWrapper(this)
 
 public val Iterator<JsAny?>.js : JsAny
     get() = if (this is JsAny) this else JSIteratorWrapper(this)
@@ -44,3 +44,10 @@ public val Throwable.js : JsAny? get() = when (this) {
     is JSError -> this
     else -> JSError(message, cause = this)
 }
+
+public val Regex.js : JsAny get() = JsRegexWrapper(
+    pattern = pattern,
+    options = options.mapNotNullTo(mutableSetOf()) {
+        RegexOptions.entries.firstOrNull { e -> e.option == it }
+    }
+)

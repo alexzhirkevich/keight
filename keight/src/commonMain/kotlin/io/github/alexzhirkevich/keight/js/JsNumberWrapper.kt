@@ -8,7 +8,7 @@ import kotlin.jvm.JvmInline
 
 internal class JsNumberObject(
     val number: JsNumberWrapper
-) : JSObjectImpl("Number"), Wrapper<Number> by number {
+) : JsObjectImpl("Number"), Wrapper<Number> by number {
 
     override fun toString(): String {
         return number.toString()

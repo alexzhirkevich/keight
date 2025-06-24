@@ -6,7 +6,7 @@ import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
 @JvmInline
-public value class JSSymbol(public val value : String) : JsAny {
+public value class JsSymbol(public val value : String) : JsAny {
 
     override val type: String get() = "symbol"
 
@@ -19,14 +19,16 @@ public value class JSSymbol(public val value : String) : JsAny {
     }
 
     public companion object {
-        public val toPrimitive: JSSymbol = JSSymbol("Symbol.toPrimitive",)
-        public val toStringTag: JSSymbol = JSSymbol("Symbol.toStringTag")
-        public val iterator: JSSymbol = JSSymbol("Symbol.iterator")
+        public val toPrimitive: JsSymbol = JsSymbol("Symbol.toPrimitive",)
+        public val toStringTag: JsSymbol = JsSymbol("Symbol.toStringTag")
+        public val iterator: JsSymbol = JsSymbol("Symbol.iterator")
+        public val match: JsSymbol = JsSymbol("Symbol.match")
 
-        internal val defaults = mapOf(
+        internal val WellKnown = mapOf(
             "toPrimitive" to toPrimitive,
             "toStringTag" to toStringTag,
             "iterator" to iterator,
+            "match" to match,
         )
     }
 }

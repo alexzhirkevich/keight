@@ -5,7 +5,7 @@ public open class JSError(
     name : String = "Error",
     cause : Throwable? = null
 ) : Exception("Uncaught $name: $msg", cause),
-    JSObject by JSObjectImpl(
+    JsObject by JsObjectImpl(
         name = name,
         properties = mapOf(
             "message".js to msg.toString().js,

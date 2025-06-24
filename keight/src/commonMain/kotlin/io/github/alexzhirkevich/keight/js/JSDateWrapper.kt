@@ -9,7 +9,7 @@ import kotlinx.datetime.toLocalDateTime
 internal class JSDateWrapper(
     override var value: LocalDateTime,
     val timeZone: TimeZone
-) : JSObjectImpl(), Wrapper<LocalDateTime> {
+) : JsObjectImpl(), Wrapper<LocalDateTime> {
 
     fun toInstant() = value.toInstant(timeZone)
 

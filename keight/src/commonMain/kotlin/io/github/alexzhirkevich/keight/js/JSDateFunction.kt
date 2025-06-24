@@ -75,7 +75,7 @@ internal class JSDateFunction : JSFunction(
         "toUTCString".js.func { thisDateWrapper.utc().toString().js }
         "toJSON".js.func { thisDate.toString().js }
 
-        JSSymbol.toPrimitive.func("hint" defaults OpConstant("default".js)) {
+        JsSymbol.toPrimitive.func("hint" defaults OpConstant("default".js)) {
             when (val t = it.getOrNull(0)?.toKotlin(this)) {
                 "string", "default" -> thisDate.toString().js
                 "number" -> thisDateWrapper.toInstant().toEpochMilliseconds().js
@@ -83,14 +83,14 @@ internal class JSDateFunction : JSFunction(
             }
         }
 
-        "valueOf".js.func { thisDateWrapper.toInstant().toEpochMilliseconds().js }
+        ValueOf.js.func { thisDateWrapper.toInstant().toEpochMilliseconds().js }
     },
     properties = listOf(
         "now".func {
             Clock.System.now().toEpochMilliseconds().js
         },
         "parse".func {
-            val str = JSStringFunction.toString(it[0], this)
+            val str = toString(it[0])
             Instant.parse(str).toEpochMilliseconds().js
         }
     ).associateBy { it.name.js }.toMutableMap(),
@@ -99,7 +99,7 @@ internal class JSDateFunction : JSFunction(
         it.constructDate(it.get("date".js).listOf()).value.format(LocalDateTime.Formats.ISO).js
     }
 ) {
-    override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JSObject {
+    override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JsObject {
         return runtime.constructDate(args)
     }
 }

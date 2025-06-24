@@ -30,7 +30,7 @@ internal fun numberMethods() : List<JSFunction> {
                 ?.takeIf { !it.toDouble().isNaN() && it.toDouble().isFinite() }
                 ?.toInt() ?: 10
 
-            JSStringFunction.toString(arg, this).trim().trimParseInt(radix)?.js
+            toString(arg).trim().trimParseInt(radix)?.js
         },
         "isSafeInteger".func("number") {
             val arg = it.getOrNull(0) ?: return@func false.js
@@ -71,7 +71,7 @@ internal class JSNumberFunction : JSFunction(
             val digits = args.argOrElse(0) { return@func value.js }
             value.toDouble().roundTo(toNumber(digits).toInt() - 1).js
         }
-        "toString".js.func("radix" defaults OpConstant(10.js)) { args ->
+        ToString.js.func("radix" defaults OpConstant(10.js)) { args ->
 
             val radix = if (args.isEmpty())
                 10
@@ -82,7 +82,7 @@ internal class JSNumberFunction : JSFunction(
                 else -> number.toString().js
             }
         }
-        "valueOf".js.func {
+        ValueOf.js.func {
             when (val t = thisRef) {
                 is JsNumberWrapper -> t.value.js
                 is JsNumberObject -> t.value.js
@@ -167,7 +167,7 @@ internal class JSNumberFunction : JSFunction(
         return obj !is JsNumberWrapper && super.isInstance(obj, runtime)
     }
 
-    override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JSObject {
+    override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JsObject {
         return JsNumberObject(JsNumberWrapper(runtime.toNumber(args.getOrNull(0))))
     }
 }

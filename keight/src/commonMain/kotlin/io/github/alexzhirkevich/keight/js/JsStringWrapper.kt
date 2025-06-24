@@ -8,7 +8,7 @@ import kotlin.jvm.JvmInline
 
 internal class JsStringObject(
     override val value : JsStringWrapper
-) : JSObjectImpl("String"), Wrapper<Wrapper<String>>, CharSequence by value {
+) : JsObjectImpl("String"), Wrapper<Wrapper<String>>, CharSequence by value {
 
     override fun hashCode(): Int {
         return value.hashCode()

@@ -59,7 +59,7 @@ suspend fun harness(name : String, runtime: JSRuntime) {
                     if (result.value.contains("message".js, runtime)) {
                         result.value.get("message".js, runtime)
                     } else {
-                        JSStringFunction.toString(result.value, runtime)
+                        runtime.toString(result.value)
                     }
                 } else {
                     result

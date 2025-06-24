@@ -61,6 +61,7 @@ import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
 import io.github.alexzhirkevich.keight.js.toFunctionParam
+import io.github.alexzhirkevich.keight.js.toJsRegex
 import io.github.alexzhirkevich.keight.js.validateFunctionParams
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -481,6 +482,7 @@ private fun ListIterator<Token>.parseFactor(
 ): Expression {
     val expr =  when (val next = nextSignificant()) {
         is Token.Str -> OpConstant(next.value.js)
+        is Token.Regex -> OpConstant(next.value.toJsRegex())
         is Token.TemplateString -> {
             val expressions = next.tokens.fastMap {
                 when (it) {
@@ -812,7 +814,7 @@ private fun ListIterator<Token>.parseNew() : Expression {
     return Expression { runtime ->
         val constructor = runtime.get(next.identifier.js)
         runtime.typeCheck(constructor is Constructor) {
-            "'${next.identifier}' is not a constructor".js
+            "'$constructor' (${next.identifier}) is not a constructor".js
         }
         constructor.construct(args.fastMap { it(runtime) }, runtime)
     }

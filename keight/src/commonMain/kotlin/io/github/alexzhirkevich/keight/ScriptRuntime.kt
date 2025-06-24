@@ -93,7 +93,8 @@ public abstract class ScriptRuntime : CoroutineScope {
     public abstract suspend fun neg(a: JsAny?): JsAny?
     public abstract suspend fun pos(a: JsAny?): JsAny?
 
-    public abstract suspend fun toNumber(a: JsAny?): Number
+    public abstract suspend fun toNumber(value: JsAny?): Number
+    public abstract suspend fun toString(value: JsAny?): String
 
 }
 
@@ -287,7 +288,8 @@ private class StrictRuntime(
     override suspend fun dec(a: JsAny?): JsAny? = delegate.dec(a)
     override suspend fun neg(a: JsAny?): JsAny? = delegate.neg(a)
     override suspend fun pos(a: JsAny?): JsAny? = delegate.pos(a)
-    override suspend fun toNumber(a: JsAny?): Number = delegate.toNumber(a)
+    override suspend fun toNumber(value: JsAny?): Number = delegate.toNumber(value)
+    override suspend fun toString(value: JsAny?): String = delegate.toString(value)
 }
 
 private class ScopedRuntime(
@@ -361,7 +363,8 @@ private class ScopedRuntime(
     override suspend fun dec(a: JsAny?): JsAny? = parent.dec(a)
     override suspend fun neg(a: JsAny?): JsAny? = parent.neg(a)
     override suspend fun pos(a: JsAny?): JsAny? = parent.pos(a)
-    override suspend fun toNumber(a: JsAny?): Number = parent.toNumber(a)
+    override suspend fun toNumber(value: JsAny?): Number = parent.toNumber(value)
+    override suspend fun toString(value: JsAny?): String = parent.toString(value)
 }
 
 private tailrec fun ScriptRuntime.closestFunctionScope() : ScriptRuntime {

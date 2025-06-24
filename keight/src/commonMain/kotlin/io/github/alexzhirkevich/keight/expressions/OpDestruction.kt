@@ -198,7 +198,7 @@ internal fun Expression.asDestruction(
                             if ((assignableValue is OpConstant || assignableValue is OpClassInit
                                 || (assignableValue is OpTouple && assignableValue.singleRecursiveOrNull() != null))
                                 && defaultValue is JSFunction
-                                && JSStringFunction.toString(defaultValue.get("name".js, runtime),runtime).isEmpty()
+                                && runtime.toString(defaultValue.get("name".js, runtime)).isEmpty()
                             ) {
                                 defaultValue.defineName(variableName)
                             }
@@ -335,7 +335,7 @@ private class SpreadDestruction(
             }
             default != null -> destruct(default.get(runtime), variableType, runtime, null)
             else -> runtime.typeError {
-                "${JSStringFunction.toString(obj, runtime)} is not iterable".js
+                "${runtime.toString(obj)} is not iterable".js
             }
         }
     }

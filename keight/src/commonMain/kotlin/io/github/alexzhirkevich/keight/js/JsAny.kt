@@ -3,6 +3,11 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.get
 
+internal object Uninitialized : JsAny by Undefined
+
+internal const val ToString = "toString"
+internal const val ValueOf = "valueOf"
+
 public interface JsAny {
 
     public val type : String get() = "object"
@@ -41,13 +46,15 @@ internal suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime) : B
     return isPrototypeOf(obj, runtime, true)
 }
 
-internal object Uninitialized : JsAny by Undefined
-
 private suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime, isFirst : Boolean) : Boolean {
     return when {
         !isFirst && obj === this -> true
         obj !is JsAny -> false
-        else -> isPrototypeOf(obj.proto(runtime), runtime, false)
+        else -> {
+            val proto = obj.proto(runtime)
+            proto !== obj && isPrototypeOf(proto, runtime, false)
+        }
     }
 }
+
 

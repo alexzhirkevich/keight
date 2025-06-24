@@ -8,7 +8,7 @@ import io.github.alexzhirkevich.keight.js.interpreter.checkArgs
 import kotlin.math.*
 import kotlin.random.Random
 
-internal fun JSMath() : JSObject = Object("Math") {
+internal fun JSMath() : JsObject = Object("Math") {
     "PI".js.eq(JsNumberWrapper(PI), writable = false, configurable = false)
     "E".js.eq(JsNumberWrapper(E), writable = false, configurable = false)
     "LN10".js.eq(JsNumberWrapper(2.302585092994046), writable = false, configurable = false)

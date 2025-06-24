@@ -1,7 +1,7 @@
 package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.js.JSKotlinError
-import io.github.alexzhirkevich.keight.js.JSPromiseWrapper
+import io.github.alexzhirkevich.keight.js.JsPromiseWrapper
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsArrayWrapper
 import io.github.alexzhirkevich.keight.js.JsMapWrapper
@@ -28,7 +28,7 @@ internal fun fromKotlin(a: Any?): JsAny? {
         is Set<*> -> JsSetWrapper(a.map(::fromKotlin).toMutableSet())
         is List<*> -> JsArrayWrapper(a.map(::fromKotlin).toMutableList())
         is CharSequence -> a.js
-        is Job -> JSPromiseWrapper(a)
+        is Job -> JsPromiseWrapper(a)
         is Throwable -> JSKotlinError(a)
         else -> error("Failed to convert $a to JS")
     }
