@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.VariableType
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.CONSTRUCTOR
 import io.github.alexzhirkevich.keight.js.SyntaxError
@@ -53,9 +54,9 @@ private fun TryCatchFinally(
         throw x
     } catch (t: Throwable) {
         val t = when  {
-            t is ReferenceError && t.get(CONSTRUCTOR, r) !== (r.findRoot() as JSRuntime).ReferenceError ->
+            t is ReferenceError && t.get(CONSTRUCTOR, r) !== (r.findJsRoot()).ReferenceError ->
                 r.makeReferenceError { t.message.orEmpty().js  }
-            t is TypeError && t.get(CONSTRUCTOR, r) !== (r.findRoot() as JSRuntime).TypeError ->
+            t is TypeError && t.get(CONSTRUCTOR, r) !== (r.findJsRoot()).TypeError ->
                 r.makeTypeError { t.message.orEmpty().js  }
             else -> t
         }

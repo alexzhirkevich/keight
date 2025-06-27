@@ -18,7 +18,28 @@ class JsArrayTest {
         "array.indexOf(9, 2);".eval(it).assertEqualsTo(2L)
         "array.indexOf(2, -1);".eval(it).assertEqualsTo(-1L)
         "array.indexOf(2, -3);".eval(it).assertEqualsTo(0L)
+
+        "[1, , 3].indexOf(undefined)".eval(it).assertEqualsTo(-1L)
+
+        """
+            const arrayLike = {
+              length: 3,
+              0: 2,
+              1: 3,
+              2: 4,
+              3: 5, // ignored by indexOf() since length is 3
+            };
+        """.eval(it)
+
+        "Array.prototype.indexOf.call(arrayLike, 2)".eval(it).assertEqualsTo(0L)
+        "Array.prototype.indexOf.call(arrayLike, 5)".eval(it).assertEqualsTo(-1L)
+
+        """
+            const array = [NaN];
+            array.indexOf(NaN); // -1
+        """.eval().assertEqualsTo(-1L)
     }
+
     @Test
     fun lastIndexOf() = runtimeTest {
         "const numbers = [2, 5, 9, 2];".eval(it)
@@ -31,27 +52,79 @@ class JsArrayTest {
 
         "[1,2,2,3].lastIndexOf(2)".eval().assertEqualsTo(2L)
         "[1,2,2,3].lastIndexOf(2,1)".eval().assertEqualsTo(1L)
+
+        """
+            const array = [NaN];
+            array.lastIndexOf(NaN); // -1
+        """.eval(it).assertEqualsTo(-1L)
+
+
+        """
+            const arrayLike = {
+              length: 3,
+              0: 2,
+              1: 3,
+              2: 4,
+              3: 5, // ignored by indexOf() since length is 3
+            };
+        """.eval(it)
+
+        "Array.prototype.lastIndexOf.call(arrayLike, 2)".eval(it).assertEqualsTo(0L)
+        "Array.prototype.lastIndexOf.call(arrayLike, 5)".eval(it).assertEqualsTo(-1L)
+
     }
 
     @Test
-    fun forEach() = runTest {
+    fun forEach() = runtimeTest {
         """
             let x = 0
             let arr = [1,2,3]
             arr.forEach(v => x+=v)
             x
-        """.trimIndent().eval().assertEqualsTo(6L)
+        """.eval().assertEqualsTo(6L)
 
         """
             let x = 0
             let arr = [1,2,3]
             arr.forEach(() => x++)
             x
-        """.trimIndent().eval().assertEqualsTo(3L)
+        """.eval().assertEqualsTo(3L)
+
+        """
+            let x = 0
+            let arr = [1,,,4]
+            arr.forEach(() => x++)
+            x 
+        """.eval().assertEqualsTo(2L)
+
+        """
+            let obj = {}
+            let arr = [1,,,4]
+            arr.forEach(function(v, idx) { this[idx] = v }, obj)
+        """.eval(it)
+
+        "obj[0]".eval(it).assertEqualsTo(1L)
+        "obj[3]".eval(it).assertEqualsTo(4L)
+
+      """
+          const arrayLike = {
+            length: 3,
+            0: 2,
+            1: 3,
+            2: 4,
+            3: 5, // ignored by forEach() since length is 3
+          };
+          
+          var sum = 0
+          
+          Array.prototype.forEach.call(arrayLike, (x) => sum += x);
+          sum
+      """.eval(it).assertEqualsTo(9L)
+
     }
 
     @Test
-    fun map()= runTest {
+    fun map() = runTest {
         """
             let arr = [1,2,3]
             arr.map(v => v * v)
@@ -61,6 +134,18 @@ class JsArrayTest {
             let arr = [1,2,3]
             arr.map(() => 1)
         """.trimIndent().eval().assertEqualsTo(listOf(1L,1L,1L))
+
+        """
+            ["1", "2", "3"].map(Number);
+        """.eval().assertEqualsTo(listOf(1L, 2L, 3L))
+
+        """
+           ["1.1", "2.2e2", "3e300"].map(Number);
+        """.eval().assertEqualsTo(listOf(1.1, 220.0, 3e+300))
+
+        """
+         ["1.1", "2.2e2", "3e300"].map((str) => parseInt(str, 10));
+        """.eval().assertEqualsTo(listOf(1L, 2L, 3L))
     }
 
     @Test

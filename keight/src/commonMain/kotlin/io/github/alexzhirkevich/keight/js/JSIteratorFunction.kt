@@ -5,11 +5,15 @@ import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.callableOrThrow
+import io.github.alexzhirkevich.keight.expressions.OpCompare
+import io.github.alexzhirkevich.keight.expressions.OpConstant
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import io.github.alexzhirkevich.keight.thisRef
 
-private const val CALLBACK = "callback"
+private val CALLBACK = "callback" defaults OpConstant(Undefined)
+private val COUNT = "count" defaults OpConstant(0.js)
 
 internal class JSIteratorFunction : JSFunction(
     name = "Iterator",
@@ -17,15 +21,9 @@ internal class JSIteratorFunction : JSFunction(
         NEXT.js.func {
             val value = thisRef<Iterator<JsAny?>>()
             if (value.hasNext()) {
-                Object {
-                    VALUE.js eq value.next()
-                    DONE.js eq false.js
-                }
+                IteratorEntry(value.next())
             } else {
-                Object {
-                    VALUE.js eq Undefined
-                    DONE.js eq true.js
-                }
+                IteratorDone()
             }
         }
         "every".js.func(CALLBACK) { args ->
@@ -66,25 +64,12 @@ internal class JSIteratorFunction : JSFunction(
                 iter?.next(this)
             }
         }
-        "take".js.func(CALLBACK) { args ->
+        "take".js.func(COUNT) { args ->
             val count = toNumber(args[0]).toInt()
-            var i = 0
             val iter = thisRef
-            helperIterator {
+            helperIterator { i ->
                 val obj = iter?.next(this@func)
-                when {
-                    i >= count -> Object {
-                        VALUE.js eq Undefined
-                        DONE.js eq true.js
-                    }
-
-                    ++i == count -> Object {
-                        VALUE.js eq obj?.value(this@helperIterator)
-                        DONE.js eq true.js
-                    }
-
-                    else -> obj
-                }
+                if (i >= count) IteratorDone() else obj
             }
         }
         
@@ -108,10 +93,23 @@ internal class JSIteratorFunction : JSFunction(
     }
 }
 
-private suspend fun ScriptRuntime.helperIterator(
-    next : suspend ScriptRuntime.() -> JsAny?
-) = Object { NEXT.js.func { next(this) } }.also {
-    it.setProto(this, (findRoot() as JSRuntime).Iterator.get(PROTOTYPE, this))
+internal fun IteratorDone() = Object {
+    DONE.js eq true.js
+}
+
+internal fun IteratorEntry(value : JsAny?) = Object {
+    VALUE.js eq value
+    DONE.js eq false.js
+}
+
+internal suspend fun ScriptRuntime.helperIterator(
+    next : suspend ScriptRuntime.(Int) -> JsAny?,
+): JsObject {
+    var i = -1
+
+    return Object { NEXT.js.func { next(this, ++i) } }.also {
+        it.setProto(this, findJsRoot().Iterator.get(PROTOTYPE, this))
+    }
 }
 
 internal suspend fun JsAny.next(runtime: ScriptRuntime) : JsAny {
@@ -126,25 +124,31 @@ internal suspend inline fun JsAny.value(runtime: ScriptRuntime) : JsAny? {
 }
 
 private suspend inline fun JsAny.done(runtime: ScriptRuntime) : Boolean {
-    return runtime.isFalse(get(DONE.js, runtime)).not()
+    return contains(DONE.js, runtime) && !runtime.isFalse(get(DONE.js, runtime))
 }
 
 internal suspend fun JsAny.isIterator(runtime: ScriptRuntime) : Boolean {
-    return (runtime.findRoot() as JSRuntime).Iterator
+    return runtime.findJsRoot().Iterator
         .get(PROTOTYPE, runtime)
         ?.isPrototypeOf(this, runtime) == true
 }
 
 internal suspend inline fun JsAny.forEach(runtime: ScriptRuntime, block : (JsAny?) -> Unit) {
-    when(this) {
-        is Iterator<*> -> forEach { block(it as JsAny?) }
-        is Iterable<*> -> forEach { block(it as JsAny?) }
-        else -> while (true) {
+    when {
+        this is Iterator<*> -> forEach { block(it as JsAny?) }
+        this is Iterable<*> -> forEach { block(it as JsAny?) }
+        isIterator(runtime) || contains(NEXT.js, runtime) -> while (true) {
             val next = next(runtime)
-            if (next.done(runtime)){
+            if (next.done(runtime)) {
                 break
             }
             block(next.value(runtime))
+        }
+
+        contains(LENGTH.js, runtime) -> {
+            for (i in 0 until runtime.toNumber(get(LENGTH.js, runtime)).toInt()) {
+                block(get(i.js, runtime))
+            }
         }
     }
 }
@@ -191,23 +195,19 @@ private suspend inline fun JsAny.map(runtime: ScriptRuntime, block : Callable) :
 
 private suspend inline fun JsAny.flatMap(runtime: ScriptRuntime, block : Callable) : JsAny {
 
-    var i = -1
     var currentItem: JsAny? = Uninitialized
     var isIterating = false
 
-    return runtime.helperIterator {
+    return runtime.helperIterator { i->
         while (true) {
             if (currentItem is Uninitialized) {
                 val next = this@flatMap.next(this)
                 if (next.done(this)) {
-                    return@helperIterator Object {
-                        VALUE.js eq Undefined
-                        DONE.js eq true.js
-                    }
+                    return@helperIterator IteratorDone()
                 }
                 val v = next.value(this)
 
-                currentItem = block.invoke(listOf(v, (++i).js), this)
+                currentItem = block.invoke(listOf(v, i.js), this)
 
                 val iter = currentItem
                     ?.get(JsSymbol.iterator, this)
@@ -227,15 +227,9 @@ private suspend inline fun JsAny.flatMap(runtime: ScriptRuntime, block : Callabl
                     currentItem = Uninitialized
                     continue
                 }
-                return@helperIterator Object {
-                    VALUE.js eq next.value(this@helperIterator)
-                    DONE.js eq false.js
-                }
+                return@helperIterator IteratorEntry(next.value(this@helperIterator))
             } else {
-                return@helperIterator Object {
-                    VALUE.js eq currentItem
-                    DONE.js eq false.js
-                }.also {
+                return@helperIterator IteratorEntry(currentItem).also {
                     currentItem = Uninitialized
                 }
             }

@@ -46,7 +46,7 @@ internal class OpMakeObject(
             items.forEach { expr ->
                 when (expr) {
                     is OpColonAssignment -> {
-                        setOverwrite(expr.key.js, expr.value.invoke(runtime))
+                        setOverwrite(expr.key, expr.value.invoke(runtime))
                     }
 
                     is PropertyAccessorFactory -> Unit

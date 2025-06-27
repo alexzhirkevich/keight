@@ -7,7 +7,6 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.js.JSFunction
-import io.github.alexzhirkevich.keight.js.JSStringFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsArrayWrapper
 import io.github.alexzhirkevich.keight.js.OpClassInit
@@ -89,17 +88,17 @@ private val EmptyDestruction = Destruction(emptyList()) { _, _, _, _ ->  }
 
 internal sealed interface DestructionContext {
 
-    suspend fun property(name: String?, obj: Any?, runtime: ScriptRuntime, default: Getter<*>?): JsAny?
+    suspend fun property(name: JsAny?, obj: Any?, runtime: ScriptRuntime, default: Getter<*>?): JsAny?
 
     object Object : DestructionContext {
         override suspend fun property(
-            name: String?,
+            name: JsAny?,
             obj: Any?,
             runtime: ScriptRuntime,
             default: Getter<*>?
         ): JsAny? {
             return when {
-                obj is JsAny && name != null -> obj.get(name.js, runtime)/*.let {
+                obj is JsAny && name != null -> obj.get(name, runtime)/*.let {
                     if (it is Unit && default != null) {
                         property(name, default.get(runtime), runtime, null)
                     } else {
@@ -114,7 +113,7 @@ internal sealed interface DestructionContext {
 
     class Array(val index : Int) : DestructionContext {
         override suspend fun property(
-            name: String?,
+            name: JsAny?,
             obj: Any?,
             runtime: ScriptRuntime,
             default: Getter<*>?
@@ -183,7 +182,7 @@ internal fun Expression.asDestruction(
                     type = variableType,
                     value = if (context != null) {
                         val v = context.property(
-                            name = variableName,
+                            name = variableName.js,
                             obj = obj,
                             runtime = runtime,
                             default = default
@@ -224,7 +223,7 @@ internal fun Expression.asDestruction(
                     type = variableType,
                     value = if (context != null) {
                         context.property(
-                            name = name,
+                            name = name.js,
                             obj = obj,
                             runtime = runtime,
                             default = default
@@ -279,7 +278,7 @@ internal fun Expression.asDestruction(
         )
         is OpColonAssignment -> {
             value.asDestruction().let {
-                Destruction(it.variables + key) { obj, variableType, runtime, default ->
+                Destruction(it.variables + key.toString()) { obj, variableType, runtime, default ->
                     it.destruct(
                         obj = DestructionContext.Object.property(key, obj, runtime, default),
                         variableType = variableType,

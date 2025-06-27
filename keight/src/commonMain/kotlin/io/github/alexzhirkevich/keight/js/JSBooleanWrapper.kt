@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
@@ -15,7 +16,7 @@ internal value class JSBooleanWrapper(
         get() = "boolean"
 
     override suspend fun proto(runtime: ScriptRuntime): JsAny? {
-        return (runtime.findRoot() as JSRuntime).Boolean.get(PROTOTYPE, runtime)
+        return runtime.findJsRoot().Boolean.get(PROTOTYPE, runtime)
     }
 
     override fun toString(): String {

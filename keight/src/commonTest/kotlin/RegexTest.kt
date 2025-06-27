@@ -56,6 +56,30 @@ class RegexTest {
         "res.input".eval(it).assertEqualsTo("123ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
         "res.indices[0]".eval(it).assertEqualsTo(listOf(3L,4L))
     }
+
+    @Test
+    fun test() = runtimeTest {
+        """
+            const str = "table football";
+            const regex = /fo+/;
+            const globalRegex = /fo+/g;
+        """.eval(it)
+
+        "regex.lastIndex".eval(it).assertEqualsTo(0L)
+        "regex.test(str)".eval(it).assertEqualsTo(true)
+        "regex.lastIndex".eval(it).assertEqualsTo(0L)
+
+        "globalRegex.lastIndex".eval(it).assertEqualsTo(0L)
+        "globalRegex.test(str)".eval(it).assertEqualsTo(true)
+        "globalRegex.lastIndex".eval(it).assertEqualsTo(9L)
+        "globalRegex.test(str)".eval(it).assertEqualsTo(false)
+        "globalRegex.lastIndex".eval(it).assertEqualsTo(0L)
+
+        "globalRegex.lastIndex = 9".eval(it)
+        "globalRegex.lastIndex".eval(it).assertEqualsTo(9L)
+        "globalRegex.test(str)".eval(it).assertEqualsTo(false)
+        "globalRegex.lastIndex".eval(it).assertEqualsTo(0L)
+    }
 }
 
 private fun Any?.assertIsRegex() : Regex =

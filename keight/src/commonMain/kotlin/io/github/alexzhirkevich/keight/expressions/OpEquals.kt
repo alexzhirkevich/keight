@@ -1,9 +1,8 @@
 package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.findRoot
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.js.JSBooleanWrapper
 import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JsSymbol
@@ -11,7 +10,10 @@ import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.JsStringWrapper
 import io.github.alexzhirkevich.keight.js.Undefined
+import io.github.alexzhirkevich.keight.js.Uninitialized
 import io.github.alexzhirkevich.keight.js.js
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
 internal fun OpEquals(
     a : Expression,
@@ -38,6 +40,10 @@ private suspend fun OpStrictEqualsImpl(a : JsAny?, b : JsAny?, runtime: ScriptRu
         return false
     }
 
+    if (a is Undefined && b is Uninitialized || a is Uninitialized && b is Undefined){
+        return true
+    }
+
     if (a is JsObject && b is JsObject) {
         return a === b
     }
@@ -55,13 +61,20 @@ private suspend fun OpStrictEqualsImpl(a : JsAny?, b : JsAny?, runtime: ScriptRu
     return a == b
 }
 
+@OptIn(ExperimentalContracts::class)
+internal fun JsAny?.isNullish(): Boolean {
+    contract {
+        returns(false) implies (this@isNullish != null)
+    }
+    return this == null || this is Undefined || this is Uninitialized
+}
+
 private tailrec suspend fun OpLooselyEqualsImpl(a : JsAny?, b : JsAny?,  runtime: ScriptRuntime) : Boolean {
 
     return when {
         // If one of the operands is null or undefined, the other must also be null or undefined
         // to return true. Otherwise return false.
-        a == null || b == null || a == Undefined || b == Undefined ->
-            a == b || a == null && b == Undefined || a == Undefined && b == null
+        a.isNullish() || b.isNullish() -> a.isNullish() && b.isNullish()
 
         // If the operands have the same type, they are compared as follows:
         a::class == b::class -> when (a) {
@@ -82,7 +95,7 @@ private tailrec suspend fun OpLooselyEqualsImpl(a : JsAny?, b : JsAny?,  runtime
             else -> a === b
         }
         // If one of the operands is an object and the other is a primitive, convert the object to a primitive.
-        a is JsObject || b is JsObject -> with(runtime.findRoot() as JSRuntime) {
+        a is JsObject || b is JsObject -> with(runtime.findJsRoot()) {
             if (a is JsObject) {
                 OpLooselyEqualsImpl(a.ToPrimitive(), b, runtime)
             } else {

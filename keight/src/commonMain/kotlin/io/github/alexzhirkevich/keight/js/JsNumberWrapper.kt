@@ -1,10 +1,8 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
-import io.github.alexzhirkevich.keight.findRoot
-import kotlin.jvm.JvmInline
+import io.github.alexzhirkevich.keight.findJsRoot
 
 internal class JsNumberObject(
     val number: JsNumberWrapper
@@ -29,7 +27,7 @@ internal value class JsNumberWrapper(
     override val type: String get() = "number"
 
     override suspend fun proto(runtime: ScriptRuntime): JsAny? {
-        return (runtime.findRoot() as JSRuntime).Number.get(PROTOTYPE, runtime)
+        return runtime.findJsRoot().Number.get(PROTOTYPE, runtime)
     }
 
     override fun toString(): String {

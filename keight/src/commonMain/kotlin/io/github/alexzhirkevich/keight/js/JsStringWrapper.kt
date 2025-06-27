@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
@@ -32,7 +33,7 @@ internal value class JsStringWrapper(
         get() = "string"
 
     override suspend fun proto(runtime: ScriptRuntime): JsAny? {
-        return (runtime.findRoot() as JSRuntime).String.get(PROTOTYPE, runtime)
+        return runtime.findJsRoot().String.get(PROTOTYPE, runtime)
     }
 
     override fun toString(): String {
@@ -42,7 +43,7 @@ internal value class JsStringWrapper(
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
         return when(property) {
             "length".js -> value.length.toLong().js
-            CONSTRUCTOR -> (runtime.findRoot() as JSRuntime).String
+            CONSTRUCTOR -> runtime.findJsRoot().String
             else -> super.get(property, runtime)
         }
     }

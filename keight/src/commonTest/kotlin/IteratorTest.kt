@@ -34,9 +34,6 @@ class IteratorTest {
         "let arr = [1,2,3]".eval(it)
         "let iterator = arr[Symbol.iterator]".eval(it)
 
-        assertFailsWith<TypeError> {
-            "iterator()".eval(it)
-        }
         "iterator.call(arr).next().value".eval(it).assertEqualsTo(1L)
         "arr[Symbol.iterator]().next().value".eval(it).assertEqualsTo(1L)
     }

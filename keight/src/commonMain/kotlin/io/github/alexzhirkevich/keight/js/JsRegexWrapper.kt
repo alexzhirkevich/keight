@@ -3,7 +3,10 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
+
+private const val LAST_INDEX = "lastIndex"
 
 internal enum class RegexOptions(
     val option: RegexOption? = null,
@@ -28,14 +31,18 @@ internal class JsRegexWrapper(
 
     val ignoreCase get() = RegexOptions.IgnoreCase in options
 
+    private val flags = options.sorted().joinToString("") { it.char.toString() }
+
     init {
-        defineOwnProperty("global".js, global.js)
-        defineOwnProperty("hasIndices".js, hasIndices.js)
-        defineOwnProperty("ignoreCase".js, ignoreCase.js)
+        defineOwnProperty("global".js, JsProperty { global.js })
+        defineOwnProperty("hasIndices".js, JsProperty { hasIndices.js })
+        defineOwnProperty("ignoreCase".js, JsProperty { ignoreCase.js })
+        defineOwnProperty("flags".js, JsProperty { flags.js })
+        defineOwnProperty(LAST_INDEX.js, 0.js)
     }
 
     override suspend fun proto(runtime: ScriptRuntime): JsAny? {
-        return (runtime.findRoot() as JSRuntime).RegExp.get(PROTOTYPE, runtime)
+        return runtime.findJsRoot().RegExp.get(PROTOTYPE, runtime)
     }
 
     override fun toKotlin(runtime: ScriptRuntime): Any {
@@ -43,7 +50,7 @@ internal class JsRegexWrapper(
     }
 
     override fun toString(): String {
-        return "$pattern/${options.joinToString { it.char.toString() }}"
+        return "/$pattern/$flags"
     }
 }
 
@@ -79,4 +86,19 @@ internal suspend fun JsRegexWrapper.exec(string: String, runtime: ScriptRuntime)
             }
         }
     }
+}
+
+internal suspend fun JsRegexWrapper.test(string: String, runtime: ScriptRuntime) : Boolean {
+
+    val lastIndex = if (global)
+        runtime.toNumber(get(LAST_INDEX.js, runtime)).toInt()
+    else 0
+
+    val result = value.find(string, lastIndex)
+
+    if (global) {
+        set(LAST_INDEX.js, (result?.range?.last?.plus(1) ?: 0).js, runtime)
+    }
+
+    return result != null
 }

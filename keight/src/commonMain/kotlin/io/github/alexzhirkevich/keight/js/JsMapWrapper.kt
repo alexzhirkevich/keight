@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
@@ -30,7 +31,7 @@ internal value class JsMapWrapper(
     }
 
     override suspend fun proto(runtime: ScriptRuntime): JsAny? {
-        return (runtime.findRoot() as JSRuntime).Map.get(PROTOTYPE, runtime)
+        return runtime.findJsRoot().Map.get(PROTOTYPE, runtime)
     }
 
     override fun iterator(): Iterator<List<*>> {

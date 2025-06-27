@@ -82,7 +82,7 @@ internal class JSPropertyImpl(
     }
 }
 
-internal fun JSProperty(value : suspend ScriptRuntime.() -> JsAny?) : JsPropertyAccessor {
+internal fun JsProperty(value : suspend ScriptRuntime.() -> JsAny?) : JsPropertyAccessor {
     return JsPropertyAccessor.BackedField(getter = Callable { value(this) })
 }
 

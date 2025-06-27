@@ -47,6 +47,7 @@ import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.expressions.asDestruction
 import io.github.alexzhirkevich.keight.fastAll
 import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
@@ -57,6 +58,7 @@ import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
+import io.github.alexzhirkevich.keight.js.Uninitialized
 import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
@@ -452,8 +454,8 @@ private fun ListIterator<Token>.parseStatement(
                     is Token.Operator.Colon -> if (blockContext.lastOrNull() != BlockContext.Ternary) {
                         OpColonAssignment(
                             key = when (x) {
-                                is OpGetProperty -> x.name
-                                is OpConstant -> x.value.toString()
+                                is OpGetProperty -> x.name.js
+                                is OpConstant -> x.value
                                 else -> throw SyntaxError("Invalid ussage of : operator")
                             },
                             value = parseStatement(
@@ -872,7 +874,7 @@ private fun ListIterator<Token>.parseArrayCreation(): Expression {
     val expressions = buildList {
         while (!eat(Token.Operator.Bracket.SquareClose)) {
             if (eat(Token.Operator.Comma)) {
-                add(OpConstant(Undefined))
+                add(OpConstant(Uninitialized))
             } else {
                 add(parseStatement(blockType = ExpectedBlockType.Object))
                 if (!eat(Token.Operator.Comma)) {
@@ -1591,12 +1593,12 @@ internal suspend inline fun ScriptRuntime.referenceError(lazyMessage: () -> JsAn
 }
 
 internal suspend inline fun ScriptRuntime.makeReferenceError(lazyMessage: () -> JsAny) : ReferenceError {
-    return (findRoot() as JSRuntime).ReferenceError
+    return findJsRoot().ReferenceError
         .construct(lazyMessage().listOf(), this) as ReferenceError
 }
 
 internal suspend inline fun ScriptRuntime.makeTypeError(lazyMessage: () -> JsAny) : Throwable {
-    return (findRoot() as JSRuntime).TypeError
+    return findJsRoot().TypeError
         .construct(lazyMessage().listOf(), this) as Throwable
 }
 

@@ -21,6 +21,7 @@ import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.fastMapNotNull
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
 import io.github.alexzhirkevich.keight.js.interpreter.referenceError
@@ -173,7 +174,7 @@ public open class JSFunction(
     }
 
     override suspend fun fallbackProto(runtime: ScriptRuntime): JsAny? {
-       return (runtime.findRoot() as JSRuntime).Function.get(PROTOTYPE, runtime)
+       return runtime.findJsRoot().Function.get(PROTOTYPE, runtime)
     }
 
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {

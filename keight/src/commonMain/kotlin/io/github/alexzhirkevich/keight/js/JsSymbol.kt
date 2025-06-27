@@ -2,6 +2,7 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
@@ -11,7 +12,7 @@ public value class JsSymbol(public val value : String) : JsAny {
     override val type: String get() = "symbol"
 
     override suspend fun proto(runtime: ScriptRuntime): JsAny? {
-        return (runtime.findRoot() as JSRuntime).Symbol.get(PROTOTYPE, runtime)
+        return runtime.findJsRoot().Symbol.get(PROTOTYPE, runtime)
     }
 
     override fun toString(): String {

@@ -8,6 +8,7 @@ import io.github.alexzhirkevich.keight.checkNotEmpty
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.expressions.call
 import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.LSEP
@@ -159,7 +160,7 @@ internal class JSStringFunction : JSFunction(
         "match".js.func(
             "regexp" defaults OpConstant(JsRegexWrapper())
         ) {
-            (findRoot() as JSRuntime).RegExp
+            findJsRoot().RegExp
                 .get(JsSymbol.match, this)
                 .callableOrThrow(this)
                 .call(it[0], thisRef.listOf(), this)

@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 import kotlin.math.abs
@@ -33,16 +34,31 @@ internal class JsArrayWrapper(
         value: JsAny?,
         runtime: ScriptRuntime
     ) {
-        isValidIndex(property, runtime)?.let { this.value[it] = value }
-            ?: super.set(property, value, runtime)
+        isValidIndex(property, runtime)?.let {
+            if (it > this.value.lastIndex) {
+                repeat(it - this.value.lastIndex) {
+                    add(Uninitialized)
+                }
+            }
+            this.value[it] = value
+        } ?: super.set(property, value, runtime)
     }
 
-    override suspend fun proto(runtime: ScriptRuntime): JsAny? {
-        return (runtime.findRoot() as JSRuntime).Array.get(PROTOTYPE,runtime)
+
+    override suspend fun fallbackProto(runtime: ScriptRuntime): JsAny? {
+        return runtime.findJsRoot().Array.get(PROTOTYPE,runtime)
+    }
+
+    override suspend fun contains(property: JsAny?, runtime: ScriptRuntime): Boolean {
+        return super.contains(property, runtime) && get(property, runtime) !== Uninitialized
     }
 
     override suspend fun hasOwnProperty(name: JsAny?, runtime: ScriptRuntime): Boolean {
-        return isValidIndex(name, runtime) != null || super.hasOwnProperty(name, runtime)
+        val idx = isValidIndex(name, runtime)
+            ?.takeIf { it in value.indices }
+            ?: return super.hasOwnProperty(name, runtime)
+
+        return value[idx] !== Uninitialized
     }
 
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
@@ -50,7 +66,7 @@ internal class JsArrayWrapper(
             return value.size.js
         }
 
-        isValidIndex(property, runtime)?.let {
+        isValidIndex(property, runtime)?.takeIf { it in value.indices }?.let {
             return value[it]
         }
 
@@ -78,7 +94,7 @@ internal class JsArrayWrapper(
         if (
             nDouble.isNaN().not()
             && (abs(nLong - nDouble) < Double.MIN_VALUE)
-            && nLong in value.indices
+            && nLong >= 0
         ) {
             return n.toInt()
         }

@@ -27,6 +27,7 @@ import io.github.alexzhirkevich.keight.js.JsConsole
 import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.OpArgOmitted
 import io.github.alexzhirkevich.keight.js.Undefined
+import io.github.alexzhirkevich.keight.js.Uninitialized
 import io.github.alexzhirkevich.keight.js.ValueOf
 import io.github.alexzhirkevich.keight.js.argOrElse
 import io.github.alexzhirkevich.keight.js.defaults
@@ -180,6 +181,7 @@ public open class JSRuntime(
     override suspend fun isFalse(a: Any?): Boolean {
         return a == null
                 || a == false
+                || a is Uninitialized
                 || a is Undefined
                 || a is Unit
                 || a is CharSequence && a.isEmpty()
@@ -644,7 +646,7 @@ public open class JSRuntime(
 
     private fun regSetTimeout() {
         variables["setTimeout".js] = null to "setTimeout".func("handler", "timeout") {
-            (findRoot() as JSRuntime).registerJob(it) { handler, timeout ->
+            findJsRoot().registerJob(it) { handler, timeout ->
                 delay(timeout)
                 handler.invoke(emptyList(), this@func)
             }
@@ -653,7 +655,7 @@ public open class JSRuntime(
 
     private fun regSetInterval() {
         variables["setInterval".js] = null to "setInterval".func("handler", "interval") {
-            (findRoot() as JSRuntime).registerJob(it) { handler, timeout ->
+            findJsRoot().registerJob(it) { handler, timeout ->
                 while (isActive) {
                     handler.invoke(emptyList(), this@func)
                     delay(timeout)
@@ -717,6 +719,8 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JsObject {
 
 
 }
+
+internal fun ScriptRuntime.findJsRoot() : JSRuntime = findRoot() as JSRuntime
 
 private fun jssub(a : Any?, b : Any?) : JsAny? {
     return when {

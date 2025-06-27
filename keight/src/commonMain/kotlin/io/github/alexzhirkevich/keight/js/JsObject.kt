@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
@@ -208,7 +209,7 @@ public open class JsObjectImpl(
     }
 
     internal open suspend fun fallbackProto(runtime: ScriptRuntime) : JsAny? {
-        return (runtime.findRoot() as JSRuntime).Object.get(PROTOTYPE, runtime)
+        return runtime.findJsRoot().Object.get(PROTOTYPE, runtime)
     }
 
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {

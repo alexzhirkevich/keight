@@ -12,14 +12,14 @@ internal interface Labeled {
 }
 
 internal class OpColonAssignment(
-    val key : String,
+    val key : JsAny?,
     val value : Expression
 ) : Expression() {
 
 
     init {
         if (value is Labeled){
-            value.label = key
+            value.label = key.toString()
         }
     }
 
