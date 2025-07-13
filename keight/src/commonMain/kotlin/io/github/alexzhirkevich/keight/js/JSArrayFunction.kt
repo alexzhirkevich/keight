@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Uninitialized
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.expressions.OpEqualsImpl
@@ -71,7 +72,7 @@ internal class JSArrayFunction : JSFunction(
         values()
         //todo: with
 
-        ToString.js.func {
+        Constants.toString.js.func {
             buildString {
                 thisRef?.arrayForEachIndexed(this@func){ _, it ->
                     append(toString(it))

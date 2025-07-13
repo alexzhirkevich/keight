@@ -8,6 +8,7 @@ import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class SyntaxTest {
 
@@ -297,5 +298,12 @@ class SyntaxTest {
 
            fib(7)
         """.trimIndent().eval().assertEqualsTo(13L)
+    }
+
+    @Test
+    fun construct() = runtimeTest {
+        assertIs<JsObject>("new Object()".eval(it))
+        assertIs<JsObject>("new Object".eval(it))
+        assertIs<JsObject>("new (Object)".eval(it))
     }
 }

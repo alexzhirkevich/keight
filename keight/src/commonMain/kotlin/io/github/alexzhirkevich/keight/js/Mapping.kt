@@ -4,10 +4,6 @@ import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 
-public val Deferred<JsAny?>.js : JsAny
-    get() = if (this is JsAny) this else JsPromiseWrapper(this)
-
-
 public val Job.js : JsAny
     get() = if (this is JsAny) this else JsPromiseWrapper(this)
 

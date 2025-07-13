@@ -19,4 +19,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "keight"
 include(":keight")
+include(":keight-core")
 

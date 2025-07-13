@@ -17,11 +17,60 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.jvm.JvmInline
 
+internal class OpCall(
+    private val receiver : Expression?,
+    private val func : Expression,
+    private val args : List<Expression>,
+    private val isOptional: Boolean,
+) : Expression() {
+
+    override suspend fun execute(runtime: ScriptRuntime): JsAny? {
+        val thisRef = if(receiver != null)
+            receiver.invoke(runtime)
+        else runtime.thisRef
+
+        val callable = func.invoke(runtime)
+
+        if (callable == null && isOptional) {
+            return Undefined
+        }
+
+        return callable.callableOrThrow(runtime).call(
+            thisArg = thisRef,
+            args = args.fastMap { it.invoke(runtime) },
+            runtime = runtime
+        )
+    }
+}
+
 internal fun OpCall(
     callable : Expression,
     arguments : List<Expression>,
     isOptional : Boolean
 ) : Expression {
+
+//    return when {
+//        callable is OpIndex -> OpCall(
+//            receiver = callable.receiver,
+//            func = callable,
+//            args = arguments,
+//            isOptional = callable.isOptional
+//        )
+//
+//        callable is OpGetProperty -> OpCall(
+//            receiver = callable.receiver,
+//            func = callable,
+//            args = arguments,
+//            isOptional = callable.isOptional
+//        )
+//
+//        else -> OpCall(
+//            receiver = null,
+//            func = callable,
+//            args = arguments,
+//            isOptional = false
+//        )
+//    }
 
     return when {
         callable is OpIndex -> Expression { r ->

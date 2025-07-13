@@ -54,7 +54,7 @@ public class KeightScriptEngineFactory : ScriptEngineFactory  {
         return getScriptEngine(JavaScriptEngine(JSRuntime(Job())))
     }
 
-    public fun getScriptEngine(engine: JavaScriptEngine) : ScriptEngine {
+    public fun getScriptEngine(engine: JavaScriptEngine<*>) : ScriptEngine {
         return KeightScriptEngine(this, engine)
     }
 }

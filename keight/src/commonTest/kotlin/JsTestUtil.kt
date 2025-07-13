@@ -27,15 +27,17 @@ internal fun runtimeTest(
     test(runtime)
 }
 
-internal suspend fun String.eval(runtime: ScriptRuntime = JSRuntime(Job())) : Any? {
+internal suspend fun String.eval(runtime: JSRuntime = JSRuntime(Job())) : Any? {
     return JavaScriptEngine(runtime).evaluate(this)
 }
 
-internal suspend fun String.evalRaw(runtime: ScriptRuntime = JSRuntime(Job())) : JsAny? {
+internal suspend fun String.evalRaw(runtime: JSRuntime = JSRuntime(Job())) : JsAny? {
     return JavaScriptEngine(runtime).compile(this).invoke(runtime)
 }
 
-internal suspend fun String.eval(io : Console = DefaultConsole, runtime: ScriptRuntime =
-    JSRuntime(context = Job(), console = io)) : Any? {
+internal suspend fun String.eval(
+    io : Console = DefaultConsole,
+    runtime: JSRuntime = JSRuntime(context = Job(), console = io)
+) : Any? {
     return JavaScriptEngine(runtime).evaluate(this)
 }

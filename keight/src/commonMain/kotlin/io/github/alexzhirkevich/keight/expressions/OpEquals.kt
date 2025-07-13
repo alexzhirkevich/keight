@@ -2,15 +2,15 @@ package io.github.alexzhirkevich.keight.expressions
 
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.js.JSBooleanWrapper
 import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JsSymbol
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.JsStringWrapper
+import io.github.alexzhirkevich.keight.es.abstract.esToPrimitive
 import io.github.alexzhirkevich.keight.js.Undefined
-import io.github.alexzhirkevich.keight.js.Uninitialized
+import io.github.alexzhirkevich.keight.Uninitialized
 import io.github.alexzhirkevich.keight.js.js
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
@@ -95,12 +95,10 @@ private tailrec suspend fun OpLooselyEqualsImpl(a : JsAny?, b : JsAny?,  runtime
             else -> a === b
         }
         // If one of the operands is an object and the other is a primitive, convert the object to a primitive.
-        a is JsObject || b is JsObject -> with(runtime.findJsRoot()) {
-            if (a is JsObject) {
-                OpLooselyEqualsImpl(a.ToPrimitive(), b, runtime)
-            } else {
-                OpLooselyEqualsImpl(a, b.ToPrimitive(), runtime)
-            }
+        a is JsObject || b is JsObject -> if (a is JsObject) {
+            OpLooselyEqualsImpl(a.esToPrimitive(runtime = runtime), b, runtime)
+        } else {
+            OpLooselyEqualsImpl(a, b.esToPrimitive(runtime = runtime), runtime)
         }
 
         // At this step, both operands are converted to primitives (one of String, Number, Boolean,

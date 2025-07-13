@@ -1,53 +1,11 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.findJsRoot
-import io.github.alexzhirkevich.keight.findRoot
-import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 
-
-public interface JsObject : JsAny {
-
-    public val isExtensible : Boolean  get() = true
-
-    public fun preventExtensions() {}
-
-    public suspend fun values(runtime: ScriptRuntime): List<JsAny?> = emptyList()
-
-    public suspend fun entries(runtime: ScriptRuntime): List<List<JsAny?>> = emptyList()
-
-    public suspend fun set(
-        property: JsAny?,
-        value: JsAny?,
-        runtime: ScriptRuntime,
-    )
-
-    public suspend fun defineOwnProperty(
-        property: JsAny?,
-        value: JsPropertyAccessor,
-        runtime: ScriptRuntime,
-        enumerable: Boolean? = null,
-        configurable: Boolean? = null,
-        writable: Boolean? = null,
-    ) {
-        set(property, value.get(runtime), runtime)
-    }
-
-    public fun ownPropertyDescriptor(property: JsAny?) : JsProperty? = null
-    public fun ownPropertyDescriptors() : Map<JsAny?, JsProperty> = emptyMap()
-
-    public suspend fun propertyIsEnumerable(name : JsAny?, runtime: ScriptRuntime) : Boolean {
-        return true
-    }
-
-    public suspend fun hasOwnProperty(name : JsAny?, runtime: ScriptRuntime) : Boolean {
-        return (proto(runtime) as? JsObject?)?.hasOwnProperty(name, runtime) == true
-    }
-}
 
 internal val PROTOTYPE = "prototype".js
 internal val PROTO = "__proto__".js
@@ -71,7 +29,7 @@ internal fun JsObjectImpl.setPrototype(prototype : Any?) {
 
 
 internal suspend fun JsObject.setPrototype(prototype : JsAny?, runtime: ScriptRuntime) {
-    defineOwnProperty(
+    setProperty(
         property = PROTOTYPE,
         value = JsPropertyAccessor.Value(prototype),
         runtime = runtime,
@@ -82,7 +40,7 @@ internal suspend fun JsObject.setPrototype(prototype : JsAny?, runtime: ScriptRu
 
 internal suspend fun JsObject.setProto(runtime: ScriptRuntime, proto : JsAny?) {
     if (isExtensible) {
-        defineOwnProperty(
+        setProperty(
             property = PROTO,
             value = JsPropertyAccessor.Value(proto),
             runtime = runtime,
@@ -214,7 +172,7 @@ public open class JsObjectImpl(
 
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
         return when {
-            property in map -> map[property]?.value?.get(runtime)?.get(runtime)
+            property in map -> map[property]?.value?.get(runtime)
             else -> super.get(property, runtime)
         }
     }
@@ -236,7 +194,6 @@ public open class JsObjectImpl(
         value: JsAny?,
         runtime: ScriptRuntime,
     ) {
-
         runtime.typeCheck(map[property]?.writable != false || !runtime.isStrict) {
             "Cannot assign to read only property '$property' of object $this".js
         }
@@ -248,6 +205,10 @@ public open class JsObjectImpl(
         if (!isExtensible && property == PROTO){
             return
         }
+
+//        if (!isWritableProperty(property, runtime)){
+//            return
+//        }
 
         val current = map[property]
 
@@ -278,7 +239,7 @@ public open class JsObjectImpl(
         )
     }
 
-    override suspend fun defineOwnProperty(
+    override suspend fun setProperty(
         property: JsAny?,
         value: JsPropertyAccessor,
         runtime: ScriptRuntime,
@@ -309,28 +270,12 @@ public open class JsObjectImpl(
     ) {
         val v = value as? JsPropertyAccessor? ?: JsPropertyAccessor.Value(value)
 
-        if (property in map) {
-            map[property]?.value = v
-            if (configurable != null) {
-                map[property]?.configurable = configurable
-            }
-
-//            if (map[property]?.configurable != false) {
-                if (writable != null) {
-                    map[property]?.writable = writable
-                }
-                if (enumerable != null) {
-                    map[property]?.enumerable = enumerable
-                }
-//            }
-        } else {
-            map[property] = JSPropertyImpl(
-                value = v,
-                writable = writable,
-                enumerable = enumerable,
-                configurable = configurable
-            )
-        }
+        map[property] = JSPropertyImpl(
+            value = v,
+            writable = writable,
+            enumerable = enumerable,
+            configurable = configurable
+        )
     }
 
     override suspend fun hasOwnProperty(name: JsAny?, runtime: ScriptRuntime): Boolean {
@@ -348,11 +293,11 @@ public open class JsObjectImpl(
     }
 
 
-    override fun ownPropertyDescriptor(property: JsAny?): JsProperty? {
+    override suspend fun ownPropertyDescriptor(property: JsAny?): JsProperty? {
         return map[property]
     }
 
-    override fun ownPropertyDescriptors(): Map<JsAny?, JsProperty> {
+    override suspend fun ownPropertyDescriptors(): Map<JsAny?, JsProperty> {
         return map
     }
 
@@ -367,6 +312,11 @@ public open class JsObjectImpl(
             "[object]"
         }
     }
+}
+
+private suspend fun JsObject.isWritableProperty(property: JsAny?, runtime: ScriptRuntime) : Boolean{
+    return ownPropertyDescriptor(property)?.writable == false &&
+            (proto(runtime) as? JsObject)?.ownPropertyDescriptor(property)?.writable != false
 }
 
 public sealed interface ObjectScope {
@@ -443,20 +393,7 @@ public inline fun Object(name: String = "Object", builder : ObjectScope.() -> Un
 }
 
 
-//internal fun JSObjectImpl.init(scope: ObjectScope.() -> Unit) : JSObjectImpl {
-//    ObjectScopeImpl("", this).apply(scope)
-//    return this
-//}
 
-
-internal fun JsObjectImpl.noArgsFunc(
-    name: String,
-    body: suspend ScriptRuntime.(args: List<Any?>) -> JsAny?
-) : JSFunction = func(
-    name = name,
-    args = emptyArray<FunctionParam>(),
-    body = body
-)
 
 internal fun JsObjectImpl.func(
     name: String,

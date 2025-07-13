@@ -58,7 +58,7 @@ import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
-import io.github.alexzhirkevich.keight.js.Uninitialized
+import io.github.alexzhirkevich.keight.Uninitialized
 import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
@@ -524,7 +524,7 @@ private fun ListIterator<Token>.parseFactor(
             )
         ).also {
             if (it.value is OpFunctionInit && it.value.function.isArrow){
-                throw SyntaxError("Unexpected token '...'")
+                throw SyntaxError(unexpected("..."))
             }
         }
         Token.Operator.Arithmetic.Inc,
@@ -597,6 +597,7 @@ private fun ListIterator<Token>.parseFactor(
                 }
             }
         }
+        is Token.Operator.SemiColon -> Expression { Undefined }
         else -> throw SyntaxError(unexpected(next::class.simpleName.orEmpty()))
     }
 
@@ -706,7 +707,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
         Token.Identifier.Keyword.Case,
         Token.Identifier.Keyword.Default -> {
             syntaxCheck(blockContext.last() == BlockContext.Switch) {
-                "Unexpected token 'case'"
+                unexpected("case")
             }
             val case = if (keyword == Token.Identifier.Keyword.Case)
                 parseFactor(emptyList())
@@ -802,23 +803,43 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
 }
 
 private fun ListIterator<Token>.parseNew() : Expression {
+    val index = nextIndex()
     val next = nextSignificant()
-    syntaxCheck(next is Token.Identifier.Property){
-        "Invalid syntax after 'new'"
-    }
 
-    val args = if (nextIsInstance<Token.Operator.Bracket.RoundOpen>()) {
-        parseExpressionGrouping().expressions
-    } else {
-        emptyList()
-    }
-
-    return Expression { runtime ->
-        val constructor = runtime.get(next.identifier.js)
-        runtime.typeCheck(constructor is Constructor) {
-            "'$constructor' (${next.identifier}) is not a constructor".js
+    if (next is Token.Identifier.Property) {
+        syntaxCheck(next is Token.Identifier.Property) {
+            "Invalid syntax after 'new'"
         }
-        constructor.construct(args.fastMap { it(runtime) }, runtime)
+
+        val args = if (nextIsInstance<Token.Operator.Bracket.RoundOpen>()) {
+            parseExpressionGrouping().expressions
+        } else {
+            emptyList()
+        }
+
+        return Expression { runtime ->
+            val constructor = runtime.get(next.identifier.js)
+            runtime.typeCheck(constructor is Constructor) {
+                "'$constructor' (${next.identifier}) is not a constructor".js
+            }
+            constructor.construct(args.fastMap { it(runtime) }, runtime)
+        }
+    } else {
+        returnToIndex(index)
+        val constructor = parseStatement(
+            blockContext = emptyList(),
+            blockType = ExpectedBlockType.Object
+        )
+        return Expression { runtime ->
+            val c = constructor.invoke(runtime)
+            runtime.typeCheck(c is Constructor) {
+                "'$c' is not a constructor".js
+            }
+            runtime.typeCheck(c !is JSFunction || !c.isArrow){
+                "(intermediate value) is not a constructor".js
+            }
+            c.construct(emptyList(), runtime)
+        }
     }
 }
 
@@ -1455,7 +1476,7 @@ private fun ListIterator<Token>.parseBlock(
                     hasSeparator = true
                 }
                 syntaxCheck(hasSeparator || nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
-                    "Unexpected token ${next()}"
+                    unexpected(next().toString())
                 }
             }
 

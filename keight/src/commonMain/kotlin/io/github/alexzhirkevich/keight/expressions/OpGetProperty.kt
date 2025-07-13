@@ -28,7 +28,7 @@ internal class OpGetProperty(
             receiver == null -> if (runtime.contains(nameJs)) {
                 runtime.get(nameJs)
             } else {
-                runtime.referenceError { "$nameJs is not defined".js }
+                runtime.referenceError("$nameJs is not defined".js)
             }
             else -> invoke(receiver.invoke(runtime), isOptional, nameJs, runtime)
         }

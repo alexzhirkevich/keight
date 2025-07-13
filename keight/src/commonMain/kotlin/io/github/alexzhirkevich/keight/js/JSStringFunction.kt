@@ -1,16 +1,12 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.checkNotEmpty
 import io.github.alexzhirkevich.keight.expressions.OpConstant
-import io.github.alexzhirkevich.keight.expressions.call
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.findJsRoot
-import io.github.alexzhirkevich.keight.findRoot
-import io.github.alexzhirkevich.keight.get
 import io.github.alexzhirkevich.keight.js.interpreter.LSEP
 import io.github.alexzhirkevich.keight.thisRef
 import io.github.alexzhirkevich.keight.valueAtIndexOrUnit

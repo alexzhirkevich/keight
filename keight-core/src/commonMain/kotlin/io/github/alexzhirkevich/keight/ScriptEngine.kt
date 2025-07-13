@@ -1,8 +1,12 @@
 package io.github.alexzhirkevich.keight
 
-public abstract class ScriptEngine {
+import kotlinx.coroutines.sync.Mutex
 
-    public abstract val runtime : ScriptRuntime
+public interface ScriptEngine<out R : ScriptRuntime> {
+
+    public val runtime : R
+
+    public val mutex : Mutex
 
     /**
      * Compile [script] code to an executable [Script] instance.
@@ -11,9 +15,9 @@ public abstract class ScriptEngine {
      * executed multiple times in parallel - it will wait for the previous execution to finish
      * - Script is always executed in the coroutine context of the engine runtime
      * */
-    public abstract fun compile(script: String) : Script
+    public fun compile(script: String) : Script
 
-    public open suspend fun evaluate(script: String) : Any? {
+    public suspend fun evaluate(script: String) : Any? {
         return compile(script).invoke(runtime)?.toKotlin(runtime)
     }
 
@@ -25,7 +29,7 @@ public abstract class ScriptEngine {
      *
      * @see [ScriptRuntime.reset]
      * */
-    public open fun reset() {
+    public fun reset() {
         runtime.reset()
     }
 }

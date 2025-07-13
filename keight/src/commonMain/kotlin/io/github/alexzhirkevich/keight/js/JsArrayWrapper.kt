@@ -1,12 +1,10 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Uninitialized
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.findJsRoot
-import io.github.alexzhirkevich.keight.findRoot
-import kotlin.jvm.JvmInline
 import kotlin.math.abs
 
 internal class JsArrayWrapper(

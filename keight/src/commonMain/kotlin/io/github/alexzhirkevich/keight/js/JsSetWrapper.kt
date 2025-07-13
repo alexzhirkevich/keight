@@ -18,3 +18,4 @@ internal value class JsSetWrapper(
 
     override fun toKotlin(runtime: ScriptRuntime): Any = value.map { it?.toKotlin(runtime) }.toSet()
 }
+

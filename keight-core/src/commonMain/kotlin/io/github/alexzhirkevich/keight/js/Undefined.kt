@@ -1,7 +1,6 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
-import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 
 public object Undefined : JsAny {
     override val type: String
@@ -12,6 +11,6 @@ public object Undefined : JsAny {
     }
 
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
-        runtime.referenceError { "Can't read properties of undefined".js }
+        runtime.referenceError(runtime.fromKotlin("Can't read properties of undefined"))
     }
 }

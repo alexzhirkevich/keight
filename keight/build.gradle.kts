@@ -6,6 +6,7 @@ kotlin {
         commonMain.dependencies {
             api(libs.coroutines.core)
             api(libs.datetime)
+            api(project(":keight-core"))
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

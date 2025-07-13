@@ -1,127 +1,19 @@
 package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.ObjectMap
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
+import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.mapThisArg
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.sync.Mutex
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.CoroutineContext
-import kotlin.jvm.JvmInline
 
-
-public enum class VariableType {
-    Global, Local, Const
-}
-
-public abstract class ScriptRuntime : CoroutineScope {
-
-    @PublishedApi
-    internal open val isStrict : Boolean get() = false
-
-    public open val isSuspendAllowed: Boolean get() = true
-
-    internal val lock: Mutex = Mutex()
-
-    @PublishedApi
-    internal abstract val thisRef: JsAny?
-
-    public abstract fun isEmpty(): Boolean
-
-    public abstract suspend fun delete(property: JsAny?, ignoreConstraints: Boolean = false): Boolean
-
-    public abstract suspend fun contains(property: JsAny?): Boolean
-
-    public abstract suspend fun get(property: JsAny?): JsAny?
-
-    public abstract suspend fun set(property: JsAny?, value: JsAny?, type: VariableType?)
-
-    public abstract suspend fun <T> withScope(
-        thisRef: JsAny? = this.thisRef,
-        extraProperties: Map<String, Pair<VariableType, JsAny?>> = emptyMap(),
-        isSuspendAllowed: Boolean = this.isSuspendAllowed,
-        isFunction: Boolean = false,
-        isStrict: Boolean = this.isStrict,
-        block: suspend (ScriptRuntime) -> T
-    ): T
-
-    public abstract suspend fun <T> useStrict(
-        block: suspend (ScriptRuntime) -> T
-    ) : T
-
-    /**
-     * Restore runtime to its initial state, cancel all running jobs
-     * */
-    public abstract fun reset()
-
-
-
-    public abstract suspend fun isFalse(a: Any?): Boolean
-
-    /**
-     * Returns true if [a] and [b] can be compared and false when
-     * the comparison result for such types is always false
-     **/
-    public abstract suspend fun isComparable(a: JsAny?, b: JsAny?): Boolean
-
-    /**
-     * Should return negative value if [a] < [b],
-     * positive if [a] > b and 0 if [a] equals to [b]
-     *
-     * Engine can call this function only in case [isComparable] result is true
-     *
-     * @see [Comparator]
-     * */
-    public abstract suspend fun compare(a: JsAny?, b: JsAny?): Int
-
-    public abstract suspend fun sum(a: JsAny?, b: JsAny?): JsAny?
-    public abstract suspend fun sub(a: JsAny?, b: JsAny?): JsAny?
-    public abstract suspend fun mul(a: JsAny?, b: JsAny?): JsAny?
-    public abstract suspend fun div(a: JsAny?, b: JsAny?): JsAny?
-    public abstract suspend fun mod(a: JsAny?, b: JsAny?): JsAny?
-
-    public abstract suspend fun inc(a: JsAny?): JsAny?
-    public abstract suspend fun dec(a: JsAny?): JsAny?
-
-    public abstract suspend fun neg(a: JsAny?): JsAny?
-    public abstract suspend fun pos(a: JsAny?): JsAny?
-
-    public abstract suspend fun toNumber(value: JsAny?): Number
-    public abstract suspend fun toString(value: JsAny?): String
-
-}
-
-
-
-public suspend fun ScriptRuntime.set(property: JsAny?, value: JsAny?): Unit =
-    set(property, value, null)
-
-
-public fun <T> ScriptRuntime.runSync(block : suspend ScriptRuntime.() -> T) : T {
-    check(!isSuspendAllowed) {
-        "Synchronous invocation is only available in runtimes with suspending calls disabled. See ScriptRuntime.isSuspendAllowed"
-    }
-    val res = try {
-        @Suppress("UNCHECKED_CAST")
-        (block as Function2<ScriptRuntime, Continuation<*>, T>)
-            .invoke(this, EmptyContinuation(coroutineContext))
-    } catch (t : ClassCastException){
-        throw Exception("Synchronous invocation is not compatible with your version of kotlinx.coroutines. Please report this issue", t)
-    }
-
-    check(res !== SUSPENDED) {
-        "Runtime with disallowed suspension was suspended. That should never happen. Please report this issue"
-    }
-
-    return res
-}
 
 internal suspend inline fun ScriptRuntime.requireThisRef(caller : String? = null) : JsAny {
     val t = thisRef
@@ -135,18 +27,12 @@ internal suspend inline fun <reified T > ScriptRuntime.thisRef() : T {
     return try {
         thisRef as T
     } catch (t: ClassCastException){
-        typeError { "Cannot convert $thisRef to ${T::class}".js }
+        typeError("Cannot convert $thisRef to ${T::class}".js)
     }
 }
 
-private val SUSPENDED : Any get()  =  kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+public abstract class DefaultRuntime : ScriptRuntime {
 
-@JvmInline
-private value class EmptyContinuation(override val context: CoroutineContext) : Continuation<Any?> {
-    override fun resumeWith(result: Result<Any?>) {}
-}
-
-public abstract class DefaultRuntime : ScriptRuntime() {
 
     protected val variables: MutableMap<JsAny?, Pair<VariableType?, JsAny?>> = ObjectMap(mutableMapOf())
 
@@ -190,7 +76,7 @@ public abstract class DefaultRuntime : ScriptRuntime() {
 
     override suspend fun get(property: JsAny?): JsAny? {
         return when {
-            contains(property) -> variables[property]?.second?.get(this)
+            contains(property) -> variables[property]?.second//?.get(this)
             else -> Undefined
         }
     }
@@ -235,26 +121,26 @@ public abstract class DefaultRuntime : ScriptRuntime() {
 }
 
 private class StrictRuntime(
-    val delegate : ScriptRuntime
-) : ScriptRuntime(),
-    CoroutineScope by delegate {
+    override val parent : ScriptRuntime
+) : ScriptRuntime,
+    CoroutineScope by parent {
 
-    override val thisRef: JsAny? get() = mapThisArg(delegate.thisRef, true)
+    override val thisRef: JsAny? get() = mapThisArg(parent.thisRef, true)
     override val isStrict: Boolean get() = true
-    override val isSuspendAllowed: Boolean get() = delegate.isSuspendAllowed
-    override fun isEmpty(): Boolean = delegate.isEmpty()
+    override val isSuspendAllowed: Boolean get() = parent.isSuspendAllowed
+    override fun isEmpty(): Boolean = parent.isEmpty()
 
     override suspend fun delete(property: JsAny?, ignoreConstraints: Boolean) : Boolean {
         throw SyntaxError("Delete of an unqualified identifier in strict mode.")
     }
 
-    override suspend fun contains(property: JsAny?): Boolean = delegate.contains(property)
-    override suspend fun get(property: JsAny?): JsAny? = delegate.get(property)
+    override suspend fun contains(property: JsAny?): Boolean = parent.contains(property)
+    override suspend fun get(property: JsAny?): JsAny? = parent.get(property)
     override suspend fun set(property: JsAny?, value: JsAny?, type: VariableType?) {
         if (type == null && !contains(property)) {
             throw ReferenceError("Unresolved reference $property")
         }
-        delegate.set(property, value, type)
+        parent.set(property, value, type)
     }
 
     override suspend fun <T> withScope(
@@ -264,7 +150,7 @@ private class StrictRuntime(
         isFunction: Boolean,
         isStrict: Boolean,
         block: suspend (ScriptRuntime) -> T
-    ): T = delegate.withScope(
+    ): T = parent.withScope(
         thisRef = thisRef,
         extraProperties = extraProperties,
         isSuspendAllowed = isSuspendAllowed,
@@ -273,27 +159,31 @@ private class StrictRuntime(
         block = block
     )
     override suspend fun <T> useStrict(block: suspend (ScriptRuntime) -> T): T = block(this)
-    override fun reset() = delegate.reset()
+    override fun reset() = parent.reset()
 
 
-    override suspend fun isFalse(a: Any?): Boolean = delegate.isFalse(a)
-    override suspend fun isComparable(a: JsAny?, b: JsAny?): Boolean = delegate.isComparable(a,b)
-    override suspend fun compare(a: JsAny?, b: JsAny?): Int = delegate.compare(a,b)
-    override suspend fun sum(a: JsAny?, b: JsAny?): JsAny? = delegate.sum(a,b)
-    override suspend fun sub(a: JsAny?, b: JsAny?): JsAny? = delegate.sub(a,b)
-    override suspend fun mul(a: JsAny?, b: JsAny?): JsAny? = delegate.mul(a,b)
-    override suspend fun div(a: JsAny?, b: JsAny?): JsAny? = delegate.div(a,b)
-    override suspend fun mod(a: JsAny?, b: JsAny?): JsAny? = delegate.mod(a,b)
-    override suspend fun inc(a: JsAny?): JsAny? = delegate.inc(a)
-    override suspend fun dec(a: JsAny?): JsAny? = delegate.dec(a)
-    override suspend fun neg(a: JsAny?): JsAny? = delegate.neg(a)
-    override suspend fun pos(a: JsAny?): JsAny? = delegate.pos(a)
-    override suspend fun toNumber(value: JsAny?): Number = delegate.toNumber(value)
-    override suspend fun toString(value: JsAny?): String = delegate.toString(value)
+    override fun fromKotlin(value: Any): JsAny = parent.fromKotlin(value)
+    override suspend fun isFalse(a: Any?): Boolean = parent.isFalse(a)
+    override fun makeObject(properties: Map<JsAny?, JsAny?>): JsObject = parent.makeObject(properties)
+    override suspend fun referenceError(message: JsAny?): Nothing = parent.referenceError(message)
+    override suspend fun typeError(message: JsAny?): Nothing = parent.typeError(message)
+    override suspend fun isComparable(a: JsAny?, b: JsAny?): Boolean = parent.isComparable(a,b)
+    override suspend fun compare(a: JsAny?, b: JsAny?): Int = parent.compare(a,b)
+    override suspend fun sum(a: JsAny?, b: JsAny?): JsAny? = parent.sum(a,b)
+    override suspend fun sub(a: JsAny?, b: JsAny?): JsAny? = parent.sub(a,b)
+    override suspend fun mul(a: JsAny?, b: JsAny?): JsAny? = parent.mul(a,b)
+    override suspend fun div(a: JsAny?, b: JsAny?): JsAny? = parent.div(a,b)
+    override suspend fun mod(a: JsAny?, b: JsAny?): JsAny? = parent.mod(a,b)
+    override suspend fun inc(a: JsAny?): JsAny? = parent.inc(a)
+    override suspend fun dec(a: JsAny?): JsAny? = parent.dec(a)
+    override suspend fun neg(a: JsAny?): JsAny? = parent.neg(a)
+    override suspend fun pos(a: JsAny?): JsAny? = parent.pos(a)
+    override suspend fun toNumber(value: JsAny?): Number = parent.toNumber(value)
+    override suspend fun toString(value: JsAny?): String = parent.toString(value)
 }
 
 private class ScopedRuntime(
-    val parent: ScriptRuntime,
+    override val parent: ScriptRuntime,
     val isFunction: Boolean,
     private val strict: Boolean,
     mThisRef: JsAny? = parent.thisRef,
@@ -350,7 +240,10 @@ private class ScopedRuntime(
         return variables.isEmpty() && parent.isEmpty()
     }
 
-
+    override fun makeObject(properties: Map<JsAny?, JsAny?>): JsObject = parent.makeObject(properties)
+    override suspend fun referenceError(message: JsAny?): Nothing = parent.referenceError(message)
+    override suspend fun typeError(message: JsAny?): Nothing = parent.typeError(message)
+    override fun fromKotlin(value: Any): JsAny = parent.fromKotlin(value)
     override suspend fun isFalse(a: Any?): Boolean = parent.isFalse(a)
     override suspend fun isComparable(a: JsAny?, b: JsAny?): Boolean = parent.isComparable(a,b)
     override suspend fun compare(a: JsAny?, b: JsAny?): Int = parent.compare(a,b)
@@ -370,7 +263,7 @@ private class ScopedRuntime(
 private tailrec fun ScriptRuntime.closestFunctionScope() : ScriptRuntime {
     return when (this){
         is ScopedRuntime -> if (isFunction) this else parent.closestFunctionScope()
-        is StrictRuntime -> delegate.closestFunctionScope()
+        is StrictRuntime -> parent.closestFunctionScope()
         else -> this
     }
 }
@@ -378,7 +271,7 @@ private tailrec fun ScriptRuntime.closestFunctionScope() : ScriptRuntime {
 public tailrec fun ScriptRuntime.findRoot() : ScriptRuntime {
     return when (this){
         is ScopedRuntime -> parent.findRoot()
-        is StrictRuntime -> delegate.findRoot()
+        is StrictRuntime -> parent.findRoot()
         else -> this
     }
 }

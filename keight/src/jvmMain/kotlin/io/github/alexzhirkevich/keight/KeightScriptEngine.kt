@@ -11,7 +11,7 @@ import javax.script.ScriptEngine as JXScriptEngine
 
 internal class KeightScriptEngine(
     private val factory: KeightScriptEngineFactory,
-    private var engine : JavaScriptEngine
+    private var engine : JavaScriptEngine<*>
 ) : JXScriptEngine {
 
     override fun eval(script: String?, context: ScriptContext?): Any? {

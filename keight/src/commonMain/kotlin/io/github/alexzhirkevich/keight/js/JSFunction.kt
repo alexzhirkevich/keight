@@ -6,6 +6,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.LazyGetter
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Uninitialized
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.Destruction
@@ -22,7 +23,6 @@ import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.fastMapNotNull
 import io.github.alexzhirkevich.keight.findJsRoot
-import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
 import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck

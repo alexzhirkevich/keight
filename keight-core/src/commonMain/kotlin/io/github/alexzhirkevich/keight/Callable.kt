@@ -1,11 +1,6 @@
 package io.github.alexzhirkevich.keight
 
-import io.github.alexzhirkevich.keight.expressions.asCallable
 import io.github.alexzhirkevich.keight.js.JsAny
-import io.github.alexzhirkevich.keight.js.Undefined
-import io.github.alexzhirkevich.keight.js.interpreter.typeError
-import io.github.alexzhirkevich.keight.js.js
-import kotlin.jvm.JvmInline
 
 public interface Callable : JsAny {
 
@@ -25,18 +20,6 @@ public interface Callable : JsAny {
 
 public fun Callable(body: suspend ScriptRuntime.(List<JsAny?>) -> JsAny?): Callable =
     CallableImpl(body)
-
-internal fun JsAny.callableOrNull() : Callable? {
-    return when(this){
-        is Callable -> this
-        is Function<*> -> asCallable()
-        else -> null
-    }
-}
-
-internal suspend fun JsAny?.callableOrThrow(runtime: ScriptRuntime) : Callable {
-    return this?.callableOrNull() ?: runtime.typeError { "$this it is not a function".js }
-}
 
 @JvmInline
 private value class CallableImpl(

@@ -15,24 +15,24 @@ import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.setProto
 
-internal open class JSErrorFunction(
+internal open class JSErrorFunction<E : JSError>(
     name : String = "Error",
     prototype : JsObject = Object {
         "message".js eq "".js
     },
-    private val make : (Any?) -> JSError = { JSError(it) }
+    private val make : (Any?) -> E
 ) : JSFunction(
     name = name,
     prototype = prototype,
     parameters = listOf(FunctionParam("msg" , default =  OpConstant("Uncaught $name".js))),
     body = Expression { make(it.get("msg".js)) }
 ) {
-    override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JsObject {
+    override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): E {
         return make(args.getOrElse(0) { "Uncaught $name" })
     }
 }
 
-internal class JSTypeErrorFunction(errorFunction: JSErrorFunction) : JSErrorFunction(
+internal class JSTypeErrorFunction(errorFunction: JSErrorFunction<*>) : JSErrorFunction<TypeError>(
     name = "TypeError",
     prototype = JsObjectImpl("Error")
         .apply { setProto(errorFunction.prototype) },
@@ -41,7 +41,7 @@ internal class JSTypeErrorFunction(errorFunction: JSErrorFunction) : JSErrorFunc
     init { setProto(errorFunction) }
 }
 
-internal class JSReferenceErrorFunction(errorFunction: JSErrorFunction) : JSErrorFunction(
+internal class JSReferenceErrorFunction(errorFunction: JSErrorFunction<*>) : JSErrorFunction<ReferenceError>(
     name = "ReferenceError",
     prototype = JsObjectImpl("Error")
         .apply { setProto(errorFunction.prototype) },
@@ -50,7 +50,7 @@ internal class JSReferenceErrorFunction(errorFunction: JSErrorFunction) : JSErro
     init { setProto(errorFunction) }
 }
 
-internal class JSSyntaxErrorFunction(errorFunction: JSErrorFunction) : JSErrorFunction(
+internal class JSSyntaxErrorFunction(errorFunction: JSErrorFunction<*>) : JSErrorFunction<SyntaxError>(
     name = "SyntaxError",
     prototype = JsObjectImpl("Error")
         .apply { setProto(errorFunction.prototype) },

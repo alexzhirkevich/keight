@@ -71,7 +71,7 @@ internal class JSNumberFunction : JSFunction(
             val digits = args.argOrElse(0) { return@func value.js }
             value.toDouble().roundTo(toNumber(digits).toInt() - 1).js
         }
-        ToString.js.func("radix" defaults OpConstant(10.js)) { args ->
+        Constants.toString.js.func("radix" defaults OpConstant(10.js)) { args ->
 
             val radix = if (args.isEmpty())
                 10
@@ -82,7 +82,7 @@ internal class JSNumberFunction : JSFunction(
                 else -> number.toString().js
             }
         }
-        ValueOf.js.func {
+        Constants.valueOf.js.func {
             when (val t = thisRef) {
                 is JsNumberWrapper -> t.value.js
                 is JsNumberObject -> t.value.js
@@ -121,42 +121,42 @@ internal class JSNumberFunction : JSFunction(
         )
         defineOwnProperty(
             "MAX_VALUE".js,
-            JsNumberWrapper(Double.MAX_VALUE),
+            Double.MAX_VALUE.js,
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
             "MIN_VALUE".js,
-            JsNumberWrapper(Double.MIN_VALUE),
+            Double.MIN_VALUE.js,
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
             "MIN_SAFE_INTEGER".js,
-            JsNumberWrapper(Long.MIN_VALUE),
+            Long.MIN_VALUE.js,
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
             "NaN".js,
-            JsNumberWrapper(Double.NaN),
+            Double.NaN.js,
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
             "NEGATIVE_INFINITY".js,
-            JsNumberWrapper(Double.NEGATIVE_INFINITY),
+            Double.NEGATIVE_INFINITY.js,
             writable = false,
             configurable = false,
             enumerable = false
         )
         defineOwnProperty(
             "POSITIVE_INFINITY".js,
-            JsNumberWrapper(Double.POSITIVE_INFINITY),
+            Double.POSITIVE_INFINITY.js,
             writable = false,
             configurable = false,
             enumerable = false
@@ -231,4 +231,16 @@ private fun Double.roundTo(digit : Int) : Double {
 
     val pow = pow10[digit-1] ?: return this
     return ((this * pow).roundToInt() / pow)
+}
+
+internal fun Number.sameValueZero(other : Number) : Boolean {
+    if (this is Double && isNaN() && other is Double && other.isNaN()){
+        return true
+    }
+
+    if (this == 0.0 && other == -0.0 || this == -0.0 && other == 0.0){
+        return true
+    }
+
+    return this == other || toDouble() == other.toDouble()
 }

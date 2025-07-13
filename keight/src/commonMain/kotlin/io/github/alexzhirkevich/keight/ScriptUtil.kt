@@ -1,8 +1,15 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.js.JSBooleanWrapper
 import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.JsObject
+import io.github.alexzhirkevich.keight.js.JsSymbol
 import io.github.alexzhirkevich.keight.js.Undefined
+import io.github.alexzhirkevich.keight.js.isNumber
+import io.github.alexzhirkevich.keight.js.isString
 import io.github.alexzhirkevich.keight.js.js
+import io.github.alexzhirkevich.keight.js.sameValueZero
+import io.github.alexzhirkevich.keight.js.unsafeToNumber
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
@@ -18,6 +25,62 @@ internal fun Delegate(
 ) = Expression {
     op(it, a(it))
 }
+
+internal object Uninitialized : JsAny by Undefined
+
+internal suspend fun JsAny?.sameValue(other : JsAny?) : Boolean {
+    if (!sameType(other)){
+        return false
+    }
+
+    if (this?.isNumber() == true){
+        checkNotNull(other)
+        unsafeToNumber().sameValueZero(other.unsafeToNumber())
+    }
+
+    return sameValueNotNumber(other)
+}
+
+internal suspend fun JsAny?.sameValueNotNumber(other : JsAny?) : Boolean {
+
+    check(sameValue(other))
+
+    if (this == null || this is Undefined){
+        return true
+    }
+
+    if (isString()){
+        return this == other
+    }
+
+    if (this is JSBooleanWrapper){
+        return this == other
+    }
+
+    return this === other
+}
+
+
+internal suspend fun JsAny?.sameType(other : JsAny?) : Boolean {
+
+    return when {
+        this is Undefined && other is Undefined -> true
+        this == null && other == null -> true
+        this is JSBooleanWrapper && other is JSBooleanWrapper -> true
+        this?.isNumber() == true && other?.isNumber() == true -> true
+        this is JsSymbol && other is JsSymbol -> true
+        this?.isString() == true && other?.isString() == true -> true
+        this is JsObject && other is JsObject -> true
+
+        else -> false
+    }
+}
+
+
+
+internal fun JsAny.callableOrNull() : Callable? = this as? Callable
+internal suspend fun JsAny?.callableOrThrow(runtime: ScriptRuntime) : Callable =
+    this?.callableOrNull() ?: runtime.typeError("$this is not a function".js)
 
 internal fun <T : Any?> checkNotEmpty(value : T?) : T {
     check(value != null && value != Unit){

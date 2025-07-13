@@ -75,15 +75,15 @@ internal class JSDateFunction : JSFunction(
         "toUTCString".js.func { thisDateWrapper.utc().toString().js }
         "toJSON".js.func { thisDate.toString().js }
 
-        JsSymbol.toPrimitive.func("hint" defaults OpConstant("default".js)) {
+        JsSymbol.toPrimitive.func("hint" defaults OpConstant(Constants.default.js)) {
             when (val t = it.getOrNull(0)?.toKotlin(this)) {
-                "string", "default" -> thisDate.toString().js
-                "number" -> thisDateWrapper.toInstant().toEpochMilliseconds().js
+                Constants.string, Constants.default -> thisDate.toString().js
+                Constants.number -> thisDateWrapper.toInstant().toEpochMilliseconds().js
                 else -> typeError { "Invalid hint: $t".js }
             }
         }
 
-        ValueOf.js.func { thisDateWrapper.toInstant().toEpochMilliseconds().js }
+        Constants.valueOf.js.func { thisDateWrapper.toInstant().toEpochMilliseconds().js }
     },
     properties = listOf(
         "now".func {

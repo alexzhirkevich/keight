@@ -55,6 +55,7 @@ internal value class JsStringWrapper(
     override fun toKotlin(runtime: ScriptRuntime): Any = value
 }
 
-
-
+internal fun JsAny.isString() : Boolean {
+    return this is JsStringWrapper || this is JSStringFunction
+}
 

@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.es.abstract.esToNumber
 import io.github.alexzhirkevich.keight.expressions.JSErrorFunction
 import io.github.alexzhirkevich.keight.expressions.JSReferenceErrorFunction
 import io.github.alexzhirkevich.keight.expressions.JSSyntaxErrorFunction
@@ -16,6 +17,7 @@ import io.github.alexzhirkevich.keight.js.JSON
 import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JSObjectFunction
 import io.github.alexzhirkevich.keight.js.JSPromiseFunction
+import io.github.alexzhirkevich.keight.js.JSPropertyImpl
 import io.github.alexzhirkevich.keight.js.JSRegExpFunction
 import io.github.alexzhirkevich.keight.js.JsPropertyAccessor
 import io.github.alexzhirkevich.keight.js.JSSetFunction
@@ -25,10 +27,16 @@ import io.github.alexzhirkevich.keight.js.JSSymbolFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsConsole
 import io.github.alexzhirkevich.keight.js.JsNumberWrapper
+import io.github.alexzhirkevich.keight.js.JsProperty
 import io.github.alexzhirkevich.keight.js.OpArgOmitted
+import io.github.alexzhirkevich.keight.es.abstract.esToPrimitive
+import io.github.alexzhirkevich.keight.es.abstract.esToString
+import io.github.alexzhirkevich.keight.js.Constants
+import io.github.alexzhirkevich.keight.js.JSError
+import io.github.alexzhirkevich.keight.js.JsObjectImpl
+import io.github.alexzhirkevich.keight.js.ReferenceError
+import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.Undefined
-import io.github.alexzhirkevich.keight.js.Uninitialized
-import io.github.alexzhirkevich.keight.js.ValueOf
 import io.github.alexzhirkevich.keight.js.argOrElse
 import io.github.alexzhirkevich.keight.js.defaults
 import io.github.alexzhirkevich.keight.js.func
@@ -56,6 +64,9 @@ public open class JSRuntime(
     public var console: Console = DefaultConsole,
 ) : DefaultRuntime() {
 
+    override val parent: ScriptRuntime?
+        get() = null
+
     override val coroutineContext: CoroutineContext =
         context + SupervisorJob(context[Job]) + CoroutineName("JS coroutine")
 
@@ -69,7 +80,7 @@ public open class JSRuntime(
     internal lateinit var Boolean: JSBooleanFunction
     internal lateinit var Promise: JSPromiseFunction
     internal lateinit var Symbol: JSSymbolFunction
-    internal lateinit var Error: JSErrorFunction
+    internal lateinit var Error: JSErrorFunction<*>
     internal lateinit var TypeError: JSTypeErrorFunction
     internal lateinit var ReferenceError: JSReferenceErrorFunction
     internal lateinit var SyntaxError: JSSyntaxErrorFunction
@@ -109,7 +120,7 @@ public open class JSRuntime(
         Boolean = JSBooleanFunction()
         Promise = JSPromiseFunction()
         Symbol = JSSymbolFunction()
-        Error = JSErrorFunction()
+        Error = JSErrorFunction { JSError(it) }
         TypeError = JSTypeErrorFunction(Error)
         ReferenceError = JSReferenceErrorFunction(Error)
         SyntaxError = JSSyntaxErrorFunction(Error)
@@ -159,7 +170,7 @@ public open class JSRuntime(
 
         variables["eval".js] = null to "eval".func("script" defaults OpArgOmitted) {
             val script = it.argOrElse(0) { return@func Undefined }?.toKotlin(this).toString()
-            JavaScriptEngine(this).compile(script).invoke(this)
+            JavaScriptEngine(this@JSRuntime).compile(script).invoke(this)
         }
     }
 
@@ -172,11 +183,22 @@ public open class JSRuntime(
         }
     }
 
-//    final override suspend fun get(property: Any?): Any? {
-//        return if (contains(property)) {
-//            super.get(property)
-//        } else thisRef.get(property, this)
-//    }
+    override fun fromKotlin(value: Any): JsAny {
+        return when (value) {
+            is Unit -> Undefined
+            is Number -> value.js
+            is CharSequence -> value.js
+            is Boolean -> value.js
+            is List<*> -> value.map { it?.let(::fromKotlin) }.js
+            is Set<*> -> value.mapTo(mutableSetOf()) { it?.let(::fromKotlin) }.js
+            is Map<*, *> -> value.map { it.key?.let(::fromKotlin) to it.value?.let(::fromKotlin) }.toMap().js
+            is Iterator<*> -> iterator { value.forEach { yield(it?.let(::fromKotlin)) } }.js
+            is Job -> value.js
+            is Regex -> value.js
+            is Throwable -> value.js ?: Undefined
+            else -> throw IllegalArgumentException("Can't cast $value to JS type")
+        }
+    }
 
     override suspend fun isFalse(a: Any?): Boolean {
         return a == null
@@ -187,6 +209,18 @@ public open class JSRuntime(
                 || a is CharSequence && a.isEmpty()
                 || a is Number && a.toDouble().let { it == 0.0 || it.isNaN() }
                 || (a as? Wrapper<*>)?.value?.let { isFalse(it) } == true
+    }
+
+    override fun makeObject(properties: Map<JsAny?, JsAny?>): JsObject {
+        return JsObjectImpl(properties = properties)
+    }
+
+    override suspend fun referenceError(message: JsAny?): Nothing {
+        throw ReferenceError.construct(message.listOf(), this) as ReferenceError
+    }
+
+    override suspend fun typeError(message: JsAny?): Nothing {
+        throw TypeError.construct(message.listOf(), this) as TypeError
     }
 
     override suspend fun isComparable(a: JsAny?, b: JsAny?): Boolean {
@@ -224,18 +258,18 @@ public open class JSRuntime(
         var tb: Any? = b
 
         if (ta is JsObject) {
-            ta = a.ToPrimitive()
+            ta = a.esToPrimitive(runtime = this)
         }
         if (tb is JsObject) {
-            tb = b.ToPrimitive()
+            tb = b.esToPrimitive(runtime = this)
         }
 
         if (ta is CharSequence || tb is CharSequence) {
-            return (ta.ToString() + tb.ToString()).js
+            return (ta.esToString(this) + tb.esToString(this)).js
         }
 
-        val na = ta.ToNumber()
-        val nb = tb.ToNumber()
+        val na = ta.esToNumber(this)
+        val nb = tb.esToNumber(this)
 
         return when {
             na is Long && nb is Long -> (na + nb).js
@@ -276,7 +310,7 @@ public open class JSRuntime(
     }
 
     override suspend fun toNumber(value: JsAny?): Number {
-        return value.ToNumber()
+        return value.esToNumber(this)
     }
 
     override suspend fun toString(value: JsAny?): String {
@@ -284,7 +318,7 @@ public open class JSRuntime(
             return Undefined.toString()
         }
         
-        return value?.get(io.github.alexzhirkevich.keight.js.ToString.js, this)
+        return value?.get(Constants.toString.js, this)
             ?.callableOrNull()
             ?.call(value, emptyList(), this)
             ?.toString()
@@ -350,92 +384,13 @@ public open class JSRuntime(
 
         is Wrapper<*> -> value.numberOrNull(withNaNs,throwForObjects)
         is JsObject ->  if (withNaNs) {
-            toPrimitive("number".js, throwForObjects)?.numberOrNull(withNaNs, throwForObjects)
+            toPrimitive(Constants.number.js)?.numberOrNull(withNaNs, throwForObjects)
         } else {
             null
         }
         else -> null
     }
 
-    /**
-     * 7.1.4
-     *
-     * [ToNumber (argument)](https://tc39.es/ecma262/#sec-tonumber)
-     *
-     * The abstract operation ToNumber takes argument argument (an ECMAScript language value) and
-     * returns either a normal completion containing a Number or a throw completion. It converts
-     * argument to a value of type Number.
-     *
-     * It performs the following steps when called:
-     *
-     * 1. If argument is a Number, return argument.
-     * 2. If argument is either a Symbol or a BigInt, throw a TypeError exception.
-     * 3. If argument is undefined, return NaN.
-     * 4. If argument is either null or false, return +0𝔽.
-     * 5. If argument is true, return 1𝔽.
-     * 6. If argument is a String, return StringToNumber(argument).
-     * 7. Assert: argument is an Object.
-     * 8. Let primValue be ? ToPrimitive(argument, number).
-     * 9. Assert: primValue is not an Object.
-     * 10. Return ? ToNumber(primValue).
-     * */
-    internal tailrec suspend fun Any?.ToNumber() : Number {
-        return when(this) {
-            is Wrapper<*> -> value.ToNumber()
-            is Byte -> toLong()
-            is UByte -> toLong()
-            is Short -> toLong()
-            is UShort -> toLong()
-            is Int -> toLong()
-            is UInt -> toLong()
-            is ULong -> toLong()
-            is Float -> toDouble()
-            is Long -> this
-            is Double -> this
-            is JsSymbol -> typeError { "Symbol cannot be converted to a number".js }
-            is Unit, is Undefined -> return Double.NaN
-            null, false -> +0L
-            true -> 1L
-            is CharSequence -> StringToNumber()
-            is JsAny -> ToPrimitive(S_NUMBER).ToNumber()
-            else -> Double.NaN
-        }
-    }
-
-    /**
-     * 7.1.4.1.1
-     *
-     * [StringToNumber (str)](https://tc39.es/ecma262/#sec-stringtonumber)
-     *
-     * The abstract operation StringToNumber takes argument str (a String) and returns a Number.
-     *
-     * It performs the following steps when called:
-     *
-     * 1. Let literal be ParseText(str, StringNumericLiteral).
-     * 2. If literal is a List of errors, return NaN.
-     * 3. Return the StringNumericValue of literal.
-     *
-     * */
-    internal fun CharSequence.StringToNumber() : Number {
-        return if (isBlank()){
-            0L
-        } else {
-            val s = toString()
-                .trim()
-                .trimStart('\n', '+')
-                .trimEnd('\n')
-                .lowercase()
-
-            NumberFormat.entries.forEach {
-                val p = "0${it.prefix}"
-                if (it.prefix != null && s.startsWith(p)) {
-                    return s.removePrefix(p).toLong(it.radix)
-                }
-            }
-
-            s.toLongOrNull() ?: s.toDoubleOrNull() ?: Double.NaN
-        }
-    }
 
     /**
      * 11.1.6
@@ -459,136 +414,8 @@ public open class JSRuntime(
 
     }
 
-    /**
-     * 7.1.17
-     *
-     * [ToString (argument)](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-tostring)
-     *
-     * The abstract operation ToString takes argument argument (an ECMAScript language value) and
-     * returns either a normal completion containing a String or a throw completion. It converts
-     * argument to a value of type String.
-     *
-     * It performs the following steps when called:
-     *
-     * 1. If argument is a String, return argument.
-     * 2. If argument is a Symbol, throw a TypeError exception.
-     * 3. If argument is undefined, return "undefined".
-     * 4. If argument is null, return "null".
-     * 5. If argument is true, return "true".
-     * 6. If argument is false, return "false".
-     * 7. If argument is a Number, return Number::toString(argument, 10).
-     * 8. If argument is a BigInt, return BigInt::toString(argument, 10).
-     * 9. Assert: argument is an Object.
-     * 10. Let primValue be ? ToPrimitive(argument, string).
-     * 11. Assert: primValue is not an Object.
-     * 12. Return ? ToString(primValue).
-     * */
-    internal tailrec suspend fun Any?.ToString() : String {
-        return when(this){
-            is Wrapper<*> -> value.ToString()
-            is CharSequence -> toString()
-            is JsSymbol -> typeError { "Symbol cannot be converted to a string".js }
-            Unit -> "undefined"
-            null, true, false, Number -> toString()
-            is JsObject -> ToPrimitive(S_STRING).ToString()
-            else -> toString()
-        }
-    }
-
-    /**
-     * 7.1.1
-     *
-     * [ToPrimitive (input [,preferredType])]((https://tc39.es/ecma262/#sec-toprimitive))
-     *
-     * The abstract operation ToPrimitive takes argument input (an ECMAScript language value) and
-     * optional argument preferredType (string or number) and returns either a normal completion
-     * containing an ECMAScript language value or a throw completion. It converts its input argument
-     * to a non-Object type. If an object is capable of converting to more than one primitive type,
-     * it may use the optional hint preferredType to favour that type.
-     *
-     * It performs the following steps when called:
-     *
-     * 1. If input is an Object, then
-     *    a. Let exoticToPrim be ? GetMethod(input, %Symbol.toPrimitive%).
-     *    b. If exoticToPrim is not undefined, then
-     *       i. If preferredType is not present, then
-     *          1. Let hint be "default".
-     *       ii. Else if preferredType is string, then
-     *           1. Let hint be "string".
-     *       iii. Else,
-     *            1. Assert: preferredType is number.
-     *            2. Let hint be "number".
-     *       iv. Let result be ? Call(exoticToPrim, input, « hint »).
-     *       v. If result is not an Object, return result.
-     *       vi. Throw a TypeError exception.
-     *    c. If preferredType is not present, let preferredType be number.
-     *    d. Return ? OrdinaryToPrimitive(input, preferredType).
-     * 2. Return input.
-     */
-    internal tailrec suspend fun JsAny?.ToPrimitive(type: String? = S_DEFAULT) : JsAny? {
-
-        return when  {
-            this is JsObject -> {
-                val exoticToPrim = get(JsSymbol.toPrimitive, this@JSRuntime)?.callableOrNull()
-                if (exoticToPrim != null){
-                    val hint = type ?: S_DEFAULT
-                    val result = exoticToPrim.call(this, hint.js.listOf(), this@JSRuntime)
-                    typeCheck(result !is JsObject){ "Cannot convert object to primitive value".js }
-                    return result
-                }
-
-                return OrdinaryToPrimitive(type ?: S_NUMBER)
-            }
-             this is Wrapper<*> && value is JsAny -> (value as JsAny).ToPrimitive(type)
-            else -> this
-        }
-    }
-
-    /**
-     * 7.1.1.1
-     *
-     * [OrdinaryToPrimitive(O,hint)](https://tc39.es/ecma262/#sec-ordinarytoprimitive)
-     *
-     * The abstract operation OrdinaryToPrimitive takes arguments O (an Object) and hint (string or
-     * number) and returns either a normal completion containing an ECMAScript language value or a
-     * throw completion.
-     *
-     * It performs the following steps when called:
-     *
-     * 1. If hint is string, then
-     *    a. Let methodNames be « "toString", "valueOf" ».
-     * 2. Else,
-     *    a. Let methodNames be « "valueOf", "toString" ».
-     * 3. For each element name of methodNames, do
-     *    a. Let method be ? Get(O, name).
-     *    b. If IsCallable(method) is true, then
-     *       i. Let result be ? Call(method, O).
-     *       ii. If result is not an Object, return result.
-     * 4. Throw a TypeError exception.
-     * */
-    private suspend fun JsAny.OrdinaryToPrimitive(hint: String?) : JsAny? {
-        val methods = mutableListOf<JsAny?>(ValueOf.js, io.github.alexzhirkevich.keight.js.ToString.js)
-
-        if (hint == S_STRING)
-            methods.reverse()
-
-        for (m in methods) {
-            val callable = get(m, this@JSRuntime)
-                ?.callableOrNull() ?: continue
-            val res = callable.call(this, emptyList(), this@JSRuntime)
-            if (res !is JsObject){
-                return res
-            }
-        }
-
-        typeError {
-            "Cannot convert object to primitive value".js
-        }
-    }
-
     internal suspend fun JsAny.toPrimitive(
-        type : JsAny? = "default".js,
-        force : Boolean = false,
+        type : JsAny? = Constants.default.js,
         symbolOnly : Boolean = false,
     ) : JsAny? {
 
@@ -607,7 +434,7 @@ public open class JSRuntime(
                 typeError { "Symbol cannot be converted to a number".js }
             }
 
-            get(ValueOf.js, this@JSRuntime)?.callableOrNull()
+            get(Constants.valueOf.js, this@JSRuntime)?.callableOrNull()
                 ?.call(this, emptyList(), this@JSRuntime)
                 ?.takeIf { it !is JsObject }
                 ?.let { return it }
@@ -675,9 +502,24 @@ public open class JSRuntime(
 
 private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JsObject {
 
+    override suspend fun ownPropertyDescriptor(property: JsAny?): JsProperty? {
+
+        val r =  thisRef()
+
+        if (!r.contains(property))
+            return null
+
+        return JSPropertyImpl(
+            value = JsPropertyAccessor.Value(get(property, r)),
+            writable = true,
+            enumerable = true,
+            configurable = true
+        )
+    }
+
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
         return if (thisRef().contains(property)){
-            thisRef().get(property)?.get(runtime)
+            thisRef().get(property)
         } else {
             super.get(property, thisRef())
         }
@@ -691,7 +533,7 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JsObject {
         thisRef().set(property, value, null)
     }
 
-    override suspend fun defineOwnProperty(
+    override suspend fun setProperty(
         property: JsAny?,
         value: JsPropertyAccessor,
         runtime: ScriptRuntime,
@@ -837,7 +679,3 @@ private fun jspos(v : Any?) : JsAny {
         else -> Double.NaN
     }.js
 }
-
-private const val S_NUMBER = "number"
-private const val S_STRING = "string"
-private const val S_DEFAULT = "default"

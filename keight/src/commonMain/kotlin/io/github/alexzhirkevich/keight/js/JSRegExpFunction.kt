@@ -8,7 +8,7 @@ private val STRING_PARAM = "string" defaults OpArgOmitted
 internal class JSRegExpFunction : JSFunction(
     name = "RegExp",
     prototype = Object {
-        ToString.js.func {
+        Constants.toString.js.func {
             thisRef.toString().js
         }
         "exec".js.func(STRING_PARAM) {

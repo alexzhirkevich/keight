@@ -3,11 +3,6 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.get
 
-internal object Uninitialized : JsAny by Undefined
-
-internal const val ToString = "toString"
-internal const val ValueOf = "valueOf"
-
 public interface JsAny {
 
     public val type : String get() = "object"
@@ -24,7 +19,7 @@ public interface JsAny {
 
     public suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
 
-        if (property == PROTO){
+        if (property == runtime.fromKotlin("__proto__")){
             return proto(runtime)?.get(runtime)
         }
 
@@ -42,7 +37,7 @@ public interface JsAny {
     public fun toKotlin(runtime: ScriptRuntime): Any = this
 }
 
-internal suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime) : Boolean {
+public suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime) : Boolean {
     return isPrototypeOf(obj, runtime, true)
 }
 
@@ -56,5 +51,3 @@ private suspend fun JsAny.isPrototypeOf(obj : Any?, runtime: ScriptRuntime, isFi
         }
     }
 }
-
-

@@ -9,14 +9,14 @@ import kotlin.math.*
 import kotlin.random.Random
 
 internal fun JSMath() : JsObject = Object("Math") {
-    "PI".js.eq(JsNumberWrapper(PI), writable = false, configurable = false)
-    "E".js.eq(JsNumberWrapper(E), writable = false, configurable = false)
-    "LN10".js.eq(JsNumberWrapper(2.302585092994046), writable = false, configurable = false)
-    "LN2".js.eq(JsNumberWrapper(0.6931471805599453), writable = false, configurable = false)
-    "LOG10E".js.eq(JsNumberWrapper(0.4342944819032518), writable = false, configurable = false)
-    "LOG2E".js.eq(JsNumberWrapper(1.4426950408889634), writable = false, configurable = false)
-    "SQRT1_2".js.eq(JsNumberWrapper(0.7071067811865476), writable = false, configurable = false)
-    "SQRT2".js.eq(JsNumberWrapper(1.4142135623730951), writable = false, configurable = false)
+    "PI".js.eq(JsNumberWrapper(PI), enumerable = true, writable = false, configurable = false)
+    "E".js.eq(JsNumberWrapper(E), enumerable = true, writable = false, configurable = false)
+    "LN10".js.eq(2.302585092994046.js, enumerable = true, writable = false, configurable = false)
+    "LN2".js.eq(0.6931471805599453.js, enumerable = true, writable = false, configurable = false)
+    "LOG10E".js.eq(0.4342944819032518.js, enumerable = true, writable = false, configurable = false)
+    "LOG2E".js.eq(1.4426950408889634.js, enumerable = true, writable = false, configurable = false)
+    "SQRT1_2".js.eq(0.7071067811865476.js,enumerable = true, writable = false, configurable = false)
+    "SQRT2".js.eq(1.4142135623730951.js, enumerable = true, writable = false, configurable = false)
 
     "abs".js.func("x") { op1(it, ::acos) }
     "asoc".js.func("x") { op1(it, ::acos) }

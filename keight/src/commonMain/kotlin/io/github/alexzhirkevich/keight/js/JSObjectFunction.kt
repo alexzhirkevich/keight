@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.callableOrNull
+import io.github.alexzhirkevich.keight.es.abstract.esToPropertyKey
 import io.github.alexzhirkevich.keight.expressions.OpEqualsImpl
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.fastMap
@@ -23,7 +24,7 @@ internal class JSObjectFunction : JSFunction(
     },
     prototype = JsObjectImpl(
         properties = listOf(
-            ToString.func { thisRef.toString().js },
+            Constants.toString.func { thisRef.toString().js },
             "isPrototypeOf".func("object") {
                 (thisRef?.isPrototypeOf(it[0],this) == true).js
             },
@@ -106,13 +107,14 @@ internal class JSObjectFunction : JSFunction(
                 "$obj is not a object".js
             }
 
-            val name = args.getOrElse(1) {
+            val key = args.getOrElse(1) {
                 return@func Undefined
-            }
+            }?.esToPropertyKey(this)
 
-            val prop = args.getOrNull(2) as? JsObject ?: return@func Undefined
 
-            obj.define(this, name, prop)
+            val desc = args.getOrNull(2) ?: return@func Undefined
+
+            obj.defineOwnPropertyOrThrow(key, desc, this)
             obj
         },
 
@@ -247,31 +249,37 @@ private suspend fun ScriptRuntime.constructObject(param : Any?) : JsObjectImpl {
     }
 }
 
-private suspend fun JsObject.define(runtime: ScriptRuntime, name : JsAny?, property : JsAny) {
+private suspend fun JsObject. define(runtime: ScriptRuntime, name : JsAny?, property : JsAny) {
     val p = when {
-        property.contains("value".js, runtime) ->
-            JsPropertyAccessor.Value(property.get("value".js, runtime))
+        property.contains(Constants.get.js, runtime) ||
+                property.contains(Constants.set.js, runtime) ->
+            JsPropertyAccessor.BackedField(
+                property.get(Constants.get.js, runtime)?.callableOrNull(),
+                property.get(Constants.set.js, runtime)?.callableOrNull()
+            )
 
-        property.contains("get".js, runtime) -> JsPropertyAccessor.BackedField(
-            property.get("get".js, runtime)?.callableOrNull(),
-            property.get("set".js, runtime)?.callableOrNull()
-        )
-
-        else -> JsPropertyAccessor.Value(get(name, runtime))
+        else -> JsPropertyAccessor.Value(property.get(Constants.value.js, runtime))
     }
 
-    defineOwnProperty(
+    val writable = when {
+        property.contains(Constants.writable.js, runtime) ->
+            !runtime.isFalse(property.get(Constants.writable.js, runtime))
+
+        property.contains("set".js, runtime) -> null
+
+        else -> false
+    }
+
+    setProperty(
         property = name,
         value = p,
         runtime = runtime,
-        enumerable = if (property.contains("enumerable".js, runtime)) {
-            !runtime.isFalse(property.get("enumerable".js, runtime))
-        } else null,
-        configurable = if (property.contains("configurable".js, runtime)) {
-            !runtime.isFalse(property.get("configurable".js, runtime))
-        } else null,
-        writable = if (property.contains("writable".js, runtime)) {
-            !runtime.isFalse(property.get("writable".js, runtime))
-        } else null,
+        enumerable = if (property.contains(Constants.enumerable.js, runtime)) {
+            !runtime.isFalse(property.get(Constants.enumerable.js, runtime))
+        } else false,
+        configurable = if (property.contains(Constants.configurable.js, runtime)) {
+            !runtime.isFalse(property.get(Constants.configurable.js, runtime))
+        } else false,
+        writable = writable,
     )
 }

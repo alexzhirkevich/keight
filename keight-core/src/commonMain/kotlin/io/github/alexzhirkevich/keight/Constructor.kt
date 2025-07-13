@@ -1,7 +1,6 @@
 package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.js.JsAny
-import io.github.alexzhirkevich.keight.js.PROTOTYPE
 import io.github.alexzhirkevich.keight.js.isPrototypeOf
 
 public interface Constructor : Callable {
@@ -13,6 +12,7 @@ public interface Constructor : Callable {
     }
 
     public suspend fun isInstance(obj: JsAny?, runtime: ScriptRuntime): Boolean {
-        return get(PROTOTYPE, runtime)?.isPrototypeOf(obj, runtime) == true
+        return get(runtime.fromKotlin("prototype"), runtime)
+            ?.isPrototypeOf(obj, runtime) == true
     }
 }

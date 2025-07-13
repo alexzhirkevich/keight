@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.Uninitialized
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.expressions.OpCompare
@@ -18,7 +19,7 @@ private val COUNT = "count" defaults OpConstant(0.js)
 internal class JSIteratorFunction : JSFunction(
     name = "Iterator",
     prototype = Object("Iterator Prototype") {
-        NEXT.js.func {
+        Constants.next.js.func {
             val value = thisRef<Iterator<JsAny?>>()
             if (value.hasNext()) {
                 IteratorEntry(value.next())
@@ -94,12 +95,12 @@ internal class JSIteratorFunction : JSFunction(
 }
 
 internal fun IteratorDone() = Object {
-    DONE.js eq true.js
+    Constants.done.js eq true.js
 }
 
 internal fun IteratorEntry(value : JsAny?) = Object {
-    VALUE.js eq value
-    DONE.js eq false.js
+    Constants.value.js eq value
+    Constants.done.js eq false.js
 }
 
 internal suspend fun ScriptRuntime.helperIterator(
@@ -107,24 +108,24 @@ internal suspend fun ScriptRuntime.helperIterator(
 ): JsObject {
     var i = -1
 
-    return Object { NEXT.js.func { next(this, ++i) } }.also {
+    return Object { Constants.next.js.func { next(this, ++i) } }.also {
         it.setProto(this, findJsRoot().Iterator.get(PROTOTYPE, this))
     }
 }
 
 internal suspend fun JsAny.next(runtime: ScriptRuntime) : JsAny {
-    return get(NEXT.js, runtime)
+    return get(Constants.next.js, runtime)
         .callableOrThrow(runtime)
         .call(this, emptyList(), runtime)
         ?: Undefined
 }
 
 internal suspend inline fun JsAny.value(runtime: ScriptRuntime) : JsAny? {
-    return get(VALUE.js, runtime)
+    return get(Constants.value.js, runtime)
 }
 
 private suspend inline fun JsAny.done(runtime: ScriptRuntime) : Boolean {
-    return contains(DONE.js, runtime) && !runtime.isFalse(get(DONE.js, runtime))
+    return contains(Constants.done.js, runtime) && !runtime.isFalse(get(Constants.done.js, runtime))
 }
 
 internal suspend fun JsAny.isIterator(runtime: ScriptRuntime) : Boolean {
@@ -137,7 +138,7 @@ internal suspend inline fun JsAny.forEach(runtime: ScriptRuntime, block : (JsAny
     when {
         this is Iterator<*> -> forEach { block(it as JsAny?) }
         this is Iterable<*> -> forEach { block(it as JsAny?) }
-        isIterator(runtime) || contains(NEXT.js, runtime) -> while (true) {
+        isIterator(runtime) || contains(Constants.next.js, runtime) -> while (true) {
             val next = next(runtime)
             if (next.done(runtime)) {
                 break
@@ -184,11 +185,11 @@ private suspend inline fun JsAny.map(runtime: ScriptRuntime, block : Callable) :
         val n = next(this)
         val done = n.done(this)
         Object {
-            VALUE.js eq if (done) Undefined else block.invoke(
+            Constants.value.js eq if (done) Undefined else block.invoke(
                 listOf(n.value(this@helperIterator), (++i).js),
                 this@helperIterator
             )
-            DONE.js eq done.js
+            Constants.done.js eq done.js
         }
     }
 }
@@ -259,8 +260,8 @@ private suspend inline fun JsAny.filter(runtime: ScriptRuntime, block : Callable
         } while (!done)
 
         Object {
-            VALUE.js eq res
-            DONE.js eq done.js
+            Constants.value.js eq res
+            Constants.done.js eq done.js
         }
     }
 }

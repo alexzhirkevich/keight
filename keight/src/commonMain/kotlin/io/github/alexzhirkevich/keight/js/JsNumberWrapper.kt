@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findJsRoot
+import kotlin.jvm.JvmInline
 
 internal class JsNumberObject(
     val number: JsNumberWrapper
@@ -39,4 +40,16 @@ internal value class JsNumberWrapper(
     }
 
     override fun toKotlin(runtime: ScriptRuntime): Any = value
+}
+
+internal fun JsAny.isNumber() : Boolean {
+    return this is JsNumberWrapper || this is JsNumberObject
+}
+
+internal fun JsAny.unsafeToNumber() : Number {
+    return when(this){
+        is JsNumberWrapper -> value
+        is JsNumberObject -> number.unsafeToNumber()
+        else -> error("$this is not a number")
+    }
 }

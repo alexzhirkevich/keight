@@ -7,9 +7,7 @@ import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
-internal const val NEXT = "next"
-internal const val VALUE = "value"
-internal const val DONE = "done"
+
 
 @JvmInline
 internal value class JSIteratorWrapper(
