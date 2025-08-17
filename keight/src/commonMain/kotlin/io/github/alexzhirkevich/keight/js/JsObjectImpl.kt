@@ -82,10 +82,7 @@ internal class ObjectMap<V>(
     }
 
     private fun mapKey(key: JsAny?) : JsAny? {
-        return when (key) {
-//            is Wrapper<*> -> key.unwrap()
-            else -> key
-        }
+        return key
     }
 }
 
@@ -145,7 +142,8 @@ public open class JsObjectImpl(
     override suspend fun values(runtime: ScriptRuntime): List<JsAny?> {
         return map
             .filter { it.value.enumerable != false }
-            .values.map { it.value.get(runtime) }
+            .values
+            .map { it.value.get(runtime) }
     }
 
     override suspend fun entries(runtime: ScriptRuntime): List<List<JsAny?>> {

@@ -51,6 +51,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -88,6 +89,9 @@ public open class JSRuntime(
     internal lateinit var Iterator: JSIteratorFunction
     internal lateinit var RegExp: JSRegExpFunction
 
+    private val mModules = mutableMapOf<String, Module>()
+    internal val modules : Map<String, Module> = mModules
+
     private var jobsCounter = 1L
     private val jobsMap = mutableMapOf<Long, Job>()
 
@@ -102,11 +106,15 @@ public open class JSRuntime(
      * */
     override fun reset() {
         super.reset()
-        init()
-
         coroutineContext.cancelChildren()
         jobsMap.clear()
         jobsCounter = 1
+        init()
+        modules.forEach { it.value.runtime.reset() }
+    }
+
+    internal fun addModule(name : String, module: Module) {
+        mModules[name] = module
     }
 
     private fun init() {
@@ -150,11 +158,12 @@ public open class JSRuntime(
             variables[it.name.js] = VariableType.Global to it
         }
 
-        variables["globalThis".js] = null to thisRef
 
         variables["Infinity".js] = null to JsNumberWrapper(Double.POSITIVE_INFINITY)
         variables["NaN".js] = null to JsNumberWrapper(Double.NaN)
         variables["undefined".js] = null to Undefined
+
+        variables["globalThis".js] = null to thisRef
         variables["console".js] = null to JsConsole(::console)
         variables["Math".js] = null to JSMath()
         variables["JSON".js] = null to JSON()
@@ -163,14 +172,32 @@ public open class JSRuntime(
             variables[it.name.js] = null to it
         }
 
-        regSetTimeout()
-        regSetInterval()
+        variables["setTimeout".js] = null to "setTimeout".func("handler", "timeout") {
+            findJsRoot().registerJob(it) { handler, timeout ->
+                delay(timeout)
+                handler.invoke(emptyList(), this@func)
+            }
+        }
+        variables["setInterval".js] = null to "setInterval".func("handler", "interval") {
+            findJsRoot().registerJob(it) { handler, timeout ->
+                while (currentCoroutineContext().isActive) {
+                    delay(timeout)
+                    handler.invoke(emptyList(), this@func)
+                }
+            }
+        }
         regClearJob("Timeout")
         regClearJob("Interval")
 
         variables["eval".js] = null to "eval".func("script" defaults OpArgOmitted) {
             val script = it.argOrElse(0) { return@func Undefined }?.toKotlin(this).toString()
-            JavaScriptEngine(this@JSRuntime).compile(script).invoke(this)
+            JSEngine(this@JSRuntime).compile(script).invoke(this)
+        }
+
+        variables["require".js] = null to "require".func("module"){
+            val module = modules[toString(it[0])]
+            module?.invokeIfNeeded()
+            module?.runtime?.exports ?: Undefined
         }
     }
 
@@ -179,7 +206,7 @@ public open class JSRuntime(
             "Infinity".js -> Double.POSITIVE_INFINITY.js
             "NaN".js -> Double.NaN.js
             "undefined".js -> Undefined
-            else -> super.get(property)
+            else -> super.get(property)?.unpack(this)
         }
     }
 
@@ -243,14 +270,28 @@ public open class JSRuntime(
 
     override suspend fun compare(a: JsAny?, b: JsAny?): Int {
 
-        val ka = a?.toKotlin(this)
-        val kb = b?.toKotlin(this)
+//        if (a is CharSequence && b is CharSequence){
+//            return a.toString().compareTo(b.toString())
+//        }
 
-        return if (ka is Number || kb is Number) {
-            toNumber(a).toDouble().compareTo(toNumber(b).toDouble())
-        } else {
-            ka.toString().compareTo(kb.toString())
+        val pa = a?.toPrimitive(type = Constants.number.js) ?: a
+        val pb = b?.toPrimitive(type = Constants.number.js) ?: b
+
+//        println(a!!::class)
+//        println(b!!::class)
+
+        if (pa is CharSequence && pb is CharSequence){
+            return pa.toString().compareTo(pb.toString())
         }
+
+        val na = a.esToNumber(this).toDouble()
+        val nb = b.esToNumber(this).toDouble()
+
+        return when {
+            na.isNaN() || nb.isNaN() -> 0
+            else -> na.compareTo(nb)
+        }
+
     }
 
     override suspend fun sum(a: JsAny?, b: JsAny?): JsAny? {
@@ -290,7 +331,7 @@ public open class JSRuntime(
     }
 
     override suspend fun mod(a: JsAny?, b: JsAny?): JsAny? {
-        return jsmod(a?.numberOrThis(), b?.numberOrThis(throwForObjects = true))
+        return jsmod(a?.numberOrThis(), b?.numberOrThis())
     }
 
     override suspend fun inc(a: JsAny?): JsAny? {
@@ -331,12 +372,10 @@ public open class JSRuntime(
 
     private suspend fun JsAny.numberOrThis(
         withMagic : Boolean = true,
-        throwForObjects : Boolean = false
-    ) : Any = numberOrNull(withMagic, throwForObjects) ?: this
+    ) : Any = numberOrNull(withMagic) ?: this
 
     private tailrec suspend fun Any?.numberOrNull(
         withNaNs : Boolean = true,
-        throwForObjects : Boolean = false
     ) : Number? = when(this) {
         is Undefined -> null
         null -> 0L
@@ -376,15 +415,15 @@ public open class JSRuntime(
         is Double -> this
         is List<*> -> {
             if (withNaNs) {
-                singleOrNull()?.numberOrNull(withNaNs,throwForObjects)
+                singleOrNull()?.numberOrNull(withNaNs)
             } else {
                 null
             }
         }
 
-        is Wrapper<*> -> value.numberOrNull(withNaNs,throwForObjects)
+        is Wrapper<*> -> value.numberOrNull(withNaNs)
         is JsObject ->  if (withNaNs) {
-            toPrimitive(Constants.number.js)?.numberOrNull(withNaNs, throwForObjects)
+            toPrimitive(Constants.number.js)?.numberOrNull(withNaNs)
         } else {
             null
         }
@@ -392,32 +431,14 @@ public open class JSRuntime(
     }
 
 
-    /**
-     * 11.1.6
-     *
-     * [11.1.6 Static Semantics: ParseText ( sourceText, goalSymbol )](https://tc39.es/ecma262/#sec-parsetext)
-     *
-     * TThe abstract operation ParseText takes arguments sourceText (a String or a sequence of
-     * Unicode code points) and goalSymbol (a nonterminal in one of the ECMAScript grammars) and
-     * returns a Parse Node or a non-empty List of SyntaxError objects.
-     *
-     * It performs the following steps when called:
-     *
-     * 1. If sourceText is a String, set sourceText to StringToCodePoints(sourceText).
-     * 2. Attempt to parse sourceText using goalSymbol as the goal symbol, and analyse the parse
-     * result for any early error conditions. Parsing and early error detection may be interleaved
-     * in an implementation-defined manner.
-     * 3. If the parse succeeded and no early errors were found, return the Parse Node (an instance
-     * of goalSymbol) at the root of the parse tree resulting from the parse.
-     * */
-    internal fun CharSequence.ParseText(){
-
-    }
-
     internal suspend fun JsAny.toPrimitive(
         type : JsAny? = Constants.default.js,
         symbolOnly : Boolean = false,
     ) : JsAny? {
+
+        if (this is Undefined) {
+            return if (type == Constants.number.js) 0.js else toString().js
+        }
 
         get(JsSymbol.toPrimitive, this@JSRuntime)
             ?.callableOrNull()
@@ -434,16 +455,26 @@ public open class JSRuntime(
                 typeError { "Symbol cannot be converted to a number".js }
             }
 
-            get(Constants.valueOf.js, this@JSRuntime)?.callableOrNull()
+            val valueOf = get(Constants.valueOf.js, this@JSRuntime)
+                ?.callableOrNull()
                 ?.call(this, emptyList(), this@JSRuntime)
-                ?.takeIf { it !is JsObject }
-                ?.let { return it }
 
+            if (valueOf != null && valueOf !is JsObject){
+                return valueOf
+            }
 
-            toString(this)
-                .toDoubleOrNull()
-                ?.takeUnless(Double::isNaN)
-                ?.let { return it.js  }
+            if (this !is CharSequence) {
+                toString(this)
+                    .toDoubleOrNull()
+                    ?.takeUnless(Double::isNaN)
+                    ?.let { return it.js }
+            } else {
+                this
+            }
+
+            typeCheck(valueOf !is JsObject){
+                "Cannot convert object to primitive value".js
+            }
 
             return null
         } else {
@@ -453,7 +484,7 @@ public open class JSRuntime(
 
     private suspend fun registerJob(
         args: List<JsAny?>,
-        block: suspend CoroutineScope.(Callable, Long) -> Unit
+        block: suspend CoroutineScope.(handler : Callable, timeout : Long) -> Unit
     ): JsAny {
         val jobId = jobsCounter++
 
@@ -471,28 +502,8 @@ public open class JSRuntime(
         return jobId.js
     }
 
-    private fun regSetTimeout() {
-        variables["setTimeout".js] = null to "setTimeout".func("handler", "timeout") {
-            findJsRoot().registerJob(it) { handler, timeout ->
-                delay(timeout)
-                handler.invoke(emptyList(), this@func)
-            }
-        }
-    }
-
-    private fun regSetInterval() {
-        variables["setInterval".js] = null to "setInterval".func("handler", "interval") {
-            findJsRoot().registerJob(it) { handler, timeout ->
-                while (isActive) {
-                    handler.invoke(emptyList(), this@func)
-                    delay(timeout)
-                }
-            }
-        }
-    }
-
     private fun regClearJob(what: String) {
-        variables[ "clear$what".js] =  null to  "clear$what".func("id") {
+        variables["clear$what".js] =  null to "clear$what".func("id") {
             val id = toNumber(it.getOrNull(0)).toLong()
             jobsMap[id]?.cancel()
             Undefined
@@ -558,15 +569,18 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JsObject {
         thisRef().delete(property, true)
         return true
     }
-
-
 }
+
+private tailrec suspend fun JsAny.unpack(runtime: ScriptRuntime) : JsAny? =
+    if (this is JsPropertyAccessor)
+        get(runtime)?.unpack(runtime)
+    else this
 
 internal fun ScriptRuntime.findJsRoot() : JSRuntime = findRoot() as JSRuntime
 
 private fun jssub(a : Any?, b : Any?) : JsAny? {
     return when {
-        a is Unit || b is Unit -> Double.NaN
+        a is Undefined || b is Undefined -> Double.NaN
         a is Number && b is Unit || a is Unit && b is Number -> Double.NaN
         a is Long? && b is Long? -> (a ?: 0L) - (b ?: 0L)
         a is Double? && b is Double? ->(a ?: 0.0) - (b ?: 0.0)
@@ -627,7 +641,9 @@ private fun jsdiv(a : Any?, b : Any?) : JsAny {
 
 private fun jsmod(a : Any?, b : Any?) : JsAny {
     return when {
-        b == null || a == Unit || b == Unit
+        b == null
+                || a == Undefined
+                || b == Undefined
                 || (b as? Number)?.toDouble()?.absoluteValue?.let { it < Double.MIN_VALUE } == true -> Double.NaN.js
         a == null -> 0.0.js
 //        a is Long && b is Long -> a % b

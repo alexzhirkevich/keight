@@ -125,16 +125,18 @@ internal class JSObjectFunction : JSFunction(
                 "$obj is not a object".js
             }
 
-            val props = args.getOrNull(1) as? JsObject ?: return@func Undefined
+            val props = args.getOrNull(1) as? JsObject
+                ?: return@func Undefined
 
-            props.keys(this).forEach { key ->
+            props.keys(this).forEach { k ->
+                val key = k?.esToPropertyKey(this)
                 val prop = props.get(key, this)
 
                 typeCheck(prop is JsAny){
                     "$key property of $obj is not an object".js
                 }
 
-                obj.define(this, key, prop)
+                obj.define(this, key,  prop)
             }
             obj
         },

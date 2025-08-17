@@ -42,8 +42,12 @@ class JavaxScriptEngineTest {
     @Test
     fun persistence(){
         val engine = engine()
-        engine.eval("var test = 'hello'")
-        engine.eval("test").assertEqualsTo("hello")
+        engine.eval("var test1 = 'hello1'")
+        engine.eval("let test2 = 'hello2'")
+        engine.eval("const test3 = 'hello3'")
+        engine.eval("test1").assertEqualsTo("hello1")
+        engine.eval("test2").assertEqualsTo("hello2")
+        engine.eval("test3").assertEqualsTo("hello3")
     }
 
     private fun engine() : ScriptEngine =

@@ -3,7 +3,6 @@ package io.github.alexzhirkevich.keight.js.interpreter
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Delegate
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.expressions.OpAssign
@@ -48,7 +47,6 @@ import io.github.alexzhirkevich.keight.expressions.asDestruction
 import io.github.alexzhirkevich.keight.fastAll
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.findJsRoot
-import io.github.alexzhirkevich.keight.findRoot
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
@@ -59,6 +57,7 @@ import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.Uninitialized
+import io.github.alexzhirkevich.keight.findModule
 import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
@@ -72,7 +71,6 @@ import kotlin.collections.ListIterator
 import kotlin.collections.associateBy
 import kotlin.collections.buildList
 import kotlin.collections.drop
-import kotlin.collections.dropLastWhile
 import kotlin.collections.emptyList
 import kotlin.collections.firstOrNull
 import kotlin.collections.fold
@@ -798,6 +796,8 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
         Token.Identifier.Keyword.Extends,
         Token.Identifier.Keyword.Finally,
         Token.Identifier.Keyword.Catch -> throw SyntaxError(unexpected(keyword.identifier))
+        Token.Identifier.Keyword.Import -> parseImport()
+        Token.Identifier.Keyword.Export -> parseExport()
 
     }
 }
@@ -1295,6 +1295,7 @@ private fun ListIterator<Token>.parseAwait(): Expression {
     val subject = parseStatement(blockType = ExpectedBlockType.Object)
 
     return Expression {
+
         if (!it.isSuspendAllowed) {
             throw JSError("Await is not allowed in current context")
         }
@@ -1404,8 +1405,128 @@ private fun ListIterator<Token>.parseFunction(
     )
 }
 
+private fun ListIterator<Token>.parseImport() : Expression {
+
+    val variables = if (eat(Token.Operator.Bracket.CurlyOpen)) {
+        buildList {
+            while (hasNext()) {
+                val n = nextSignificant()
+                syntaxCheck(n is Token.Identifier) {
+                    "Invalid import"
+                }
+                add(n.identifier)
+
+                val delim = nextSignificant()
+
+                if (delim is Token.Operator.Bracket.CurlyClose) {
+                    break
+                }
+
+                syntaxCheck(delim is Token.Operator.Comma) {
+                    "Invalid import"
+                }
+            }
+        }
+    } else {
+        val n = nextSignificant()
+        syntaxCheck(n is Token.Identifier) {
+            "Invalid import"
+        }
+        listOf(n.identifier)
+    }
+
+    val fromKeyword = nextSignificant()
+
+    syntaxCheck(fromKeyword is Token.Identifier && fromKeyword.identifier == "from") {
+        "Invalid import: 'from' was expected"
+    }
+
+    val moduleName = parseStatement(blockType = ExpectedBlockType.Block)
+
+    return Expression {
+        val root = it.findJsRoot()
+        val name = it.toString(moduleName(it))
+
+        val module = root.modules[name] ?: throw SyntaxError("Module with name '$name' not found")
+
+        module.invokeIfNeeded()
+
+        val exports = module.runtime.exports
+
+        variables.forEach { v ->
+            val property = v.js
+            it.set(
+                property = property,
+                value = if (exports.contains(property, it))
+                    exports.get(property, it)
+                else module.runtime.defaultExport,
+                type = VariableType.Local
+            )
+        }
+
+        Undefined
+    }
+}
+
+private fun ListIterator<Token>.parseExport(isDefault : Boolean = false) : Expression {
+
+    if (!isDefault){
+        val i = nextIndex()
+
+        if (nextSignificant() == Token.Identifier.Keyword.Default){
+            return parseExport(isDefault = true)
+        } else {
+            returnToIndex(i)
+        }
+    }
+
+    return when {
+        isDefault -> parseExportDeclaration(true)
+        eat(Token.Operator.Arithmetic.Mul) -> {
+            val n = nextSignificant()
+            syntaxCheck(n is Token.Identifier){
+                "Invalid export"
+            }
+
+            when (n.identifier){
+                "as" -> TODO()
+                "from" -> TODO()
+                else -> throw SyntaxError( "Invalid export: unexpected ${n.identifier}")
+            }
+        }
+        eat(Token.Operator.Bracket.CurlyOpen) -> TODO()
+        else -> parseExportDeclaration()
+    }
+}
 
 
+private fun ListIterator<Token>.parseExportDeclaration(isDefault: Boolean = false) : Expression {
+    val expr = parseStatement(blockType = ExpectedBlockType.Block)
+
+    if (isDefault){
+        return Expression {
+            val module = it.findModule()
+                ?: throw SyntaxError("Export is only available from modules")
+            module.defaultExport = expr(it)
+            Undefined
+        }
+    }
+
+    val (name, property) = when (expr) {
+        is OpFunctionInit -> expr.function.name to expr
+        is OpClassInit -> expr.name to expr
+        is OpAssign -> expr.variableName to expr.assignableValue
+        is OpGetProperty -> expr.name to expr
+        else -> error("Invalid export")
+    }
+
+    return Expression {
+        val module = it.findModule()
+            ?: throw SyntaxError("Export is only available from modules")
+        module.exports.set(name.js, property(it), it)
+        Undefined
+    }
+}
 
 private fun ListIterator<Token>.parseBlock(
     scoped: Boolean = true,

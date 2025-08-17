@@ -4,6 +4,8 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.Undefined
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 
 internal data class OpBlock(
@@ -16,6 +18,7 @@ internal data class OpBlock(
 ) : Expression(), Labeled {
 
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
+        currentCoroutineContext().ensureActive()
         return try {
             when {
                 isScoped -> runtime.withScope(

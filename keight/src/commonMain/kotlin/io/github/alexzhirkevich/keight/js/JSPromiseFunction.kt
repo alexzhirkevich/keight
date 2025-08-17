@@ -9,6 +9,7 @@ import io.github.alexzhirkevich.keight.expressions.ThrowableValue
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
 import io.github.alexzhirkevich.keight.requireThisRef
+import io.github.alexzhirkevich.keight.thisRef
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.InternalCoroutinesApi
@@ -68,7 +69,7 @@ internal class JSPromiseFunction : JSFunction(
         "finally".js.func("handle") { args ->
             val arg = args.getOrNull(0)
             val callable = arg?.callableOrNull()
-            val value = thisRef as Job
+            val value = thisRef<Job>()
             typeCheck(callable is Callable) {
                 "$arg is not a function".js
             }

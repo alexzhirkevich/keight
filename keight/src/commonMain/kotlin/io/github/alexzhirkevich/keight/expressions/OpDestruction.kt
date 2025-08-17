@@ -119,7 +119,7 @@ internal sealed interface DestructionContext {
             default: Getter<*>?
         ): JsAny? {
             val ret = if (obj is List<*>) {
-                obj as List<JsAny>
+                obj as List<JsAny?>
                 obj.getOrElse(index) { Undefined }
             } else {
                 if (obj == null) {

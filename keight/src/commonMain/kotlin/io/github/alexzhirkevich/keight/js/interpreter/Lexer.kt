@@ -454,7 +454,15 @@ internal fun ListIterator<Char>.string(start : Char) : Token.Str {
     return Token.Str(str.unescape())
 }
 
-private val UNICODE_REGEX = "\\\\u[0-9a-fA-F]{4}".toRegex()
+private val UNICODE_REGEX = "\\\\u[{]?[0-9a-fA-F]{4}[}]?".toRegex()
+private val UNICODE_REGEX_SURROGATE = "\\\\u[{][0-9a-fA-F]{5,6}[}]".toRegex()
+
+private fun String.toUnicodePoint() =
+    removePrefix("\\u")
+        .removePrefix("{")
+        .removeSuffix("}")
+        .toInt(16)
+
 
 private fun String.unescape() : String {
     return replace("\\'", "'")
@@ -464,8 +472,17 @@ private fun String.unescape() : String {
         .replace("\\t", "\t")
         .replace("\\b", "\b")
         .replace("\\\\", "\"")
+        .replace(UNICODE_REGEX_SURROGATE) {
+
+            val sub = it.value.toUnicodePoint() - 0x10000
+
+            val high = sub / 0x400 + 0xD800
+            val low = sub % 0x400 + 0xDC00
+
+            Char(high).toString() + Char(low)
+        }
         .replace(UNICODE_REGEX) {
-            when (val unicode = it.value.drop(2).toInt(16)) {
+            when (val unicode = it.value.toUnicodePoint()) {
                 in LSEP -> '\n'
                 else -> Char(unicode)
             }.toString()

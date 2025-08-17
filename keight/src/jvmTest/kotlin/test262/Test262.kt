@@ -97,10 +97,10 @@ suspend fun harness(name : String, runtime: JSRuntime) {
                     )
                 metadata = YAML.load(metadataStr)
             } else {
-                System.err.format(
-                    "WARN: file '%s' doesnt contain /*--- ... ---*/ directive",
-                    testFile.path
-                )
+//                System.err.format(
+//                    "WARN: file '%s' doesnt contain /*--- ... ---*/ directive",
+//                    testFile.path
+//                )
                 metadata = HashMap()
             }
 

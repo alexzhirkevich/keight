@@ -1,8 +1,7 @@
 import io.github.alexzhirkevich.keight.DefaultConsole
 import io.github.alexzhirkevich.keight.Console
 import io.github.alexzhirkevich.keight.JSRuntime
-import io.github.alexzhirkevich.keight.JavaScriptEngine
-import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.JSEngine
 import io.github.alexzhirkevich.keight.js.JsAny
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.TestScope
@@ -17,6 +16,13 @@ internal fun Any?.assertEqualsTo(other : Double, tolerance: Double = 0.0001) {
     assertEquals(other, this as Double, tolerance)
 }
 
+internal fun engineTest(
+    test : suspend (JSEngine<JSRuntime>) -> Unit
+) = runTest {
+    val engine = JSEngine(JSRuntime(backgroundScope.coroutineContext))
+    test(engine)
+}
+
 internal fun runtimeTest(
     runtime : (CoroutineContext) -> JSRuntime = {JSRuntime(it)},
     before : suspend TestScope.(JSRuntime) -> Unit = {},
@@ -28,16 +34,16 @@ internal fun runtimeTest(
 }
 
 internal suspend fun String.eval(runtime: JSRuntime = JSRuntime(Job())) : Any? {
-    return JavaScriptEngine(runtime).evaluate(this)
+    return JSEngine(runtime).evaluate(this)
 }
 
 internal suspend fun String.evalRaw(runtime: JSRuntime = JSRuntime(Job())) : JsAny? {
-    return JavaScriptEngine(runtime).compile(this).invoke(runtime)
+    return JSEngine(runtime).compile(this).invoke()
 }
 
 internal suspend fun String.eval(
     io : Console = DefaultConsole,
     runtime: JSRuntime = JSRuntime(context = Job(), console = io)
 ) : Any? {
-    return JavaScriptEngine(runtime).evaluate(this)
+    return JSEngine(runtime).evaluate(this)
 }

@@ -1,6 +1,3 @@
-import io.github.alexzhirkevich.keight.Module
-import io.github.alexzhirkevich.keight.JavaScriptEngine
-import io.github.alexzhirkevich.keight.js.JSON
 import kotlin.test.Test
 
 class JsonTest {

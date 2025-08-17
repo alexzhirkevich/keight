@@ -79,7 +79,7 @@ internal class JSArrayFunction : JSFunction(
                     append(',')
                 }
                 if (isNotEmpty()) {
-                    deleteCharAt(lastIndex)
+                    deleteAt(lastIndex)
                 }
             }.js
         }

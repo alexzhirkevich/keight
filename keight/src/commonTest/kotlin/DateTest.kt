@@ -1,5 +1,4 @@
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.offsetAt
@@ -7,7 +6,9 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalTime::class)
 class DateTest {
 
     @Test

@@ -5,15 +5,17 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeError
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.format
 import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.number
 import kotlinx.datetime.offsetAt
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.ExperimentalTime
 
 private val ScriptRuntime.thisDate
     get() = thisDateWrapper.value
@@ -21,29 +23,30 @@ private val ScriptRuntime.thisDate
 private val ScriptRuntime.thisDateWrapper
     get() = thisRef as JSDateWrapper
 
+@OptIn(ExperimentalTime::class)
 internal class JSDateFunction : JSFunction(
     name = "Date",
     prototype = Object {
-        "getDate".js.func { thisDate.dayOfMonth.js }
+        "getDate".js.func { thisDate.day.js }
         "getDay".js.func { (thisDate.dayOfWeek.isoDayNumber % 7).js }
         "getFullYear".js.func { thisDate.year.js }
         "getYear".js.func { thisDate.year.js }
         "getHours".js.func { thisDate.hour.js }
         "getMilliseconds".js.func { thisDate.nanosecond.nanoseconds.inWholeMilliseconds.js }
         "getMinutes".js.func { thisDate.minute.js }
-        "getMonth".js.func { thisDate.monthNumber.js }
+        "getMonth".js.func { thisDate.month.number.js }
         "getSeconds".js.func { thisDate.second.js }
         "getTime".js.func { thisDateWrapper.toInstant().toEpochMilliseconds().js }
         "getTimeZoneOffset".js.func {
             (thisDateWrapper.timeZone.offsetAt(thisDateWrapper.toInstant()).totalSeconds / 60).js
         }
-        "getUTCDate".js.func { thisDateWrapper.utc().dayOfMonth.js }
+        "getUTCDate".js.func { thisDateWrapper.utc().day.js }
         "getUTCDay".js.func { (thisDateWrapper.utc().dayOfWeek.isoDayNumber % 7).js }
         "getUTCFullYear".js.func { thisDateWrapper.utc().year.js }
         "getUTCHours".js.func { thisDateWrapper.utc().hour.js }
         "getUTCMilliseconds".js.func { thisDateWrapper.utc().nanosecond.nanoseconds.inWholeMilliseconds.js }
         "getUTCMinutes".js.func { thisDateWrapper.utc().minute.js }
-        "getUTCMonth".js.func { thisDateWrapper.utc().monthNumber.js }
+        "getUTCMonth".js.func { thisDateWrapper.utc().month.number.js }
         "getUTCSeconds".js.func { thisDateWrapper.utc().second.js }
 
         "setDate".js.func { thisDateWrapper.set(day = toNumber(it[0]).toInt()); Undefined }
@@ -104,6 +107,7 @@ internal class JSDateFunction : JSFunction(
     }
 }
 
+@OptIn(ExperimentalTime::class)
 private suspend fun ScriptRuntime.constructDate(args: List<JsAny?>) : JSDateWrapper{
     val tz = TimeZone.currentSystemDefault()
     if (args.isEmpty()) {

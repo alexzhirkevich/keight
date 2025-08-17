@@ -12,11 +12,18 @@ internal fun OpCompare(
     val ta = a(it)
     val tb = b(it)
 
-    if (it.isComparable(ta, tb)) {
-        result(it.compare(ta, tb)).js
-    } else {
-        false.js
+    if (ta?.toKotlin(it).let { it as? Number }?.toDouble()?.isNaN() == true){
+        return@Expression false.js
     }
+    if (tb?.toKotlin(it).let { it as? Number }?.toDouble()?.isNaN() == true){
+        return@Expression false.js
+    }
+
+//    if (it.isComparable(ta, tb)) {
+        result(it.compare(ta, tb)).js
+//    } else {
+//        false.js
+//    }
 }
 
 internal fun OpNot(

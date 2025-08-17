@@ -1,13 +1,8 @@
 package io.github.alexzhirkevich.keight
 
-/**
- * Pluggable module for script runtimes
- * */
-public interface Module {
+internal interface Module : Script {
 
-    public fun importInto(runtime: ScriptRuntime)
+    override val runtime : ModuleRuntime
 
-    public companion object
+    suspend fun invokeIfNeeded()
 }
-
-

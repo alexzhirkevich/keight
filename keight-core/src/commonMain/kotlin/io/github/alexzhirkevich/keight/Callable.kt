@@ -1,6 +1,7 @@
 package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.js.JsAny
+import kotlin.jvm.JvmInline
 
 public interface Callable : JsAny {
 

@@ -259,7 +259,11 @@ internal suspend fun JsAny?.esToObject(runtime: ScriptRuntime) : JsObject {
  * 3. Return ! ToString(key).
  * */
 internal suspend fun JsAny.esToPropertyKey(runtime: ScriptRuntime) : JsAny {
-    val key = esToPrimitive(type = "string", runtime = runtime)
+    val key = esToPrimitive(
+        type = Constants.string,
+        runtime = runtime
+    )
+
     if (key is JsSymbol){
         return key
     }

@@ -3,7 +3,6 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Expression
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.LazyGetter
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Uninitialized
@@ -327,7 +326,7 @@ public open class JSFunction(
                 initArguments(it)
 
                 it.withScope(
-                    isFunction = true,
+                    isIsolated = true,
                     thisRef = if (thisRef is Uninitialized) it.thisRef else thisRef,
                     isSuspendAllowed = isAsync,
                 ){

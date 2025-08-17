@@ -38,6 +38,8 @@ class DivTest {
         "null / 0".eval().assertEqualsTo(Double.NaN)
         "null / null".eval().assertEqualsTo(Double.NaN)
 
+        "null % undefined".eval().assertEqualsTo(Double.NaN)
+
         "undefined / null".eval().assertEqualsTo(Double.NaN)
         "5 / undefined".eval().assertEqualsTo(Double.NaN)
         "undefined / undefined".eval().assertEqualsTo(Double.NaN)

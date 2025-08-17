@@ -181,6 +181,8 @@ internal sealed interface Token {
             Await,
             With,
             This,
+            Export,
+            Import,
             Extends,
             Debugger;
 

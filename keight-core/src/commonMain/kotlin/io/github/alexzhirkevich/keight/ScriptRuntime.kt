@@ -5,6 +5,7 @@ import io.github.alexzhirkevich.keight.js.JsObject
 import kotlinx.coroutines.CoroutineScope
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
+import kotlin.jvm.JvmInline
 
 
 public enum class VariableType {
@@ -18,7 +19,7 @@ public interface ScriptRuntime : CoroutineScope {
     public val isSuspendAllowed: Boolean get() = true
 
     public val thisRef: JsAny?
-    
+
     public val parent : ScriptRuntime?
 
     public fun isEmpty(): Boolean
@@ -35,7 +36,7 @@ public interface ScriptRuntime : CoroutineScope {
         thisRef: JsAny? = this.thisRef,
         extraProperties: Map<String, Pair<VariableType, JsAny?>> = emptyMap(),
         isSuspendAllowed: Boolean = this.isSuspendAllowed,
-        isFunction: Boolean = false,
+        isIsolated: Boolean = false,
         isStrict: Boolean = this.isStrict,
         block: suspend (ScriptRuntime) -> T
     ): T

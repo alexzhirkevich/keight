@@ -16,6 +16,7 @@ public fun <T : JsAny?> LazyGetter(producer : suspend (ScriptRuntime) -> T): Get
     var mutex = Mutex()
     var v: Any? = UNINITIALIZED
 
+    @Suppress("UNCHECKED_CAST")
     override suspend fun get(runtime: ScriptRuntime): T {
         return mutex.withLock {
             if (v === UNINITIALIZED) {
