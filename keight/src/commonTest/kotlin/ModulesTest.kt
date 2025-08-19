@@ -1,8 +1,10 @@
+import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class ModulesTest {
 
@@ -140,6 +142,62 @@ class ModulesTest {
             it.compile("export const var1 = 1", "m1.js")
             it.evaluate("import var2 from 'm2.js'; var2").assertEqualsTo(3L)
         }
+    }
+
+    @Test
+    fun exported_properties_use_from_module() = engineTest {
+        it.compile(
+            """
+                    export const variable = 1
+                    export default function funcDefault() { return variable }
+                    export function func() { return funcDefault() }
+                    export function test() { return func() }
+                """,
+            "module.js"
+        )
+        it.evaluate("import test from 'module.js'; test()").assertEqualsTo(1L)
+    }
+
+    @Test
+    fun aggregating_esm() = engineTest {
+        it.compile(
+            """
+                    export const var1 = 1
+                    export function func1(){ return 'test' + var1 }
+                """,
+            "m1.js"
+        )
+        it.compile(
+            """
+                    export default "def"
+                    export function func2(){ return 'test2' }
+                """,
+            "m2.js"
+        )
+        it.compile(
+            """
+                    export const something = "something"
+                """,
+            "m3.js"
+        )
+        it.compile(
+            """
+                    export * from "m3.js"
+                    export * as obj from "m3.js"
+                    export { var1, func1 } from "m1.js"
+                    export { default, func2 as function2 } from "m2.js"
+                """,
+            "aggregate.js"
+        )
+
+        it.evaluate("import { def, var1, func1, function2, something, obj } from 'aggregate.js'")
+
+        it.evaluate("def").assertEqualsTo("def")
+        it.evaluate("var1").assertEqualsTo(1L)
+        it.evaluate("func1()").assertEqualsTo("test1")
+        it.evaluate("function2()").assertEqualsTo("test2")
+        it.evaluate("something").assertEqualsTo("something")
+        it.evaluate("obj.something").assertEqualsTo("something")
     }
 
     @Test

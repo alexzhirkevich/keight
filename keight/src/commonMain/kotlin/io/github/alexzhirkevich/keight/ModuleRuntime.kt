@@ -12,10 +12,11 @@ internal class ModuleRuntime(
     override val parent: DefaultRuntime,
 ) : DefaultRuntime(), CoroutineScope by parent {
 
+    /**
+     * Object representing module exports. Default export is stored by nullish key
+     * */
     var exports : JsObject = JsObjectImpl()
         private set
-
-    var defaultExport : JsAny? = Undefined
 
     private var defaults = initDefaults()
 
@@ -26,7 +27,6 @@ internal class ModuleRuntime(
     override fun reset() {
         super.reset()
         defaults = initDefaults()
-        defaultExport = Undefined
         isEvaluated = false
         exports = JsObjectImpl()
     }

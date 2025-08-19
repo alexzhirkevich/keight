@@ -57,7 +57,9 @@ import io.github.alexzhirkevich.keight.js.StaticClassMember
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.Uninitialized
-import io.github.alexzhirkevich.keight.findModule
+import io.github.alexzhirkevich.keight.expressions.AggregatingExportEntry
+import io.github.alexzhirkevich.keight.expressions.OpAggregatingExport
+import io.github.alexzhirkevich.keight.expressions.OpExport
 import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
@@ -1459,7 +1461,7 @@ private fun ListIterator<Token>.parseImport() : Expression {
                 property = property,
                 value = if (exports.contains(property, it))
                     exports.get(property, it)
-                else module.runtime.defaultExport,
+                else exports.get(null, it),
                 type = VariableType.Local
             )
         }
@@ -1483,20 +1485,81 @@ private fun ListIterator<Token>.parseExport(isDefault : Boolean = false) : Expre
     return when {
         isDefault -> parseExportDeclaration(true)
         eat(Token.Operator.Arithmetic.Mul) -> {
-            val n = nextSignificant()
-            syntaxCheck(n is Token.Identifier){
-                "Invalid export"
+            val index = nextIndex()
+            val (alias, declareProperty) = parseExportAliasAndType()
+            if (alias == null) {
+                returnToIndex(index)
             }
 
-            when (n.identifier){
-                "as" -> TODO()
-                "from" -> TODO()
-                else -> throw SyntaxError( "Invalid export: unexpected ${n.identifier}")
+            val from = nextSignificant()
+            syntaxCheck(from is Token.Identifier && from.identifier == "from"){
+                "Invalid export: 'from' was unexpected but got $from"
             }
+            val fromModule = parseStatement(blockType = ExpectedBlockType.None)
+
+            OpAggregatingExport(
+                exports = listOf(AggregatingExportEntry.Star(alias, declareProperty)),
+                fromModule = fromModule
+            )
         }
-        eat(Token.Operator.Bracket.CurlyOpen) -> TODO()
+        eat(Token.Operator.Bracket.CurlyOpen) -> {
+            val exports = buildList {
+                while (!eat(Token.Operator.Bracket.CurlyClose)) {
+                    add(parseAggregatingExportEntry())
+                }
+            }
+            val from = nextSignificant()
+
+            syntaxCheck(from is Token.Identifier && from.identifier == "from"){
+                "Invalid export: 'from' was unexpected but got $from"
+            }
+            val fromModule = parseStatement(blockType = ExpectedBlockType.None)
+
+            OpAggregatingExport(exports, fromModule)
+        }
         else -> parseExportDeclaration()
     }
+}
+
+private fun ListIterator<Token>.parseExportAliasAndType() : Pair<String?, Boolean> {
+    val n = nextSignificant()
+    syntaxCheck(n is Token.Identifier){
+        "Invalid export"
+    }
+
+    return if (n.identifier == "as"){
+        nextSignificant().asExportAliasAndType()
+    } else {
+        null to false
+    }
+}
+
+private fun Token.asExportAliasAndType() : Pair<String?, Boolean> {
+    return when (this){
+        is Token.Identifier -> identifier to true
+        is Token.Str -> value to false
+        else -> throw SyntaxError( "Invalid export: unexpected token $this")
+    }
+}
+
+private fun ListIterator<Token>.parseAggregatingExportEntry() : AggregatingExportEntry {
+    val import = nextSignificant()
+
+    syntaxCheck(import is Token.Identifier) {
+        "Invalid export"
+    }
+
+    val (alias, declareProperty) = if (eat(Token.Operator.Comma) || nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
+        null to false
+    } else {
+        parseExportAliasAndType()
+    }
+
+    return AggregatingExportEntry.Single(
+        import = if (import.identifier == "default") null else import.identifier,
+        alias = alias,
+        assignPropertyForAlias = declareProperty
+    )
 }
 
 
@@ -1504,28 +1567,18 @@ private fun ListIterator<Token>.parseExportDeclaration(isDefault: Boolean = fals
     val expr = parseStatement(blockType = ExpectedBlockType.Block)
 
     if (isDefault){
-        return Expression {
-            val module = it.findModule()
-                ?: throw SyntaxError("Export is only available from modules")
-            module.defaultExport = expr(it)
-            Undefined
-        }
+        return OpExport(null, expr)
     }
 
     val (name, property) = when (expr) {
         is OpFunctionInit -> expr.function.name to expr
         is OpClassInit -> expr.name to expr
-        is OpAssign -> expr.variableName to expr.assignableValue
+        is OpAssign -> expr.variableName to expr
         is OpGetProperty -> expr.name to expr
         else -> error("Invalid export")
     }
 
-    return Expression {
-        val module = it.findModule()
-            ?: throw SyntaxError("Export is only available from modules")
-        module.exports.set(name.js, property(it), it)
-        Undefined
-    }
+    return OpExport(name, property)
 }
 
 private fun ListIterator<Token>.parseBlock(
@@ -1582,6 +1635,49 @@ private fun ListIterator<Token>.parseBlock(
                         add(
                             index = funcIndex++,
                             element = Expression { assign(it); Undefined }
+                        )
+                    }
+
+                    expr is OpExport && expr.property is OpClassInit -> {
+                        val assign = OpAssign(
+                            type = VariableType.Local,
+                            variableName = expr.property.name,
+                            receiver = null,
+                            assignableValue = expr.property,
+                            merge = null
+                        )
+                        add(
+                            index = funcIndex++,
+                            element = Expression {
+                                expr(it)
+                                assign(it);
+                                Undefined
+                            }
+                        )
+                    }
+
+                    expr is OpExport && expr.property is OpFunctionInit && !expr.property.function.isArrow -> {
+
+                        val name = expr.property.function.name
+
+                        syntaxCheck(name.isNotBlank()) {
+                            "Function statements require a function name"
+                        }
+
+                        val assign = OpAssign(
+                            type = VariableType.Local,
+                            variableName = name,
+                            receiver = null,
+                            assignableValue = expr.property,
+                            merge = null
+                        )
+                        add(
+                            index = funcIndex++,
+                            element = Expression {
+                                expr(it)
+                                assign(it);
+                                Undefined
+                            }
                         )
                     }
 
