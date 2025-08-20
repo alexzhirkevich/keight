@@ -47,7 +47,7 @@ internal sealed interface AggregatingExportEntry {
             runtime: ScriptRuntime
         ) : JsAny? {
             return if (alias == null) {
-                fromModule.exports.entries(runtime).forEach { (key, value) ->
+                fromModule.exports.entries(fromModule).forEach { (key, value) ->
                     thisModule.exports.set(key, value, runtime)
                 }
                 Undefined
@@ -69,7 +69,7 @@ internal sealed interface AggregatingExportEntry {
             fromModule: ModuleRuntime,
             runtime: ScriptRuntime
         ) : JsAny? {
-            val importValue = fromModule.exports.get(import?.js, runtime)
+            val importValue = fromModule.exports.get(import?.js, fromModule)
             thisModule.exports.set((alias ?: import)?.js, importValue, runtime)
             return importValue
         }
@@ -99,13 +99,10 @@ internal fun OpAggregatingExport(
         val alias = it.alias
 
         if (it.assignPropertyForAlias && alias != null) {
-            OpAssign.invoke(
+            runtime.set(
                 type = VariableType.Const,
-                variableName = alias,
-                receiver = null,
+                property = alias.js,
                 value = exported,
-                merge = null,
-                runtime = runtime
             )
         }
     }

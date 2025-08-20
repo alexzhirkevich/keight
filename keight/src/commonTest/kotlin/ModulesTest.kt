@@ -27,20 +27,6 @@ class ModulesTest {
 
         it.evaluate("moduleFunction()").assertEqualsTo("moduleF")
         it.evaluate("moduleVariable").assertEqualsTo("moduleVar")
-
-        it.reset()
-
-        assertFailsWith<ReferenceError> { it.evaluate("moduleVariable") }
-        assertFailsWith<ReferenceError> { it.evaluate("moduleFunction") }
-
-        it.evaluate(
-            """
-                import moduleVariable from "module.js"
-                import moduleFunction from "module.js"
-            """
-        )
-        it.evaluate("moduleFunction()").assertEqualsTo("moduleF")
-        it.evaluate("moduleVariable").assertEqualsTo("moduleVar")
     }
 
     @Test
@@ -57,7 +43,7 @@ class ModulesTest {
 
         it.evaluate(
             """
-                import moduleFunction from "module.js"
+                import {moduleFunction} from "module.js"
                 moduleFunction()
             """
         )
@@ -83,8 +69,8 @@ class ModulesTest {
 
         it.evaluate(
             """
-                import moduleFunction from "module.js"
-                import moduleVariable from "module.js"
+                import {moduleFunction} from "module.js"
+                import {moduleVariable} from "module.js"
                 
                 moduleFunction()
             """
@@ -104,25 +90,6 @@ class ModulesTest {
     }
 
     @Test
-    fun esm_module_name_as_variable() = engineTest {
-        it.compile(
-            """
-                export const moduleVariable = "var"
-            """,
-            "module.js"
-        )
-
-        it.evaluate(
-            """
-                const moduleName = 'module.js'
-                import moduleVariable from moduleName
-                
-                moduleVariable
-            """
-        ).assertEqualsTo("var")
-    }
-
-    @Test
     fun esm_export_from_nonmodule() = engineTest {
         assertFailsWith<SyntaxError> {
             it.evaluate("export const moduleVariable = 1")
@@ -133,15 +100,35 @@ class ModulesTest {
     fun esm_import_from_module() {
         engineTest {
             it.compile("export const var1 = 1", "m1.js")
-            it.compile("import var1 from 'm1.js'; export const var2 = var1 + 2", "m2.js")
-            it.evaluate("import var2 from 'm2.js'; var2").assertEqualsTo(3L)
+            it.compile("import { var1 } from 'm1.js'; export const var2 = var1 + 2", "m2.js")
+            it.evaluate("import { var2 } from 'm2.js'; var2").assertEqualsTo(3L)
         }
 
         engineTest {
-            it.compile("import var1 from 'm1.js'; export const var2 = var1 + 2", "m2.js")
+            it.compile("import {var1} from 'm1.js'; export const var2 = var1 + 2", "m2.js")
             it.compile("export const var1 = 1", "m1.js")
-            it.evaluate("import var2 from 'm2.js'; var2").assertEqualsTo(3L)
+            it.evaluate("import {var2} from 'm2.js'; var2").assertEqualsTo(3L)
         }
+    }
+
+    @Test
+    fun esm_default() = engineTest {
+        it.compile(
+            """
+                    export function test() { return 1 }
+                """,
+            "module1.js"
+        )
+        it.compile(
+            """
+                    export default function test() { return 2 }
+                """,
+            "module2.js"
+        )
+        assertFailsWith<SyntaxError> {
+            it.evaluate("import def from 'module1.js';")
+        }
+        it.evaluate("import def from 'module2.js'; def()").assertEqualsTo(2L)
     }
 
     @Test
@@ -155,7 +142,7 @@ class ModulesTest {
                 """,
             "module.js"
         )
-        it.evaluate("import test from 'module.js'; test()").assertEqualsTo(1L)
+        it.evaluate("import { test } from 'module.js'; test()").assertEqualsTo(1L)
     }
 
     @Test
@@ -190,7 +177,7 @@ class ModulesTest {
             "aggregate.js"
         )
 
-        it.evaluate("import { def, var1, func1, function2, something, obj } from 'aggregate.js'")
+        it.evaluate("import { default as def, var1, func1, function2, something, obj } from 'aggregate.js'")
 
         it.evaluate("def").assertEqualsTo("def")
         it.evaluate("var1").assertEqualsTo(1L)

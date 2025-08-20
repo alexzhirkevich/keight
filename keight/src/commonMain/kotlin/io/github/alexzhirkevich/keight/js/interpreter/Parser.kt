@@ -58,8 +58,10 @@ import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.Uninitialized
 import io.github.alexzhirkevich.keight.expressions.AggregatingExportEntry
+import io.github.alexzhirkevich.keight.expressions.ImportEntry
 import io.github.alexzhirkevich.keight.expressions.OpAggregatingExport
 import io.github.alexzhirkevich.keight.expressions.OpExport
+import io.github.alexzhirkevich.keight.expressions.OpImport
 import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
@@ -1409,32 +1411,32 @@ private fun ListIterator<Token>.parseFunction(
 
 private fun ListIterator<Token>.parseImport() : Expression {
 
-    val variables = if (eat(Token.Operator.Bracket.CurlyOpen)) {
-        buildList {
-            while (hasNext()) {
-                val n = nextSignificant()
-                syntaxCheck(n is Token.Identifier) {
-                    "Invalid import"
+    val entries = buildList {
+        while (true) {
+            val i = nextIndex()
+            when (nextSignificant()) {
+                is Token.Operator.Bracket.CurlyOpen -> {
+                    if (!eat(Token.Operator.Bracket.CurlyClose)) {
+                        do {
+                            add(parseImportEntry(true))
+                        } while (eat(Token.Operator.Comma))
+
+                        val close = nextSignificant()
+                        syntaxCheck(close is Token.Operator.Bracket.CurlyClose) {
+                            "Invalid import: '}' was expected but got '$close'"
+                        }
+                    }
                 }
-                add(n.identifier)
-
-                val delim = nextSignificant()
-
-                if (delim is Token.Operator.Bracket.CurlyClose) {
-                    break
-                }
-
-                syntaxCheck(delim is Token.Operator.Comma) {
-                    "Invalid import"
+                else -> {
+                    returnToIndex(i)
+                    add(parseImportEntry(false))
                 }
             }
+
+            if (!eat(Token.Operator.Comma)){
+                break
+            }
         }
-    } else {
-        val n = nextSignificant()
-        syntaxCheck(n is Token.Identifier) {
-            "Invalid import"
-        }
-        listOf(n.identifier)
     }
 
     val fromKeyword = nextSignificant()
@@ -1445,29 +1447,57 @@ private fun ListIterator<Token>.parseImport() : Expression {
 
     val moduleName = parseStatement(blockType = ExpectedBlockType.Block)
 
-    return Expression {
-        val root = it.findJsRoot()
-        val name = it.toString(moduleName(it))
+    return OpImport(
+        entries = entries,
+        fromModule = moduleName
+    )
+}
 
-        val module = root.modules[name] ?: throw SyntaxError("Module with name '$name' not found")
-
-        module.invokeIfNeeded()
-
-        val exports = module.runtime.exports
-
-        variables.forEach { v ->
-            val property = v.js
-            it.set(
-                property = property,
-                value = if (exports.contains(property, it))
-                    exports.get(property, it)
-                else exports.get(null, it),
-                type = VariableType.Local
-            )
+private fun ListIterator<Token>.parseImportEntry(
+    isInBrackets : Boolean
+) : ImportEntry {
+    return if (isInBrackets) {
+        val import = when(val i = nextSignificant()){
+            is Token.Identifier -> i.identifier
+            is Token.Str -> i.value
+            else -> throw SyntaxError( "Invalid import: unexpected token $i")
         }
-
-        Undefined
+        val i = nextIndex()
+        val n = nextSignificant()
+        val alias = if (n is Token.Identifier && n.identifier == "as"){
+            nextSignificant().identifier()
+        } else {
+            returnToIndex(i)
+            null
+        }
+        if (import == "default") {
+            syntaxCheck(alias != null){
+                "Invalid import: alias for default import was expected"
+            }
+            ImportEntry.Default(alias)
+        } else {
+            ImportEntry.Named(import, alias)
+        }
+    } else {
+        when (val n = nextSignificant()){
+            is Token.Operator.Arithmetic.Mul -> {
+                val n = nextSignificant()
+                syntaxCheck(n is Token.Identifier && n.identifier == "as"){
+                    "Invalid import: unexpected token $n"
+                }
+                ImportEntry.Star(nextSignificant().identifier())
+            }
+            is Token.Identifier -> ImportEntry.Default(n.identifier)
+            else -> throw SyntaxError("Invalid import: unexpected token $n")
+        }
     }
+}
+
+private fun Token.identifier() : String {
+    syntaxCheck(this is Token.Identifier){
+        "Invalid import: unexpected token $this"
+    }
+    return identifier
 }
 
 private fun ListIterator<Token>.parseExport(isDefault : Boolean = false) : Expression {
@@ -1588,7 +1618,7 @@ private fun ListIterator<Token>.parseBlock(
     allowCommaSeparator : Boolean = true,
     blockContext: List<BlockContext>,
 ): Expression {
-    var funcIndex = 0
+    var hoistedIndex = 0
 
     var isSurroundedWithBraces = false
     val list = buildList {
@@ -1603,6 +1633,8 @@ private fun ListIterator<Token>.parseBlock(
                     blockType = ExpectedBlockType.None,
                     isBlockAnchor = true
                 )
+
+                // hoisted
                 when {
                     expr is OpClassInit -> {
                         val assign = OpAssign(
@@ -1613,7 +1645,7 @@ private fun ListIterator<Token>.parseBlock(
                             merge = null
                         )
                         add(
-                            index = funcIndex++,
+                            index = hoistedIndex++,
                             element = Expression { assign(it); Undefined }
                         )
                     }
@@ -1633,7 +1665,7 @@ private fun ListIterator<Token>.parseBlock(
                             merge = null
                         )
                         add(
-                            index = funcIndex++,
+                            index = hoistedIndex++,
                             element = Expression { assign(it); Undefined }
                         )
                     }
@@ -1647,7 +1679,7 @@ private fun ListIterator<Token>.parseBlock(
                             merge = null
                         )
                         add(
-                            index = funcIndex++,
+                            index = hoistedIndex++,
                             element = Expression {
                                 expr(it)
                                 assign(it);
@@ -1672,7 +1704,7 @@ private fun ListIterator<Token>.parseBlock(
                             merge = null
                         )
                         add(
-                            index = funcIndex++,
+                            index = hoistedIndex++,
                             element = Expression {
                                 expr(it)
                                 assign(it);
@@ -1680,6 +1712,7 @@ private fun ListIterator<Token>.parseBlock(
                             }
                         )
                     }
+                    expr is OpImport -> add(hoistedIndex++, expr)
 
                     else -> add(expr)
                 }
