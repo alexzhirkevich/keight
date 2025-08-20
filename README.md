@@ -2,6 +2,8 @@
 
 JavaScript runtime for Kotlin Multiplatform. Written entirely in Kotlin. Works on every Kotlin target.
 
+Powers After Effects expressions in [Compottie](https://github.com/alexzhirkevich/compottie) library.
+
 > [!WARNING]  
 > Project is experimental and WIP. Some features may not work. No support guarantees.
 > Use only for evaluation purposes or on your own risk
