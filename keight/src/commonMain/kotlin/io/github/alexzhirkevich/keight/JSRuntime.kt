@@ -277,9 +277,6 @@ public open class JSRuntime(
         val pa = a?.toPrimitive(type = Constants.number.js) ?: a
         val pb = b?.toPrimitive(type = Constants.number.js) ?: b
 
-//        println(a!!::class)
-//        println(b!!::class)
-
         if (pa is CharSequence && pb is CharSequence){
             return pa.toString().compareTo(pb.toString())
         }
