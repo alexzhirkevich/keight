@@ -31,7 +31,12 @@ public interface Script {
  * Such script is not allowed to perform top-level await calls, but you can return a Promise and
  * cast it to [Job] or [Deferred] with [JsAny.toKotlin]
  * */
-public fun Script.invokeSync(runtime: ScriptRuntime = this.runtime): JsAny? = runtime.runSync(::invoke)
+public fun Script.invokeSync(runtime: ScriptRuntime = this.runtime): JsAny? = runtime.runSync {
+    check(!isSuspendAllowed) {
+        "Synchronous invocation is only available in runtimes with suspending calls disabled. See ScriptRuntime.isSuspendAllowed"
+    }
+    invoke(this)
+}
 
 
 

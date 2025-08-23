@@ -2,6 +2,27 @@
 
 kotlin {
     sourceSets {
+        wasmJs {
+            browser {
+                testTask {
+                    useKarma {
+//                        useChrome()
+                        useSafari()
+                    }
+                }
+            }
+        }
+
+        js {
+            browser {
+                testTask {
+                    useKarma {
+//                        useChrome()
+                        useSafari()
+                    }
+                }
+            }
+        }
 
         commonMain.dependencies {
             api(libs.coroutines.core)

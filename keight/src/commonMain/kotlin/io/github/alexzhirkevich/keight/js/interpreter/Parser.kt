@@ -171,47 +171,44 @@ private fun ListIterator<Token>.prevSignificant() : Token {
 
 private fun ListIterator<Token>.parseStatement(
     blockContext: List<BlockContext> = emptyList(),
-    precedence: Int = 14,
+    maxPrecedence: Int = 14,
     blockType: ExpectedBlockType,
     isBlockAnchor : Boolean = false,
 ) : Expression {
 
-    var x = if (precedence == 0) {
-        parseFactor(blockContext, blockType)
-    } else {
-        parseStatement(blockContext, precedence - 1, blockType, isBlockAnchor)
-    }
+    var precedence = -1
 
-    if (x is OpConstant && (x.value is JSFunction || x.value is OpClassInit) && isBlockAnchor){
-        return x
-    }
+    var x = parseFactor(blockContext, blockType)
 
-    while (true) {
-        x = when (precedence) {
-            0 -> {
-                val i = nextIndex()
-                val next = nextSignificant()
-                when  {
-                    next is Token.Operator.Bracket.RoundOpen -> {
+    while (++precedence <= maxPrecedence) {
+
+        if (x is OpConstant && (x.value is JSFunction || x.value is OpClassInit) && isBlockAnchor) {
+            return x
+        }
+
+        while (true) {
+
+            val i = nextIndex()
+            
+            x = when (precedence) {
+                0 -> when (nextSignificant()) {
+                    is Token.Operator.Bracket.RoundOpen -> {
                         prevSignificant()
                         parseFunctionCall(x, blockContext = blockContext)
                     }
 
-                    next is Token.Operator.Period ||
-                    next is Token.Operator.DoublePeriod ||
-                    next is Token.Operator.Bracket.SquareOpen -> {
+                    is Token.Operator.Period,
+                    is Token.Operator.DoublePeriod,
+                    is Token.Operator.Bracket.SquareOpen -> {
                         prevSignificant()
                         parseMemberOf(x)
                     }
 
-                    next is Token.Operator.OptionalChaining -> parseOptionalChaining(x)
-
-                    else -> return x.also { returnToIndex(i) }
+                    is Token.Operator.OptionalChaining -> parseOptionalChaining(x)
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            1 -> {
-                val i = nextIndex()
-                when (val it = nextSignificant()) {
+
+                1 -> when (val it = nextSignificant()) {
                     is Token.Operator.Arithmetic.Inc,
                     is Token.Operator.Arithmetic.Dec -> {
                         syntaxCheck(x.isAssignable()) {
@@ -224,223 +221,251 @@ private fun ListIterator<Token>.parseStatement(
                         )
                     }
 
-                    else -> return x.also { returnToIndex(i) }
+                    else -> { returnToIndex(i); break; }
                 }
-            }
 
-            2 -> {
-                val i = nextIndex()
-                when (nextSignificant()) {
+                2 -> when (nextSignificant()) {
                     Token.Operator.Arithmetic.Exp -> OpExp(
                         x = x,
-                        degree = parseStatement(blockContext, precedence, ExpectedBlockType.Object)
+                        degree = parseStatement(
+                            blockContext,
+                            precedence,
+                            ExpectedBlockType.Object
+                        )
                     )
 
-                    else -> return x.also { returnToIndex(i) }
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            3 -> {
-                val i = nextIndex()
-                when (nextSignificant()) {
+
+                3 -> when (nextSignificant()) {
 
                     Token.Operator.Arithmetic.Mul -> Delegate(
                         a = x,
-                        b = parseStatement(blockContext, precedence - 1, ExpectedBlockType.Object),
+                        b = parseStatement(
+                            blockContext,
+                            precedence - 1,
+                            ExpectedBlockType.Object
+                        ),
                         op = ScriptRuntime::mul
                     )
 
                     Token.Operator.Arithmetic.Div -> Delegate(
                         a = x,
-                        b = parseStatement(blockContext, precedence - 1, ExpectedBlockType.Object),
+                        b = parseStatement(
+                            blockContext,
+                            precedence - 1,
+                            ExpectedBlockType.Object
+                        ),
                         op = ScriptRuntime::div
                     )
 
                     Token.Operator.Arithmetic.Mod -> Delegate(
                         a = x,
-                        b = parseStatement(blockContext, precedence - 1, ExpectedBlockType.Object),
+                        b = parseStatement(
+                            blockContext,
+                            precedence - 1,
+                            ExpectedBlockType.Object
+                        ),
                         op = ScriptRuntime::mod
                     )
 
-                    else -> return x.also { returnToIndex(i) }
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            4 -> {
-                val i = nextIndex()
-                when (nextSignificant()) {
+
+                4 -> when (nextSignificant()) {
                     Token.Operator.Arithmetic.Plus -> Delegate(
                         a = x,
-                        b = parseStatement(blockContext, precedence-1, ExpectedBlockType.Object),
+                        b = parseStatement(
+                            blockContext,
+                            precedence - 1,
+                            ExpectedBlockType.Object
+                        ),
                         op = ScriptRuntime::sum
                     )
+
                     Token.Operator.Arithmetic.Minus -> Delegate(
                         a = x,
-                        b = parseStatement(blockContext,  precedence-1, ExpectedBlockType.Object),
+                        b = parseStatement(
+                            blockContext,
+                            precedence - 1,
+                            ExpectedBlockType.Object
+                        ),
                         op = ScriptRuntime::sub
                     )
 
-                    else -> return x.also { returnToIndex(i) }
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            5 ->  {
-                val i = nextIndex()
-                when (nextSignificant()) {
+
+                5 -> when (nextSignificant()) {
                     Token.Operator.Bitwise.Shl -> OpLongInt(
                         a = x,
-                        b = parseStatement(blockContext, precedence-1, ExpectedBlockType.Object),
+                        b = parseStatement(
+                            blockContext,
+                            precedence - 1,
+                            ExpectedBlockType.Object
+                        ),
                         op = Long::shl
                     )
 
                     Token.Operator.Bitwise.Shr -> OpLongInt(
                         a = x,
-                        b = parseStatement(blockContext, precedence-1, ExpectedBlockType.Object),
+                        b = parseStatement(
+                            blockContext,
+                            precedence - 1,
+                            ExpectedBlockType.Object
+                        ),
                         op = Long::shr
                     )
+
                     Token.Operator.Bitwise.Ushr -> OpLongInt(
                         a = x,
-                        b = parseStatement(blockContext, precedence-1, ExpectedBlockType.Object),
+                        b = parseStatement(
+                            blockContext,
+                            precedence - 1,
+                            ExpectedBlockType.Object
+                        ),
                         op = Long::ushr
                     )
-                    else -> return x.also { returnToIndex(i) }
+
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            6 ->  {
-                val i = nextIndex()
-                when (nextSignificant()) {
+
+                6 -> when (nextSignificant()) {
                     Token.Operator.In -> parseInOperator(x, precedence)
                     Token.Operator.Instanceof -> parseInstanceOfOperator(x, precedence)
-                    else -> return x.also { returnToIndex(i) }
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            7 ->  {
-                val i = nextIndex()
-                when (nextSignificant()) {
+
+                7 -> when (nextSignificant()) {
                     Token.Operator.Compare.Less -> OpCompare(
                         a = x,
-                        b = parseStatement(blockContext,  precedence, ExpectedBlockType.Object),
+                        b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
                         result = { it < 0 }
                     )
+
                     Token.Operator.Compare.LessOrEq -> OpCompare(
                         a = x,
                         b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
                         result = { it <= 0 }
                     )
+
                     Token.Operator.Compare.Greater -> OpCompare(
                         a = x,
                         b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
                         result = { it > 0 }
                     )
+
                     Token.Operator.Compare.GreaterOrEq -> OpCompare(
                         a = x,
                         b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
                         result = { it >= 0 }
                     )
-                    else -> return x.also { returnToIndex(i) }
+
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            8 -> {
-                val i = nextIndex()
-                when (nextSignificant()) {
+
+                8 -> when (nextSignificant()) {
                     Token.Operator.Compare.Eq -> OpEquals(
                         a = x,
                         b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
                         isTyped = false
                     )
+
                     Token.Operator.Compare.StrictEq -> OpEquals(
                         a = x,
-                        b = parseStatement(blockContext,  precedence, ExpectedBlockType.Object),
-                        isTyped = true
-                    )
-                    Token.Operator.Compare.Neq -> OpNotEquals(
-                        a = x,
-                        b = parseStatement(blockContext,  precedence, ExpectedBlockType.Object),
-                        isTyped = false
-                    )
-                    Token.Operator.Compare.StrictNeq -> OpNotEquals(
-                        a = x,
-                        b = parseStatement(blockContext,  precedence, ExpectedBlockType.Object),
+                        b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
                         isTyped = true
                     )
 
-                    else -> return x.also { returnToIndex(i) }
+                    Token.Operator.Compare.Neq -> OpNotEquals(
+                        a = x,
+                        b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
+                        isTyped = false
+                    )
+
+                    Token.Operator.Compare.StrictNeq -> OpNotEquals(
+                        a = x,
+                        b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
+                        isTyped = true
+                    )
+
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            9 -> {
-                val i = nextIndex()
-                when (nextSignificant()) {
+
+                9 -> when (nextSignificant()) {
                     Token.Operator.Bitwise.And -> OpLongLong(
                         a = x,
                         b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
                         op = Long::and
                     )
-                    else -> return x.also { returnToIndex(i) }
+
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            10 -> {
-                val i = nextIndex()
-                when (nextSignificant()) {
+
+                10 -> when (nextSignificant()) {
                     Token.Operator.Bitwise.Xor -> OpLongLong(
                         a = x,
                         b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
                         op = Long::xor
                     )
-                    else -> return x.also { returnToIndex(i) }
+
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            11 -> {
-                val i = nextIndex()
-                when (nextSignificant()) {
+
+                11 -> when (nextSignificant()) {
                     Token.Operator.Bitwise.Or -> OpLongLong(
                         a = x,
                         b = parseStatement(blockContext, precedence, ExpectedBlockType.Object),
                         op = Long::or
                     )
-                    else -> return x.also { returnToIndex(i) }
+
+                    else -> { returnToIndex(i); break; }
                 }
-            }
-            12 -> {
-                val i = nextIndex()
-                when (nextSignificant()) {
+
+                12 -> when (nextSignificant()) {
                     Token.Operator.Logical.And -> {
                         val a = x
-                        val b = parseStatement(blockContext, precedence, ExpectedBlockType.Object)
+                        val b =
+                            parseStatement(blockContext, precedence, ExpectedBlockType.Object)
                         Expression {
                             val av = a(it)
-                            if (it.isFalse(av)){
+                            if (it.isFalse(av)) {
                                 return@Expression av
                             }
                             b(it)
                         }
                     }
-                    else -> return x.also { returnToIndex(i) }
-                }
-            }
 
-            13 ->  {
-                val i = nextIndex()
-                when (nextSignificant()) {
+                    else -> { returnToIndex(i); break; }
+                }
+
+                13 -> when (nextSignificant()) {
                     Token.Operator.Logical.Or -> {
                         val a = x
-                        val b = parseStatement(blockContext, precedence, ExpectedBlockType.Object)
+                        val b =
+                            parseStatement(blockContext, precedence, ExpectedBlockType.Object)
                         Expression {
                             val av = a(it)
-                            if (!it.isFalse(av)){
+                            if (!it.isFalse(av)) {
                                 return@Expression av
                             }
                             b(it)
                         }
                     }
-                    Token.Operator.NullishCoalescing -> {
-                        val replacement = parseStatement(blockContext, precedence, ExpectedBlockType.Object)
-                        val subject = x
-                        Expression { subject(it)?.takeUnless { it is Undefined } ?: replacement(it) }
-                    }
-                    else -> return x.also { returnToIndex(i) }
-                }
-            }
 
-            14 -> {
-                val i = nextIndex()
-                when (val next = nextSignificant()) {
+                    Token.Operator.NullishCoalescing -> {
+                        val replacement =
+                            parseStatement(blockContext, precedence, ExpectedBlockType.Object)
+                        val subject = x
+                        Expression {
+                            subject(it)?.takeUnless { it is Undefined } ?: replacement(it)
+                        }
+                    }
+
+                    else -> { returnToIndex(i); break; }
+                }
+
+                14 -> when (val next = nextSignificant()) {
                     Token.Operator.QuestionMark -> parseTernary(
                         condition = x,
                         precedence = precedence,
@@ -450,7 +475,9 @@ private fun ListIterator<Token>.parseStatement(
                     Token.Operator.Arrow -> OpFunctionInit(parseArrowFunction(blockContext, x))
 
                     is Token.Operator.Assign -> parseAssignmentValue(
-                        x, blockContext, getMergeForAssignment(next)
+                        x = x,
+                        blockContext = blockContext,
+                        merge = getMergeForAssignment(next)
                     )
 
                     is Token.Operator.Colon -> if (blockContext.lastOrNull() != BlockContext.Ternary) {
@@ -467,17 +494,18 @@ private fun ListIterator<Token>.parseStatement(
                             )
                         )
                     } else {
-                        return x.also { returnToIndex(i) }
+                        returnToIndex(i); break;
                     }
 
-                    else -> return x.also { returnToIndex(i) }
+                    else -> { returnToIndex(i); break; }
                 }
+
+
+                else -> error("Invalid operator priority - $precedence")
             }
-
-
-            else -> error("Invalid operator priority - $precedence")
         }
     }
+    return x
 }
 
 private fun ListIterator<Token>.parseFactor(
@@ -532,7 +560,7 @@ private fun ListIterator<Token>.parseFactor(
         Token.Operator.Arithmetic.Inc,
         Token.Operator.Arithmetic.Dec -> {
             val isInc = next is Token.Operator.Arithmetic.Inc
-            val variable = parseStatement(precedence = 0, blockType = ExpectedBlockType.Object)
+            val variable = parseStatement(maxPrecedence = 0, blockType = ExpectedBlockType.Object)
 
             require(variable.isAssignable()) {
                 unexpected(if (isInc) "++" else "--")
@@ -546,17 +574,17 @@ private fun ListIterator<Token>.parseFactor(
 
         Token.Operator.Arithmetic.Plus,
         Token.Operator.Arithmetic.Minus -> Delegate(
-            a = parseStatement(precedence = 0, blockType = ExpectedBlockType.Object),
+            a = parseStatement(maxPrecedence = 0, blockType = ExpectedBlockType.Object),
             op = if (next is Token.Operator.Arithmetic.Plus)
                 ScriptRuntime::pos else ScriptRuntime::neg
         )
 
         Token.Operator.Logical.Not -> OpNot(
-            condition = parseStatement(precedence = 0, blockType = ExpectedBlockType.Object)
+            condition = parseStatement(maxPrecedence = 0, blockType = ExpectedBlockType.Object)
         )
 
         Token.Operator.Bitwise.Reverse -> {
-            val expr = parseStatement(precedence = 0, blockType = ExpectedBlockType.Object)
+            val expr = parseStatement(maxPrecedence = 0, blockType = ExpectedBlockType.Object)
             Expression {
                 it.toNumber(expr(it)).toLong().inv().js
             }
@@ -852,7 +880,7 @@ private fun ListIterator<Token>.parseVoid() : Expression {
     val expr = if (isArg) {
         parseExpressionGrouping()
     }  else {
-        parseStatement(precedence = 1,blockType = ExpectedBlockType.Object)
+        parseStatement(maxPrecedence = 1,blockType = ExpectedBlockType.Object)
     }
     return Expression {
         expr(it)
@@ -865,7 +893,7 @@ private fun ListIterator<Token>.parseTypeof() : Expression {
     val expr = if (isArg) {
         parseExpressionGrouping()
     }  else {
-        parseStatement(precedence = 1,blockType = ExpectedBlockType.Object)
+        parseStatement(maxPrecedence = 1,blockType = ExpectedBlockType.Object)
     }
     return Expression {
         try {
@@ -877,7 +905,7 @@ private fun ListIterator<Token>.parseTypeof() : Expression {
 }
 
 private fun ListIterator<Token>.parseDelete() : Expression {
-    val x = parseStatement(precedence = 1, blockType = ExpectedBlockType.Object)
+    val x = parseStatement(maxPrecedence = 1, blockType = ExpectedBlockType.Object)
 
     val (subj, obj) = when (x) {
         is OpIndex -> x.receiver to x.index
@@ -1018,7 +1046,7 @@ private fun ListIterator<Token>.parseFunctionCall(
 
 
 private fun ListIterator<Token>.parseInOperator(subject : Expression, precedence: Int) : Expression {
-    val obj = parseStatement(precedence = precedence, blockType = ExpectedBlockType.Object)
+    val obj = parseStatement(maxPrecedence = precedence, blockType = ExpectedBlockType.Object)
     return OpIn(
         property = subject,
         inObject = obj
@@ -1026,7 +1054,7 @@ private fun ListIterator<Token>.parseInOperator(subject : Expression, precedence
 }
 
 private fun ListIterator<Token>.parseInstanceOfOperator(subject : Expression, precedence: Int) : Expression {
-    val obj = parseStatement(precedence = precedence,blockType = ExpectedBlockType.Object)
+    val obj = parseStatement(maxPrecedence = precedence,blockType = ExpectedBlockType.Object)
     return Expression {
         val o = obj(it)
         syntaxCheck(o is Constructor) {
