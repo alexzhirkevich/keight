@@ -686,7 +686,7 @@ private fun ObjectScope.pop() {
             var res: JsAny?
 
             do {
-                res = value.removeLast()
+                res = value.removeAt(value.lastIndex)
             } while (value.isNotEmpty() && res is Uninitialized)
 
             if (res is Uninitialized) Undefined else res
@@ -696,7 +696,7 @@ private fun ObjectScope.pop() {
 private fun ObjectScope.shift() {
     "shift".js.func {
         val value = thisRef<MutableList<JsAny?>>()
-        if (value.isEmpty()) Undefined else value.removeLast()
+        if (value.isEmpty()) Undefined else value.removeAt(value.lastIndex)
     }
 }
 private fun ObjectScope.unshift() {
