@@ -3,6 +3,10 @@ package io.github.alexzhirkevich.keight
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsObject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.jvm.JvmInline
@@ -100,30 +104,29 @@ public fun ScriptRuntime.findRoot() : ScriptRuntime {
     return parent?.findRoot() ?: this
 }
 
+@OptIn(InternalCoroutinesApi::class)
+/**
+ * Run [block] synchronously. The code in this block must not suspend.
+ * This is NOT the same as runBlocking.
+ * */
 public fun <T> ScriptRuntime.runSync(block : suspend ScriptRuntime.() -> T) : T {
-    check(!isSuspendAllowed) {
-        "Synchronous invocation is only available in runtimes with suspending calls disabled. See ScriptRuntime.isSuspendAllowed"
-    }
-    val res = try {
-        @Suppress("UNCHECKED_CAST")
-        (block as Function2<ScriptRuntime, Continuation<*>, T>)
-            .invoke(this, EmptyContinuation(coroutineContext))
-    } catch (t : ClassCastException){
-        throw Exception("Synchronous invocation is not compatible with your version of kotlinx.coroutines. Please report this issue", t)
+
+    var res : Result<T>? = null
+
+    val cont = Continuation(coroutineContext) {
+        res = it
     }
 
-    check(res !== SUSPENDED) {
-        "Runtime with disallowed suspension was suspended. That should never happen. Please report this issue"
+    CoroutineStart.UNDISPATCHED.invoke(
+        block = block,
+        receiver = this,
+        completion = cont
+    )
+
+    if (res == null) {
+        throw Exception("This block can't be invoked synchronously")
     }
 
-    return res
+    return res.getOrThrow()
 }
-
-private val SUSPENDED : Any get()  =  kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-
-@JvmInline
-private value class EmptyContinuation(override val context: CoroutineContext) : Continuation<Any?> {
-    override fun resumeWith(result: Result<Any?>) {}
-}
-
 

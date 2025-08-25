@@ -9,11 +9,6 @@ plugins {
     alias(libs.plugins.mavenPublish)
 }
 
-buildscript {
-    dependencies {
-        classpath(libs.nexus.publish)
-    }
-}
 
 rootProject.projectDir.resolve("local.properties").let {
     if (it.exists()) {
