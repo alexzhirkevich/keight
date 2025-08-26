@@ -1,6 +1,5 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck

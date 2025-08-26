@@ -1,12 +1,8 @@
-import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.js.JSError
-import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.Undefined
-import io.github.alexzhirkevich.keight.js.interpreter.Token
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith

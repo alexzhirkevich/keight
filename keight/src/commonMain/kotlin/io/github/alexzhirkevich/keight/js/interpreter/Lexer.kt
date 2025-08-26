@@ -555,25 +555,25 @@ internal fun ListIterator<Char>.number(start : Char) : Token.Num {
 
     previous()
 
-    val number: Number = try {
+    return try {
         if (value.endsWith('.')) {
             previous()
             isFloat = false
         }
         if (isFloat) {
-            value.toString().replace("_","").toDouble()
+            val number = value.toString().replace("_","").toDouble()
+            Token.Num( number, numberFormat, isFloat)
         } else {
-            value.toString().trimEnd('.')
+            val number = value.toString().trimEnd('.')
                 .replace("_","")
                 .let { n -> numberFormat.prefix?.let(n::substringAfter) ?: n }
                 .toULong(numberFormat.radix)
                 .toLong()
+            Token.Num(number, numberFormat, isFloat)
         }
     } catch (t: NumberFormatException) {
         throw SyntaxError("Unexpected token '$value'", t)
     }
-
-    return Token.Num(number, numberFormat, isFloat)
 }
 
 private val keywords by lazy {

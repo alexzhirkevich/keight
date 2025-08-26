@@ -93,7 +93,7 @@ internal class JSPromiseFunction : JSFunction(
 
             CompletableDeferred<Undefined>().apply {
                 completeExceptionally(
-                    if (v is Throwable) v else ThrowableValue(v)
+                    v as? Throwable ?: ThrowableValue(v)
                 )
             }.js
         },
@@ -130,7 +130,7 @@ internal class JSPromiseFunction : JSFunction(
         val reject = "reject".func("value") {
             val x = it.argOrElse(0) { Undefined }
             deferred.completeExceptionally(
-                if (x is ThrowableValue) x else ThrowableValue(x)
+                x as? Throwable ?: ThrowableValue(x)
             ); Undefined
         }
 

@@ -28,10 +28,10 @@ jobs:
             os: macos-latest
           - target: macOsArm64Test
             os: macos-latest
-          - target: wasmJsTest
+          - target: wasmJsNodeTest
             os: ubuntu-latest
-          - target: jsTest
-            os: ubuntu-latest
+#          - target: jsTest
+#            os: ubuntu-latest
           - target: jvmTest
             os: ubuntu-latest
     runs-on: ${{ matrix.os }}

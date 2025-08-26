@@ -1,16 +1,12 @@
 package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.js.JsAny
-import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.ObjectMap
-import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.js
-import io.github.alexzhirkevich.keight.js.mapThisArg
-import kotlinx.coroutines.CoroutineScope
 
 
 internal suspend inline fun ScriptRuntime.requireThisRef(caller : String? = null) : JsAny {

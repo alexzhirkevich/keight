@@ -189,7 +189,7 @@ private fun ListIterator<Token>.parseStatement(
         while (true) {
 
             val i = nextIndex()
-            
+
             x = when (precedence) {
                 0 -> when (nextSignificant()) {
                     is Token.Operator.Bracket.RoundOpen -> {
@@ -796,7 +796,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
             val throwable = parseStatement(blockType = ExpectedBlockType.Object)
             Expression {
                 val t = throwable(it)
-                throw if (t is Throwable) t else ThrowableValue(t)
+                throw t as? Throwable ?: ThrowableValue(t)
             }
         }
         Token.Identifier.Keyword.Async -> parseAsync()
