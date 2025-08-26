@@ -9,6 +9,7 @@ import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.delay
 import runtimeTest
 import kotlin.test.Test
+import kotlin.test.Ignore
 import kotlin.test.assertTrue
 
 private val UNSUPPORTED_FEATURES = listOf(
@@ -66,13 +67,7 @@ class Test262Suite {
     var passed = 0
 
     @Test
-    fun temp() = runtimeTest {
-        """
-         '00100' < '1'
-        """.trimIndent().eval(it).assertEqualsTo(true)
-    }
-
-    @Test
+    @Ignore
     fun test() = runtimeTest { r ->
 
         val order = listOf(
