@@ -216,6 +216,12 @@ public open class JSRuntime(
             is Number -> value.js
             is CharSequence -> value.js
             is Boolean -> value.js
+            is FloatArray -> value.js
+            is LongArray -> value.js
+            is DoubleArray -> value.js
+            is ShortArray -> value.js
+            is ByteArray -> value.js
+            is Array<*> -> value.map { it?.let(::fromKotlin) }.js
             is List<*> -> value.map { it?.let(::fromKotlin) }.js
             is Set<*> -> value.mapTo(mutableSetOf()) { it?.let(::fromKotlin) }.js
             is Map<*, *> -> value.map { it.key?.let(::fromKotlin) to it.value?.let(::fromKotlin) }.toMap().js
