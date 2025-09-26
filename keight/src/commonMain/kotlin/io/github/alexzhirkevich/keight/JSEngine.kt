@@ -9,6 +9,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
 
+/**
+ * Engine that can compile JavaScript code.
+ *
+ * Scripts compiled with this runtime should not be executed in different runtimes
+ *
+ * @param runtime [JSRuntime] that will be used as a default invocation runtime for script.
+ * */
 public open class JSEngine<out R : JSRuntime>(
     override val runtime: R
 ) : ScriptEngine<R> {
@@ -37,9 +44,6 @@ private open class JSScript(
     protected val mutex = Mutex()
 
     override suspend fun invoke(runtime: ScriptRuntime): JsAny? {
-        require(runtime.findRoot() === this.runtime.findRoot()) {
-            "Script can only be invoked in the runtime or a sub-runtime of the engine it compiled with"
-        }
         return withContext(runtime.coroutineContext) {
             mutex.withLock {
                 invokeImpl(runtime)
