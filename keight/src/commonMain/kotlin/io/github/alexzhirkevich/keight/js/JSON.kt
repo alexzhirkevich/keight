@@ -86,7 +86,7 @@ private fun ListIterator<Char>.parsePrimitive() : JsAny? {
         eat("undefined") -> Undefined
         else -> {
             val n = nextSignificant()
-            syntaxCheck(n.isDigit() || n == '-') {
+            syntaxCheck(n.isDigit() || n == '-' || n == '+') {
                 "Invalid JSON: number expected but got $n at ${previousIndex()}"
             }
             previous()
