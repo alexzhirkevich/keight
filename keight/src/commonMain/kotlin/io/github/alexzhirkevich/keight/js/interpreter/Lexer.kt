@@ -503,7 +503,7 @@ internal fun ListIterator<Char>.number(start : Char) : Token.Num {
     val value = StringBuilder()
     var numberFormat = NumberFormat.Dec
     var isFloat = false
-    var ch = start
+    var ch: Char? = start
     var wasE = false
     do {
         when (ch) {
@@ -546,7 +546,9 @@ internal fun ListIterator<Char>.number(start : Char) : Token.Num {
             }
         }
         value.append(ch)
-        ch = next().lowercaseChar()
+        ch = if (hasNext()) {
+            next().lowercaseChar()
+        } else null
     } while (
         ch in numberFormat.alphabet ||
         ch in NumberFormatIndicators ||
@@ -565,10 +567,12 @@ internal fun ListIterator<Char>.number(start : Char) : Token.Num {
             Token.Num( number, numberFormat, isFloat)
         } else {
             val number = value.toString().trimEnd('.')
+                .trimStart('-')
                 .replace("_","")
                 .let { n -> numberFormat.prefix?.let(n::substringAfter) ?: n }
                 .toULong(numberFormat.radix)
                 .toLong()
+                .let { n -> if (start == '-') -n else n }
             Token.Num(number, numberFormat, isFloat)
         }
     } catch (t: NumberFormatException) {
