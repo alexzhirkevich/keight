@@ -81,21 +81,28 @@ private fun ListIterator<Char>.parsePrimitive() : JsAny? {
     return when {
         eat('"') -> JsStringWrapper(string('"').value)
         eat("null") -> null
+        eat("true") -> JSBooleanWrapper(true)
+        eat("false") -> JSBooleanWrapper(false)
+        eat("undefined") -> Undefined
         else -> {
             val n = nextSignificant()
-            syntaxCheck(n.isDigit()) {
+            syntaxCheck(n.isDigit() || n == '-') {
                 "Invalid JSON: number expected but got $n at ${previousIndex()}"
             }
-            return JsNumberWrapper(number(n).value)
+            previous()
+            JsNumberWrapper(number(n).value)
         }
     }
 }
 
 private tailrec suspend fun Any?.stringify(runtime: ScriptRuntime) : String {
     return when (this) {
+        null -> "null"
+        Undefined -> "undefined"
         is List<*> -> stringify(runtime)
         is JsObject -> stringify(runtime)
         is Number -> toString()
+        is Boolean -> toString()
         is Wrapper<*> -> value.stringify(runtime)
         is JsAny -> "\"${runtime.toString(this).escape()}\""
         else -> "\"${toString().escape()}\""
