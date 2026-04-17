@@ -4,6 +4,8 @@ import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.Named
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.expressions.OpGetter
+import io.github.alexzhirkevich.keight.expressions.OpSetter
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 
 internal sealed interface StaticClassMember : Named {
@@ -33,7 +35,8 @@ internal class OpClassInit(
 
         return JSClass(
             name = name,
-            properties = properties.mapValues { it.value.invoke(runtime) },
+            // Process properties: evaluate expressions and detect getters/setters
+            properties = processClassProperties(properties, runtime),
             static = static.mapValues {
                 when (val v = it.value) {
                     is StaticClassMember.Method -> v.function
@@ -71,6 +74,52 @@ internal class JSClass(
     override fun toString(): String {
         return "[class $name]"
     }
+}
+
+/**
+ * Process class properties, converting getters and setters to proper JsPropertyAccessor.
+ * @param properties Map of property expressions from the parser
+ * @param runtime The script runtime for evaluating expressions
+ */
+internal suspend fun processClassProperties(properties: Map<JsAny?, Expression>, runtime: ScriptRuntime): Map<JsAny?, JsAny?> {
+    val result = mutableMapOf<JsAny?, JsAny?>()
+    val getters = mutableMapOf<String, JSFunction>()
+    val setters = mutableMapOf<String, JSFunction>()
+
+    // First pass: check expression types and evaluate regular properties
+    for ((key, value) in properties) {
+        val propName = key?.toString() ?: continue
+
+        when (value) {
+            is OpGetter -> {
+                // Key is "__getter__propertyName", extract actual property name
+                val actualName = if (propName.startsWith("__getter__")) {
+                    propName.removePrefix("__getter__")
+                } else propName
+                getters[actualName] = value.value
+            }
+            is OpSetter -> {
+                // Key is "__setter__propertyName", extract actual property name
+                val actualName = if (propName.startsWith("__setter__")) {
+                    propName.removePrefix("__setter__")
+                } else propName
+                setters[actualName] = value.value
+            }
+            else -> {
+                // Regular property: evaluate the expression
+                result[key] = value.invoke(runtime)
+            }
+        }
+    }
+
+    // Second pass: create BackedField for properties with getter/setter
+    for (propName in getters.keys + setters.keys) {
+        val getter = getters[propName]
+        val setter = setters[propName]
+        result[propName.js] = JsPropertyAccessor.BackedField(getter, setter)
+    }
+
+    return result
 }
 
 

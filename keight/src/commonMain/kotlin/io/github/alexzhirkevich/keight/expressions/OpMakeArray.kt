@@ -63,7 +63,7 @@ internal class OpMakeObject(
 
                                 defineOwnProperty(
                                     property = k,
-                                    value = descriptor.value.get(runtime),
+                                    value = descriptor.value.getAccessor(null, runtime),
                                     writable = descriptor.writable,
                                     enumerable = descriptor.enumerable,
                                     configurable = descriptor.configurable

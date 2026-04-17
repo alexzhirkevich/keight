@@ -613,13 +613,13 @@ private fun ListIterator<Token>.parseFactor(
         is Token.Identifier.Keyword -> parseKeyword(next, blockContext)
         is Token.Identifier.Reserved -> throw SyntaxError("Unexpected reserved word (${next.identifier})")
         is Token.Identifier.Property -> {
-            val isObject = blockContext.lastOrNull() == BlockContext.Object
+            val canHaveAccessor = blockContext.lastOrNull() in listOf(BlockContext.Object, BlockContext.Class)
             var i = nextIndex()
             val n = nextSignificant()
             when {
-                isObject && next.identifier == "get" && n is Token.Identifier ->
+                canHaveAccessor && next.identifier == "get" && n is Token.Identifier ->
                     OpGetter(parseFunction(name = n.identifier, blockContext = emptyList()))
-                isObject && next.identifier == "set" && n is Token.Identifier ->
+                canHaveAccessor && next.identifier == "set" && n is Token.Identifier ->
                     OpSetter(parseFunction(name = n.identifier, blockContext = emptyList()))
                 else -> {
                     returnToIndex(i)
@@ -1140,9 +1140,17 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
 
             token is Token.Identifier -> {
                 prevSignificant()
-                when (val statement = parseStatement(blockType = ExpectedBlockType.None)) {
+                when (val statement = parseStatement(blockContext = listOf(BlockContext.Class), blockType = ExpectedBlockType.None)) {
                     is OpAssign -> properties[statement.variableName.js] = statement.assignableValue
                     is OpGetProperty -> properties[statement.name.js] = OpConstant(Undefined)
+                    is OpGetter -> {
+                        // Store getter as a special marker, will be processed in OpClassInit
+                        properties["__getter__${statement.value.name}".js] = statement
+                    }
+                    is OpSetter -> {
+                        // Store setter as a special marker, will be processed in OpClassInit
+                        properties["__setter__${statement.value.name}".js] = statement
+                    }
                     else -> throw SyntaxError("Invalid class member")
                 }
             }

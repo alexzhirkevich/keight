@@ -150,7 +150,7 @@ internal class JSObjectFunction : JSFunction(
 
             val name = args.getOrElse(1) { return@func Undefined }
 
-            obj.ownPropertyDescriptor(name)?.descriptor() ?: Undefined
+            obj.ownPropertyDescriptor(name)?.descriptor(obj) ?: Undefined
         },
 
         "getOwnPropertyDescriptors".func( "object") { args ->
@@ -160,7 +160,7 @@ internal class JSObjectFunction : JSFunction(
             }
 
             JsObjectImpl(
-                properties = obj.ownPropertyDescriptors().mapValues { it.value.descriptor() }
+                properties = obj.ownPropertyDescriptors().mapValues { it.value.descriptor(obj) }
             )
         },
 

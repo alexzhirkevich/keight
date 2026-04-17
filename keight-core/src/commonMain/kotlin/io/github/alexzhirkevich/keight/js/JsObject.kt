@@ -26,7 +26,7 @@ public interface JsObject : JsAny {
         configurable: Boolean? = null,
         writable: Boolean? = null,
     ) {
-        set(property, value.get(runtime), runtime)
+        set(property, value.getAccessor(null, runtime), runtime)
     }
 
     public suspend fun ownPropertyDescriptor(property: JsAny?) : JsProperty? = null

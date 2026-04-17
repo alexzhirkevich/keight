@@ -143,7 +143,7 @@ public open class JsObjectImpl(
         return map
             .filter { it.value.enumerable != false }
             .values
-            .map { it.value.get(runtime) }
+            .map { it.value.getAccessor(null, runtime) }
     }
 
     override suspend fun entries(runtime: ScriptRuntime): List<List<JsAny?>> {
@@ -151,7 +151,7 @@ public open class JsObjectImpl(
             .mapNotNull {
                 if (it.value.enumerable == false) null else listOf(
                     it.key,
-                    it.value.value.get(runtime)
+                    it.value.value.getAccessor(null, runtime)
                 )
             }
     }
@@ -170,8 +170,16 @@ public open class JsObjectImpl(
 
     override suspend fun get(property: JsAny?, runtime: ScriptRuntime): JsAny? {
         return when {
-            property in map -> map[property]?.value?.get(runtime)
+            property in map -> map[property]?.value?.getAccessor(this, runtime)
             else -> super.get(property, runtime)
+        }
+    }
+
+    // Override protoChainGet to properly handle thisArg in prototype chain
+    override suspend fun protoChainGet(property: JsAny?, runtime: ScriptRuntime, thisArg: JsAny?): JsAny? {
+        return when {
+            property in map -> map[property]?.value?.getAccessor(thisArg ?: this, runtime)
+            else -> super.protoChainGet(property, runtime, thisArg)
         }
     }
 
@@ -212,9 +220,24 @@ public open class JsObjectImpl(
 
         if (current != null) {
             if (current.writable != false) {
-                current.value.set(value, runtime)
+                current.value.setAccessor(this, value, runtime)
             }
         } else {
+            // Check prototype chain for existing property with setter
+            val protoProp = findPropertyInProtoChain(property, runtime)
+            if (protoProp != null) {
+                // Property exists on prototype - check if it has a setter
+                if (protoProp.value is JsPropertyAccessor.BackedField) {
+                    // Call the setter from the prototype
+                    protoProp.value.setAccessor(this, value, runtime)
+                    return
+                } else if (protoProp.writable == false) {
+                    // Non-writable property on prototype - ignore in non-strict mode
+                    return
+                }
+            }
+            // Property doesn't exist or is a writable data property on prototype
+            // Create new property on this instance
             map[property] = JSPropertyImpl(
                 value = value as? JsPropertyAccessor ?: JsPropertyAccessor.Value(value),
                 writable = null,
@@ -222,6 +245,29 @@ public open class JsObjectImpl(
                 configurable = null
             )
         }
+    }
+
+    /**
+     * Find a property descriptor in the prototype chain.
+     * Used for checking setters and writable status of inherited properties.
+     */
+    private suspend fun findPropertyInProtoChain(property: JsAny?, runtime: ScriptRuntime): JsProperty? {
+        var current: JsAny? = proto(runtime)
+        val seen = mutableSetOf<JsAny?>()
+
+        while (current != null && current !is Undefined && current !in seen) {
+            seen.add(current)
+            if (current is JsObject) {
+                val desc = current.ownPropertyDescriptor(property)
+                if (desc != null) {
+                    return desc
+                }
+                current = current.proto(runtime)
+            } else {
+                break
+            }
+        }
+        return null
     }
 
     internal fun setOverwrite(
