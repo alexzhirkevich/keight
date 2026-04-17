@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.fastForEach
+import io.github.alexzhirkevich.keight.js.interpreter.NumberFormat
 import io.github.alexzhirkevich.keight.js.interpreter.escape
 import io.github.alexzhirkevich.keight.js.interpreter.number
 import io.github.alexzhirkevich.keight.js.interpreter.string
@@ -81,21 +82,27 @@ private fun ListIterator<Char>.parsePrimitive() : JsAny? {
     return when {
         eat('"') -> JsStringWrapper(string('"').value)
         eat("null") -> null
+        eat("true") -> JSBooleanWrapper(true)
+        eat("false") -> JSBooleanWrapper(false)
+        eat("undefined") -> Undefined
         else -> {
             val n = nextSignificant()
-            syntaxCheck(n.isDigit()) {
+            syntaxCheck(n.isDigit() || n in listOf('-','+','e','E','.') || NumberFormat.entries.any { it.prefix == n }) {
                 "Invalid JSON: number expected but got $n at ${previousIndex()}"
             }
-            return JsNumberWrapper(number(n).value)
+            JsNumberWrapper(number(n).value)
         }
     }
 }
 
 private tailrec suspend fun Any?.stringify(runtime: ScriptRuntime) : String {
     return when (this) {
+        null -> "null"
+        Undefined -> "undefined"
         is List<*> -> stringify(runtime)
         is JsObject -> stringify(runtime)
         is Number -> toString()
+        is Boolean -> toString()
         is Wrapper<*> -> value.stringify(runtime)
         is JsAny -> "\"${runtime.toString(this).escape()}\""
         else -> "\"${toString().escape()}\""
