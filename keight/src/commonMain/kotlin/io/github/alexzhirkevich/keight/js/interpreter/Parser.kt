@@ -5,6 +5,7 @@ import io.github.alexzhirkevich.keight.Delegate
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
+import io.github.alexzhirkevich.keight.js.Constants
 import io.github.alexzhirkevich.keight.expressions.OpAssign
 import io.github.alexzhirkevich.keight.expressions.OpAssignByIndex
 import io.github.alexzhirkevich.keight.expressions.OpBlock
@@ -1145,11 +1146,11 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
                     is OpGetProperty -> properties[statement.name.js] = OpConstant(Undefined)
                     is OpGetter -> {
                         // Store getter as a special marker, will be processed in OpClassInit
-                        properties["__getter__${statement.value.name}".js] = statement
+                        properties["${Constants.getterPrefix}${statement.value.name}".js] = statement
                     }
                     is OpSetter -> {
                         // Store setter as a special marker, will be processed in OpClassInit
-                        properties["__setter__${statement.value.name}".js] = statement
+                        properties["${Constants.setterPrefix}${statement.value.name}".js] = statement
                     }
                     else -> throw SyntaxError("Invalid class member")
                 }
