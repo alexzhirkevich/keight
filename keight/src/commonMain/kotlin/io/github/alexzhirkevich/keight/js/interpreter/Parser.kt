@@ -117,7 +117,12 @@ internal enum class ExpectedBlockType {
 }
 
 internal enum class BlockContext {
-    None, Loop, Switch, Function, Class, Object, Ternary
+    None, Loop, Switch, Function, Class, Object, Ternary,
+    /**
+     * Represents being inside a property value in an object literal.
+     * Used to distinguish between computed property names [expr] and array literals [1, 2].
+     */
+    ObjectPropertyValue
 }
 
 private fun unexpected(expr : String) : String = "Unexpected token '$expr'"
@@ -489,7 +494,7 @@ private fun ListIterator<Token>.parseStatement(
                         merge = getMergeForAssignment(next)
                     )
 
-                    is Token.Operator.Colon -> if (blockContext.lastOrNull() != BlockContext.Ternary) {
+                    is Token.Operator.Colon -> if (BlockContext.Ternary !in blockContext) {
                         // Check if this is a computed property name
                         // Computed property names include: [expr], OpComputedPropertyName, and OpMakeArray (when used as computed key)
                         val isComputedProperty = x is OpComputedPropertyName || x is OpMakeArray
@@ -502,6 +507,10 @@ private fun ListIterator<Token>.parseStatement(
                             else -> throw SyntaxError("Invalid usage of : operator")
                         }
                         
+                        // When parsing property values in an object literal, use ObjectPropertyValue context
+                        // to distinguish array literals [1,2] from computed property names [expr]
+                        val propertyValueContext = blockContext + BlockContext.ObjectPropertyValue
+                        
                         val value = if (isComputedProperty) {
                             // For computed property names, we need to store both the key expression and value expression
                             // For OpMakeArray, the array itself is the key expression
@@ -512,13 +521,13 @@ private fun ListIterator<Token>.parseStatement(
                             }
                             OpComputedProperty(
                                 keyExpr, parseStatement(
-                                blockContext,
+                                propertyValueContext,
                                 precedence,
                                 ExpectedBlockType.Object
                             ))
                         } else {
                             parseStatement(
-                                blockContext,
+                                propertyValueContext,
                                 precedence,
                                 ExpectedBlockType.Object
                             )
@@ -641,7 +650,15 @@ private fun ListIterator<Token>.parseFactor(
         }
         Token.Operator.Bracket.SquareOpen -> {
             prevSignificant()
-            parseArrayCreation()
+            // Check if we're in object context but not inside a property value.
+            // In object context, [ at property key position = computed property name.
+            // In object property value position = array literal.
+            val isObjectPropertyKey = blockContext.lastOrNull() == BlockContext.Object
+            if (isObjectPropertyKey) {
+                parseComputedPropertyName()
+            } else {
+                parseArrayCreation()
+            }
         }
         is Token.Operator.New -> parseNew()
         is Token.Operator.Typeof -> parseTypeof()
@@ -676,24 +693,27 @@ private fun ListIterator<Token>.parseAssignmentValue(
     blockContext: List<BlockContext>,
     merge: (suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?)? = null
 ): Expression {
+    // When parsing property values in an object literal, use ObjectPropertyValue context
+    // to distinguish array literals [1,2] from computed property names [expr]
+    val propertyValueContext = blockContext + BlockContext.ObjectPropertyValue
     return when (x) {
         is OpIndex -> OpAssignByIndex(
             receiver = x.receiver,
             index = x.index,
-            assignableValue = parseStatement(blockType = ExpectedBlockType.Object, blockContext = blockContext),
+            assignableValue = parseStatement(blockType = ExpectedBlockType.Object, blockContext = propertyValueContext),
             merge = merge
         )
 
         is OpGetProperty -> OpAssign(
             variableName = x.name,
             receiver = x.receiver,
-            assignableValue = parseStatement(blockType = ExpectedBlockType.Object,blockContext = blockContext),
+            assignableValue = parseStatement(blockType = ExpectedBlockType.Object,blockContext = propertyValueContext),
             merge = merge
         )
         is OpBlock, is OpMake -> OpDestructAssign(
             destruction = x.asDestruction(),
             variableType = null,
-            value = parseStatement(blockType = ExpectedBlockType.Object, blockContext = blockContext)
+            value = parseStatement(blockType = ExpectedBlockType.Object, blockContext = propertyValueContext)
         )
         is OpSpread -> throw SyntaxError("Rest parameter may not have a default initializer")
 

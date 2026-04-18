@@ -288,27 +288,17 @@ public open class JSFunction(
         val invokeRuntime = closure ?: runtime
 
         suspend fun doInvoke() : JsAny? {
-            return invokeImpl(invokeRuntime, thisRef) { r ->
+            return invokeImpl(invokeRuntime, thisRef, extraArgs) { r ->
                 parameters.fastForEachIndexed { i, p ->
                     p.set(i, allArgs, r)
-                }
-                extraArgs.forEach {
-                    r.set(it.key.js, it.value.second, it.value.first)
                 }
                 if (!isArrow) {
                     r.set(
                         "arguments".js,
                         JsArrayWrapper(allArgs.toMutableList()),
-//                        LazyGetter {
-//                            r.typeCheck(!isArrow && !isAsync && !it.isStrict) {
-//                                "'arguments' is not available in this context"
-//                            }
-//                            JsArrayWrapper(allArgs.toMutableList())
-//                        },
                         VariableType.Local
                     )
                 }
-
             }
         }
 
@@ -327,16 +317,26 @@ public open class JSFunction(
     private suspend fun invokeImpl(
         runtime: ScriptRuntime,
         thisRef: JsAny?,
+        extraArgs: Map<String, Pair<VariableType, JsAny?>>,
         initArguments : suspend (ScriptRuntime) -> Unit,
     ) : JsAny? {
         return try {
-            runtime.withScope {
+            // Create a scope for extraArgs first, then create isolated scope on top of it
+            // This ensures each method's 'super' binding is independent
+            val outerScope = runtime.withScope(
+                extraProperties = extraArgs
+            ) { it }
 
-                initArguments(it)
+            outerScope.withScope(
+                isIsolated = true,
+                thisRef = if (thisRef is Uninitialized) outerScope.thisRef else thisRef,
+                isSuspendAllowed = isAsync,
+            ) { isolatedScope ->
+                initArguments(isolatedScope)
 
-                it.withScope(
+                isolatedScope.withScope(
                     isIsolated = true,
-                    thisRef = if (thisRef is Uninitialized) it.thisRef else thisRef,
+                    thisRef = if (thisRef is Uninitialized) isolatedScope.thisRef else thisRef,
                     isSuspendAllowed = isAsync,
                 ){
                     body.invoke(it)

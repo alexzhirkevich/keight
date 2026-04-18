@@ -76,6 +76,21 @@ internal fun OpCall(
             isOptional = callable.isOptional
         )
 
+        // Handle super.method() calls - use OpCall to ensure JSFunction.call is invoked
+        callable is OpSuperGetProperty -> OpCall(
+            receiver = null,
+            func = callable,
+            args = arguments,
+            isOptional = isOptional
+        )
+
+        callable is OpSuperGetPropertyComputed -> OpCall(
+            receiver = null,
+            func = callable,
+            args = arguments,
+            isOptional = isOptional
+        )
+
         else -> Expression { r ->
             callable.invoke(r).let {
                 if (isOptional && (it == null || it is Undefined)) {
