@@ -93,15 +93,15 @@ internal suspend fun processClassProperties(properties: Map<JsAny?, Expression>,
         when (value) {
             is OpGetter -> {
                 // Key is "__getter__propertyName", extract actual property name
-                val actualName = if (propName.startsWith("__getter__")) {
-                    propName.removePrefix("__getter__")
+                val actualName = if (propName.startsWith(Constants.getterPrefix)) {
+                    propName.removePrefix(Constants.getterPrefix)
                 } else propName
                 getters[actualName] = value.value
             }
             is OpSetter -> {
                 // Key is "__setter__propertyName", extract actual property name
-                val actualName = if (propName.startsWith("__setter__")) {
-                    propName.removePrefix("__setter__")
+                val actualName = if (propName.startsWith(Constants.setterPrefix)) {
+                    propName.removePrefix(Constants.setterPrefix)
                 } else propName
                 setters[actualName] = value.value
             }
