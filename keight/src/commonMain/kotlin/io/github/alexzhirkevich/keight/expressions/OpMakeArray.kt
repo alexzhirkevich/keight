@@ -7,6 +7,7 @@ import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JsObjectImpl
 import io.github.alexzhirkevich.keight.js.JsPropertyAccessor
 import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.JsArrayWrapper
 import io.github.alexzhirkevich.keight.js.js
 
 internal abstract class OpMake : Expression() {
@@ -46,7 +47,21 @@ internal class OpMakeObject(
             items.forEach { expr ->
                 when (expr) {
                     is OpColonAssignment -> {
-                        setOverwrite(expr.key, expr.value.invoke(runtime))
+                        // Check if this is a computed property (wrapped in OpComputedProperty)
+                        if (expr.key == null && expr.value is OpComputedProperty) {
+                            // Computed property: execute the OpComputedProperty to get [key, value]
+                            val result = expr.value.invoke(runtime)
+                            if (result is JsArrayWrapper) {
+                                val key = result.getOrNull(0)
+                                val value = result.getOrNull(1)
+                                if (key != null) {
+                                    setOverwrite(key, value)
+                                }
+                            }
+                        } else {
+                            // Normal property
+                            setOverwrite(expr.key, expr.value.invoke(runtime))
+                        }
                     }
 
                     is PropertyAccessorFactory -> Unit
@@ -74,6 +89,30 @@ internal class OpMakeObject(
                                 any.keys(runtime).fastForEach {
                                     setOverwrite(it, any.get(it, runtime))
                                 }
+                            }
+                        }
+                    }
+
+                    is OpComputedProperty -> {
+                        // For computed properties, result is a JsArrayWrapper containing [key, value]
+                        val result = expr.invoke(runtime)
+                        if (result is JsArrayWrapper) {
+                            val key = result.getOrNull(0)
+                            val value = result.getOrNull(1)
+                            if (key != null) {
+                                setOverwrite(key, value)
+                            }
+                        }
+                    }
+                    
+                    is OpComputedPropertyMethod -> {
+                        // For computed property methods, result is a JsArrayWrapper containing [key, OpFunctionInit]
+                        val result = expr.invoke(runtime)
+                        if (result is JsArrayWrapper) {
+                            val key = result.getOrNull(0)
+                            val value = result.getOrNull(1)
+                            if (key != null && value != null) {
+                                setOverwrite(key, value)
                             }
                         }
                     }

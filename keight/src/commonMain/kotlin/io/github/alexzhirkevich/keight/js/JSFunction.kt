@@ -94,6 +94,8 @@ public open class JSFunction(
     internal val isArrow : Boolean = false,
     private val superConstructor : Constructor? = null,
     internal val prototype : JsObject? = JsObjectImpl(),
+    // Store the parent prototype for super binding
+    internal val superProto : JsAny? = null,
     properties : MutableMap<JsAny?, JsAny?> = mutableMapOf(),
 ) : JsObjectImpl(name, properties), Callable, JsObject, Constructor {
 
@@ -195,10 +197,17 @@ public open class JSFunction(
     }
 
     override suspend fun call(thisArg: JsAny?, args: List<JsAny?>, runtime: ScriptRuntime): JsAny? {
+        // Build extraArgs with super binding if available
+        val superBinding = if (superProto != null) {
+            mapOf("super" to Pair(VariableType.Const, superProto))
+        } else {
+            emptyMap()
+        }
+
         return invoke(
             args = if (bindedArgs.isEmpty()) args else bindedArgs + args,
             runtime = runtime,
-            extraArgs = emptyMap(),
+            extraArgs = superBinding,
             thisRef = if (isMutableThisRef) thisArg else thisRef
         )
     }
@@ -426,8 +435,24 @@ internal infix fun String.defaults(default: Expression?) : FunctionParam {
 internal class OpFunctionInit(
     val function : JSFunction
 ) : Expression() {
+    // Cache the result to avoid repeated execution which would overwrite closure
+    private var cachedResult: JsAny? = null
+    
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
-        function.closure = runtime
+        // Return cached result if available
+        cachedResult?.let { return it }
+        
+        // Only set closure if not already set.
+        // This is critical for class inheritance - when a subclass extends a parent class,
+        // the parent's OpFunctionInit may be invoked again in the subclass's context.
+        // If we overwrite the closure here, the parent method's internal super binding
+        // will be lost, causing infinite recursion in multi-level inheritance.
+        if (function.closure == null) {
+            function.closure = runtime
+        }
+        
+        // Cache and return the result
+        cachedResult = function
         return function
     }
 }

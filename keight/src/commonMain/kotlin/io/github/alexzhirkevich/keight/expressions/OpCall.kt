@@ -30,13 +30,26 @@ internal class OpCall(
 
         val callable = func.invoke(runtime)
 
-        if (callable == null && isOptional) {
+        if ((callable == null || callable is Undefined) && isOptional) {
             return Undefined
+        }
+
+        // Expand spread arguments
+        val expandedArgs = mutableListOf<JsAny?>()
+        for (arg in args) {
+            if (arg is OpSpread) {
+                val spreadValue = arg.invoke(runtime)
+                if (spreadValue is Iterable<*>) {
+                    expandedArgs.addAll(spreadValue as Iterable<JsAny?>)
+                }
+            } else {
+                expandedArgs.add(arg.invoke(runtime))
+            }
         }
 
         return callable.callableOrThrow(runtime).call(
             thisArg = thisRef,
-            args = args.fastMap { it.invoke(runtime) },
+            args = expandedArgs,
             runtime = runtime
         )
     }
@@ -45,72 +58,23 @@ internal class OpCall(
 internal fun OpCall(
     callable : Expression,
     arguments : List<Expression>,
-    isOptional : Boolean
+    isOptional : Boolean = false
 ) : Expression {
 
-//    return when {
-//        callable is OpIndex -> OpCall(
-//            receiver = callable.receiver,
-//            func = callable,
-//            args = arguments,
-//            isOptional = callable.isOptional
-//        )
-//
-//        callable is OpGetProperty -> OpCall(
-//            receiver = callable.receiver,
-//            func = callable,
-//            args = arguments,
-//            isOptional = callable.isOptional
-//        )
-//
-//        else -> OpCall(
-//            receiver = null,
-//            func = callable,
-//            args = arguments,
-//            isOptional = false
-//        )
-//    }
-
     return when {
-        callable is OpIndex -> Expression { r ->
-            val receiver = callable.receiver.invoke(r)
+        callable is OpIndex -> OpCall(
+            receiver = callable.receiver,
+            func = callable,
+            args = arguments,
+            isOptional = callable.isOptional
+        )
 
-            if ((receiver == null || receiver == Undefined) && callable.isOptional) {
-                return@Expression Undefined
-            }
-
-            r.typeCheck(receiver != null) {
-                "Can't get properties of $receiver".js
-            }
-
-            receiver.call(
-                func = callable.index.invoke(r),
-                thisRef = receiver,
-                args = arguments.fastMap { it(r) },
-                isOptional = callable.isOptional,
-                runtime = r
-            )
-        }
-
-        callable is OpGetProperty && callable.receiver != null -> Expression { r ->
-            val receiver = callable.receiver.invoke(r)
-
-            if ((receiver == null || receiver == Undefined) && callable.isOptional) {
-                return@Expression Undefined
-            }
-
-            r.typeCheck(receiver != null) {
-                "Can't get properties (${callable.name}) of $receiver".js
-            }
-
-            receiver.call(
-                func = callable.name.js,
-                thisRef = receiver,
-                args = arguments.fastMap { it(r) },
-                isOptional = callable.isOptional,
-                runtime = r
-            )
-        }
+        callable is OpGetProperty && callable.receiver != null -> OpCall(
+            receiver = callable.receiver,
+            func = callable,
+            args = arguments,
+            isOptional = callable.isOptional
+        )
 
         else -> Expression { r ->
             callable.invoke(r).let {

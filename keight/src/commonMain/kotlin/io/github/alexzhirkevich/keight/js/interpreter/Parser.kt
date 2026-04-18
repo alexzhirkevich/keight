@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight.js.interpreter
 
+import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Delegate
 import io.github.alexzhirkevich.keight.Expression
@@ -20,6 +21,7 @@ import io.github.alexzhirkevich.keight.expressions.OpEquals
 import io.github.alexzhirkevich.keight.expressions.OpExp
 import io.github.alexzhirkevich.keight.expressions.OpForInLoop
 import io.github.alexzhirkevich.keight.expressions.OpForLoop
+import io.github.alexzhirkevich.keight.expressions.OpForOfLoop
 import io.github.alexzhirkevich.keight.expressions.OpGetProperty
 import io.github.alexzhirkevich.keight.expressions.OpGetter
 import io.github.alexzhirkevich.keight.expressions.OpIfCondition
@@ -27,6 +29,9 @@ import io.github.alexzhirkevich.keight.expressions.OpIn
 import io.github.alexzhirkevich.keight.expressions.OpIncDecAssign
 import io.github.alexzhirkevich.keight.expressions.OpIndex
 import io.github.alexzhirkevich.keight.expressions.OpColonAssignment
+import io.github.alexzhirkevich.keight.expressions.OpComputedProperty
+import io.github.alexzhirkevich.keight.expressions.OpComputedPropertyMethod
+import io.github.alexzhirkevich.keight.expressions.OpComputedPropertyName
 import io.github.alexzhirkevich.keight.expressions.OpLongInt
 import io.github.alexzhirkevich.keight.expressions.OpLongLong
 import io.github.alexzhirkevich.keight.expressions.OpMake
@@ -37,12 +42,15 @@ import io.github.alexzhirkevich.keight.expressions.OpNotEquals
 import io.github.alexzhirkevich.keight.expressions.OpReturn
 import io.github.alexzhirkevich.keight.expressions.OpSetter
 import io.github.alexzhirkevich.keight.expressions.OpSpread
+import io.github.alexzhirkevich.keight.expressions.OpSuperGetProperty
+import io.github.alexzhirkevich.keight.expressions.OpSuperGetPropertyComputed
 import io.github.alexzhirkevich.keight.expressions.OpSwitch
 import io.github.alexzhirkevich.keight.expressions.OpTouple
 import io.github.alexzhirkevich.keight.expressions.OpTryCatch
 import io.github.alexzhirkevich.keight.expressions.OpWhileLoop
 import io.github.alexzhirkevich.keight.expressions.PropertyAccessorFactory
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
+import io.github.alexzhirkevich.keight.expressions.Destruction
 import io.github.alexzhirkevich.keight.expressions.asDestruction
 import io.github.alexzhirkevich.keight.fastAll
 import io.github.alexzhirkevich.keight.fastMap
@@ -333,6 +341,7 @@ private fun ListIterator<Token>.parseStatement(
                 6 -> when (nextSignificant()) {
                     Token.Operator.In -> parseInOperator(x, precedence)
                     Token.Operator.Instanceof -> parseInstanceOfOperator(x, precedence)
+                    Token.Identifier.Keyword.Of -> parseOfOperator(x, precedence)
                     else -> { returnToIndex(i); break; }
                 }
 
@@ -481,18 +490,41 @@ private fun ListIterator<Token>.parseStatement(
                     )
 
                     is Token.Operator.Colon -> if (blockContext.lastOrNull() != BlockContext.Ternary) {
-                        OpColonAssignment(
-                            key = when (x) {
-                                is OpGetProperty -> x.name.js
-                                is OpConstant -> x.value
-                                else -> throw SyntaxError("Invalid ussage of : operator")
-                            },
-                            value = parseStatement(
+                        // Check if this is a computed property name
+                        // Computed property names include: [expr], OpComputedPropertyName, and OpMakeArray (when used as computed key)
+                        val isComputedProperty = x is OpComputedPropertyName || x is OpMakeArray
+                        
+                        val key = when {
+                            x is OpGetProperty -> x.name.js
+                            x is OpConstant -> x.value
+                            isComputedProperty -> null as JsAny? // Computed property - key will be evaluated at runtime
+                            x is OpIndex -> throw SyntaxError("Invalid usage of : operator (unexpected index)")
+                            else -> throw SyntaxError("Invalid usage of : operator")
+                        }
+                        
+                        val value = if (isComputedProperty) {
+                            // For computed property names, we need to store both the key expression and value expression
+                            // For OpMakeArray, the array itself is the key expression
+                            val keyExpr = when (x) {
+                                is OpComputedPropertyName -> x.keyExpression
+                                is OpMakeArray -> OpMakeArray(x.items)
+                                else -> x
+                            }
+                            OpComputedProperty(
+                                keyExpr, parseStatement(
+                                blockContext,
+                                precedence,
+                                ExpectedBlockType.Object
+                            ))
+                        } else {
+                            parseStatement(
                                 blockContext,
                                 precedence,
                                 ExpectedBlockType.Object
                             )
-                        )
+                        }
+                        
+                        OpColonAssignment(key = key, value = value)
                     } else {
                         returnToIndex(i); break;
                     }
@@ -592,15 +624,20 @@ private fun ListIterator<Token>.parseFactor(
 
         Token.Operator.Bracket.CurlyOpen -> {
             prevSignificant()
+            // If we're in object context, treat { } as object literal
+            val objectType = if (BlockContext.Object in blockContext)
+                ExpectedBlockType.Object
+            else
+                blockType
             parseBlock(
                 blockContext = blockContext,
-                type = blockType
+                type = objectType
             )
         }
 
         Token.Operator.Bracket.RoundOpen -> {
             prevSignificant()
-            parseExpressionGrouping()
+            parseExpressionGrouping(blockContext)
         }
         Token.Operator.Bracket.SquareOpen -> {
             prevSignificant()
@@ -618,9 +655,9 @@ private fun ListIterator<Token>.parseFactor(
             val n = nextSignificant()
             when {
                 canHaveAccessor && next.identifier == "get" && n is Token.Identifier ->
-                    OpGetter(parseFunction(name = n.identifier, blockContext = emptyList()))
+                    OpGetter(parseFunction(name = n.identifier, blockContext = blockContext))
                 canHaveAccessor && next.identifier == "set" && n is Token.Identifier ->
-                    OpSetter(parseFunction(name = n.identifier, blockContext = emptyList()))
+                    OpSetter(parseFunction(name = n.identifier, blockContext = blockContext))
                 else -> {
                     returnToIndex(i)
                     OpGetProperty(next.identifier, receiver = null)
@@ -771,7 +808,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
         }
 
         Token.Identifier.Keyword.If ->  OpIfCondition(
-            condition = parseExpressionGrouping(),
+            condition = parseExpressionGrouping(blockContext),
             onTrue = parseBlock(blockContext = blockContext),
             onFalse = if (eat(Token.Identifier.Keyword.Else)) {
                 parseBlock(blockContext = blockContext)
@@ -787,7 +824,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
                 OpReturn(OpConstant(Undefined))
             } else {
                 previous()
-                OpReturn(parseStatement(blockType = ExpectedBlockType.Object))
+                OpReturn(parseStatement(blockContext = blockContext, blockType = ExpectedBlockType.Object))
             }
         }
 
@@ -799,7 +836,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
                 throw t as? Throwable ?: ThrowableValue(t)
             }
         }
-        Token.Identifier.Keyword.Async -> parseAsync()
+        Token.Identifier.Keyword.Async -> parseAsync(blockContext)
         Token.Identifier.Keyword.Await -> parseAwait()
         Token.Identifier.Keyword.Try -> parseTryCatch(blockContext)
         Token.Identifier.Keyword.This -> Expression { it.thisRef }
@@ -824,6 +861,8 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
 //            }
         }
         Token.Identifier.Keyword.Debugger -> throw SyntaxError("Debugger is not supported")
+        Token.Identifier.Keyword.Of -> throw SyntaxError("'of' can only be used in for...of loop")
+        Token.Identifier.Keyword.Super -> parseSuper(blockContext)
         Token.Identifier.Keyword.Else,
         Token.Identifier.Keyword.Extends,
         Token.Identifier.Keyword.Finally,
@@ -831,6 +870,63 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
         Token.Identifier.Keyword.Import -> parseImport()
         Token.Identifier.Keyword.Export -> parseExport()
 
+    }
+}
+
+/**
+ * Parse super keyword and its subsequent operations.
+ * super can be followed by:
+ * - .property (property access on parent prototype)
+ * - [expr] (computed property access on parent prototype)
+ * - (args) (parent constructor call)
+ */
+private fun ListIterator<Token>.parseSuper(blockContext: List<BlockContext>): Expression {
+    syntaxCheck(BlockContext.Class in blockContext) {
+        "'super' can only be used in class methods"
+    }
+
+    return when (val next = nextSignificant()) {
+        // super() - call parent constructor
+        is Token.Operator.Bracket.RoundOpen -> {
+            prevSignificant()
+            parseSuperConstructorCall(blockContext)
+        }
+        // super.xxx - property access on parent prototype
+        is Token.Operator.Period, is Token.Operator.DoublePeriod -> {
+            val prop = nextSignificant()
+            syntaxCheck(prop is Token.Identifier) {
+                "Illegal super property access"
+            }
+            OpSuperGetProperty(name = prop.identifier)
+        }
+        // super[expr] - computed property access on parent prototype
+        is Token.Operator.Bracket.SquareOpen -> {
+            val indexExpr = parseStatement(blockType = ExpectedBlockType.Object)
+            syntaxCheck(nextSignificant() is Token.Operator.Bracket.SquareClose) {
+                "Missing ']' after super expression"
+            }
+            OpSuperGetPropertyComputed(index = indexExpr)
+        }
+        else -> {
+            throw SyntaxError("'super' must be followed by '.', '[', or '('")
+        }
+    }
+}
+
+/**
+ * Parse super(...) constructor call.
+ * super() should use the 'super' variable that was passed as extraArgs in JSFunction.construct()
+ */
+private fun ListIterator<Token>.parseSuperConstructorCall(blockContext: List<BlockContext>): Expression {
+    val args = parseExpressionGrouping(blockContext).expressions
+    // The 'super' variable is injected by JSFunction.construct() via extraArgs
+    return Expression { runtime ->
+        val superFn = runtime.get("super".js)
+        if (superFn is Callable) {
+            superFn.call(runtime.thisRef, args.fastMap { it(runtime) }, runtime)
+        } else {
+            runtime.referenceError { "'super' is not defined".js }
+        }
     }
 }
 
@@ -943,7 +1039,31 @@ private fun ListIterator<Token>.parseArrayCreation(): Expression {
     return OpMakeArray(expressions)
 }
 
-private fun ListIterator<Token>.parseExpressionGrouping(): OpTouple {
+/**
+ * Parses a computed property name in an object literal context.
+ * Syntax: { [expression]: value } or { [expression]() {} }
+ */
+private fun ListIterator<Token>.parseComputedPropertyName(): Expression {
+    check(eat(Token.Operator.Bracket.SquareOpen))
+    
+    // Parse the key expression - use low precedence to get only the next token/expression
+    // The key expression in computed property name is evaluated as-is
+    val keyExpr = parseStatement(
+        blockContext = emptyList(), 
+        maxPrecedence = 14,
+        blockType = ExpectedBlockType.Object
+    )
+    
+    syntaxCheck(eat(Token.Operator.Bracket.SquareClose)) {
+        "Missing ']' in computed property name"
+    }
+    
+    // Return an expression that represents the computed property name.
+    // Use a dedicated expression type for clarity.
+    return OpComputedPropertyName(keyExpr)
+}
+
+private fun ListIterator<Token>.parseExpressionGrouping(blockContext: List<BlockContext> = emptyList()): OpTouple {
     check(eat(Token.Operator.Bracket.RoundOpen))
 
     val expressions = if (nextIsInstance<Token.Operator.Bracket.RoundClose>()) {
@@ -953,7 +1073,7 @@ private fun ListIterator<Token>.parseExpressionGrouping(): OpTouple {
             if (nextIsInstance<Token.Operator.Bracket.RoundClose>()) {
                 return@buildList
             }
-            add(parseStatement(emptyList(), blockType = ExpectedBlockType.Object))
+            add(parseStatement(blockContext, blockType = ExpectedBlockType.Object))
         } while (nextSignificant() is Token.Operator.Comma)
         prevSignificant()
     }
@@ -1022,26 +1142,83 @@ private fun ListIterator<Token>.parseFunctionCall(
     blockContext: List<BlockContext>
 ) : Expression {
 
-    val argsIndex = nextIndex()
-    val arguments = parseExpressionGrouping().expressions
-    val afterIndex = nextIndex()
+    val arguments = parseExpressionGrouping(blockContext).expressions
+    val afterArgsIndex = nextIndex()
 
-    return if (
-        function is OpGetProperty
-        && blockContext.lastOrNull() == BlockContext.Object
-        && hasNext()
-        && next() == Token.Operator.Bracket.CurlyOpen
-    ) {
-        returnToIndex(argsIndex)
-        OpFunctionInit(parseFunction(name = function.name, blockContext = blockContext))
-    } else {
-        returnToIndex(afterIndex)
-        OpCall(
-            callable = function,
-            arguments = arguments,
-            isOptional = optional
-        )
+    // Check if this is a method shorthand: obj.method() { } or obj.method() {}
+    val isInObjectContext = blockContext.lastOrNull() == BlockContext.Object
+    
+    // Support both OpGetProperty (e.g., method()) and OpComputedPropertyName (e.g., [key]())
+    val isMethodShorthand = (function is OpGetProperty || function is OpComputedPropertyName)
+            && isInObjectContext
+            && hasNext()
+
+    if (isMethodShorthand) {
+        // Peek at the next token without consuming it
+        val nextIndex = nextIndex()
+        val nextToken = if (hasNext()) next() else null
+        returnToIndex(nextIndex)
+
+        if (nextToken == Token.Operator.Bracket.CurlyOpen) {
+            // This is method shorthand: { method() { } } or { method(params) { } }
+            // or { [key]() { } } for computed property names
+            
+            // For computed property names, we need special handling
+            if (function is OpComputedPropertyName) {
+                // Create a function with a temporary name, we'll update it at runtime
+                val keyExpr = function.keyExpression
+                val body = parseBlock(
+                    scoped = false,
+                    blockContext = blockContext + BlockContext.Function,
+                    type = ExpectedBlockType.Block
+                ) as OpBlock
+                
+                val params = arguments.map { it.toFunctionParam() }
+                
+                // Create a function with placeholder name
+                val tempFunction = JSFunction(
+                    name = "",  // Will be set at runtime
+                    parameters = params,
+                    body = body
+                )
+                
+                // Return an expression that will set the method at runtime
+                return OpComputedPropertyMethod(keyExpr, tempFunction)
+            } else {
+                // Standard method shorthand - function is OpGetProperty
+                return OpFunctionInit(parseMethodBody(name = (function as OpGetProperty).name, arguments = arguments, blockContext = blockContext))
+            }
+        }
     }
+
+    returnToIndex(afterArgsIndex)
+    return OpCall(
+        callable = function,
+        arguments = arguments,
+        isOptional = optional
+    )
+}
+
+private fun ListIterator<Token>.parseMethodBody(
+    name: String,
+    arguments: List<Expression>,
+    blockContext: List<BlockContext>
+) : JSFunction {
+    // At this point, we just need to parse the { body }
+    val body = parseBlock(
+        scoped = false,
+        blockContext = blockContext + BlockContext.Function,
+        type = ExpectedBlockType.Block
+    ) as OpBlock
+    
+    // Convert arguments expressions to function parameters
+    val params = arguments.map { it.toFunctionParam() }
+    
+    return JSFunction(
+        name = name,
+        parameters = params,
+        body = body
+    )
 }
 
 
@@ -1051,6 +1228,14 @@ private fun ListIterator<Token>.parseInOperator(subject : Expression, precedence
         property = subject,
         inObject = obj
     )
+}
+
+private fun ListIterator<Token>.parseOfOperator(subject : Expression, precedence: Int) : Expression {
+    val obj = parseStatement(maxPrecedence = precedence, blockType = ExpectedBlockType.Object)
+    return OpIn(
+        property = subject,
+        inObject = obj
+    ).also { it.isForOf = true }
 }
 
 private fun ListIterator<Token>.parseInstanceOfOperator(subject : Expression, precedence: Int) : Expression {
@@ -1226,11 +1411,16 @@ private fun ListIterator<Token>.parseForLoop(parentBlockContext: List<BlockConte
         parseBlock(scoped = false, blockContext = emptyList())
     }
 
-    // for (x in y)
+    // for (x in y) or for (x of y)
     if (assign is OpBlock) {
         val opIn = assign.expressions.singleOrNull() as? OpIn
         if (opIn != null) {
-            return parseForInLoop(opIn, parentBlockContext)
+            // Use isForOf flag to determine loop type
+            return if (opIn.isForOf) {
+                parseForOfLoop(opIn, parentBlockContext)
+            } else {
+                parseForInLoop(opIn, parentBlockContext)
+            }
         }
     }
 
@@ -1296,6 +1486,33 @@ private fun ListIterator<Token>.parseForInLoop(opIn: OpIn, parentBlockContext : 
     )
 }
 
+private fun ListIterator<Token>.parseForOfLoop(opIn: OpIn, parentBlockContext: List<BlockContext>): Expression {
+    syntaxCheck(nextSignificant() is Token.Operator.Bracket.RoundClose) {
+        "Invalid for loop"
+    }
+
+    // Convert opIn.property to a Destruction for handling both simple and destructuring cases
+    val dest = opIn.property.asDestruction()
+
+    // assign function: for destructuring, use Destruction.destruct()
+    // Note: variableType = null means assignment (not declaration)
+    val assign: suspend (ScriptRuntime, JsAny?) -> Unit = { r, v ->
+        dest.destruct(
+            obj = v,
+            variableType = null,
+            runtime = r,
+            default = null
+        )
+    }
+
+    val body = parseBlock(blockContext = parentBlockContext + BlockContext.Loop)
+    return OpForOfLoop(
+        assign = assign,
+        iterable = opIn.inObject,
+        body = body
+    )
+}
+
 private fun ListIterator<Token>.parseWhileLoop(parentBlockContext: List<BlockContext>): Expression {
     return OpWhileLoop(
         condition = parseExpressionGrouping(),
@@ -1321,14 +1538,53 @@ private fun ListIterator<Token>.parseDoWhileLoop(blockContext: List<BlockContext
     )
 }
 
-private fun ListIterator<Token>.parseAsync(): Expression {
+private fun ListIterator<Token>.parseAsync(blockContext: List<BlockContext>): Expression {
+    // Check if we're in object context and the next token is an identifier (method shorthand)
+    val isInObjectContext = blockContext.lastOrNull() == BlockContext.Object
+    
+    if (isInObjectContext && nextIsInstance<Token.Identifier.Property>()) {
+        // This is async method shorthand: { async method() {} }
+        val methodName = (nextSignificant() as Token.Identifier.Property).identifier
+        // Parse the function parameters and body
+        val touple = parseStatement(blockType = ExpectedBlockType.None)
+        syntaxCheck(touple is OpTouple) {
+            "Invalid function declaration"
+        }
+        val args = touple.expressions.map(Expression::toFunctionParam)
+        
+        val block = parseBlock(
+            scoped = false,
+            blockContext = blockContext + BlockContext.Function,
+            type = ExpectedBlockType.Block
+        )
+        
+        val func = JSFunction(
+            name = methodName,
+            parameters = args,
+            body = block,
+            isAsync = true
+        )
+        
+        return OpColonAssignment(
+            key = methodName.js,
+            value = OpFunctionInit(func)
+        )
+    }
+    
     val subject = parseStatement(blockType = ExpectedBlockType.Object)
 
-    syntaxCheck(subject is OpFunctionInit && !subject.function.isAsync) {
-        "Illegal usage of 'async' keyword"
+    // Support both async function expressions
+    return when (subject) {
+        is OpFunctionInit -> {
+            syntaxCheck(!subject.function.isAsync) {
+                "Illegal usage of 'async' keyword"
+            }
+            OpFunctionInit(subject.function.copy(isAsync = true))
+        }
+        else -> {
+            throw SyntaxError("Illegal usage of 'async' keyword")
+        }
     }
-
-    return OpFunctionInit(subject.function.copy(isAsync = true))
 }
 
 private fun ListIterator<Token>.parseAwait(): Expression {
@@ -1687,23 +1943,28 @@ private fun ListIterator<Token>.parseBlock(
                     }
 
                     expr is OpFunctionInit && !expr.function.isArrow -> {
-                        val name = expr.function.name
+                        // In object context, OpFunctionInit is a method, not a hoisted function
+                        if (type == ExpectedBlockType.Object) {
+                            add(expr)
+                        } else {
+                            val name = expr.function.name
 
-                        syntaxCheck(name.isNotBlank()) {
-                            "Function statements require a function name"
+                            syntaxCheck(name.isNotBlank()) {
+                                "Function statements require a function name"
+                            }
+
+                            val assign = OpAssign(
+                                type = VariableType.Local,
+                                variableName = name,
+                                receiver = null,
+                                assignableValue = expr,
+                                merge = null
+                            )
+                            add(
+                                index = hoistedIndex++,
+                                element = Expression { assign(it); Undefined }
+                            )
                         }
-
-                        val assign = OpAssign(
-                            type = VariableType.Local,
-                            variableName = name,
-                            receiver = null,
-                            assignableValue = expr,
-                            merge = null
-                        )
-                        add(
-                            index = hoistedIndex++,
-                            element = Expression { assign(it); Undefined }
-                        )
                     }
 
                     expr is OpExport && expr.property is OpClassInit -> {
@@ -1787,9 +2048,29 @@ private fun ListIterator<Token>.parseBlock(
             it is OpColonAssignment //  { a : 'b' }
                     || it is OpSpread //  { ...obj }
                     || it is PropertyAccessorFactory //  { get x(){} }
+                    || it is OpGetProperty // { x } - property shorthand
+                    || it is OpFunctionInit // { method() {} } - method shorthand
+                    || it is OpComputedPropertyMethod // { [key]() {} } - computed property method
         }
     ) {
-        OpMakeObject(list)
+        // Transform list to handle ES6 shorthand properties and methods
+        val transformedList = list.map { expr ->
+            when (expr) {
+                // Property shorthand: { x } -> { x: x }
+                is OpGetProperty -> OpColonAssignment(
+                    key = expr.name.js,
+                    value = expr
+                )
+                // Method shorthand: { method() {} } already handled by parseFunctionCall
+                // but OpFunctionInit at object context needs to be wrapped as method
+                is OpFunctionInit -> OpColonAssignment(
+                    key = expr.function.name.js,
+                    value = expr
+                )
+                else -> expr
+            }
+        }
+        OpMakeObject(transformedList)
     } else {
         val (isStrict, exprs) = if ((list.firstOrNull() as? OpConstant)?.value?.toString() == "use strict") {
             true to list.drop(1)
