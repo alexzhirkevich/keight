@@ -104,8 +104,8 @@ internal suspend fun processClassProperties(
         when (value) {
             is OpGetter -> {
                 // Key is "__getter__propertyName", extract actual property name
-                val actualName = if (propName.startsWith("__getter__")) {
-                    propName.removePrefix("__getter__")
+                val actualName = if (propName.startsWith(Constants.getterPrefix)) {
+                    propName.removePrefix(Constants.getterPrefix)
                 } else propName
                 // Set superProto for the getter method
                 val getter = value.value
@@ -126,8 +126,8 @@ internal suspend fun processClassProperties(
             }
             is OpSetter -> {
                 // Key is "__setter__propertyName", extract actual property name
-                val actualName = if (propName.startsWith("__setter__")) {
-                    propName.removePrefix("__setter__")
+                val actualName = if (propName.startsWith(Constants.setterPrefix)) {
+                    propName.removePrefix(Constants.setterPrefix)
                 } else propName
                 // Set superProto for the setter method
                 val setter = value.value

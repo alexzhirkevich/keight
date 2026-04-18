@@ -15,4 +15,11 @@ internal object Constants {
 
     internal const val toString = "toString"
     internal const val valueOf = "valueOf"
+
+    /**
+     * Internal property key prefixes used for storing class getters and setters
+     * before they are processed by [OpClassInit].
+     */
+    internal const val getterPrefix = "__getter__"
+    internal const val setterPrefix = "__setter__"
 }
