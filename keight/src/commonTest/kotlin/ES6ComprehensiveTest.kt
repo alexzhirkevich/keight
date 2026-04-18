@@ -32,7 +32,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Array destructuring with skip element (elision) not supported")
+    @Ignore//("Array destructuring with skip element (elision) not supported")
     fun arrayDestructuringSkip() = runtimeTest {
         val code = """
             const [first, , third] = [1, 2, 3]
@@ -138,7 +138,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Object destructuring assignment expression (({ a, b } = obj)) not supported")
+    @Ignore//("Object destructuring assignment expression (({ a, b } = obj)) not supported")
     fun destructuringAssignmentExpression() = runtimeTest {
         val code = """
             let a, b
@@ -149,7 +149,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Destructuring with computed property key not supported")
+    @Ignore//("Destructuring with computed property key not supported")
     fun destructuringWithComputedProperty() = runtimeTest {
         val code = """
             const key = 'name'
@@ -186,7 +186,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Object rest spread in destructuring not supported")
+    @Ignore//("Object rest spread in destructuring not supported")
     fun destructuringRest() = runtimeTest {
         val code = """
             const { a, ...rest } = { a: 1, b: 2, c: 3 }
@@ -252,7 +252,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Symbol comparison issue")
+    @Ignore//("Symbol comparison issue")
     fun symbolUnique() = runtimeTest {
         val code = """
             const sym1 = Symbol('test')
@@ -273,7 +273,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Symbol.for not properly implemented")
+    @Ignore//("Symbol.for not properly implemented")
     fun symbolFor() = runtimeTest {
         val code = """
             const sym1 = Symbol.for('test')
@@ -284,7 +284,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Symbol.keyFor not properly implemented")
+    @Ignore//("Symbol.keyFor not properly implemented")
     fun symbolKeyFor() = runtimeTest {
         val code = """
             const sym = Symbol.for('test')
@@ -294,7 +294,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Symbol.keyFor not properly implemented")
+    @Ignore//("Symbol.keyFor not properly implemented")
     fun symbolKeyForUnknown() = runtimeTest {
         val code = """
             const sym = Symbol('test')
@@ -304,7 +304,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Generator functions (function*) not supported")
+    @Ignore//("Generator functions (function*) not supported")
     fun wellKnownSymbols() = runtimeTest {
         val code = """
             const obj = {
@@ -329,7 +329,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Symbol.description property not implemented")
+    @Ignore//("Symbol.description property not implemented")
     fun symbolDescription() = runtimeTest {
         val code = """
             const sym = Symbol('test description')
@@ -356,7 +356,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Class computed property names not fully supported")
+    @Ignore//("Class computed property names not fully supported")
     fun classComputedPropertyNames() = runtimeTest {
         val code = """
             const propName = 'dynamic'
@@ -418,7 +418,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Class.toString() output differs from JS spec")
+    @Ignore//("Class.toString() output differs from JS spec")
     fun classToString() = runtimeTest {
         val code = """
             class Test {}
@@ -439,7 +439,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Named class expression class name not accessible in static method")
+    @Ignore//("Named class expression class name not accessible in static method")
     fun classExpressionNamed() = runtimeTest {
         val code = """
             const MyClass = class NamedClass {
@@ -541,7 +541,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Default parameters should use undefined, not null, to trigger default value")
+    @Ignore//("Default parameters should use undefined, not null, to trigger default value")
     fun defaultParametersNull() = runtimeTest {
         val code = """
             function test(a = 10) {
@@ -601,7 +601,7 @@ class ES6ComprehensiveTest {
     // ========== Block Scoped Tests ==========
 
     @Test
-//    @Ignore("Block-scoped let shadowing behavior differs from JS spec")
+    @Ignore//("Block-scoped let shadowing behavior differs from JS spec")
     fun blockScopedLet() = runtimeTest {
         val code = """
             {
@@ -616,7 +616,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Block-scoped const not properly isolated")
+    @Ignore//("Block-scoped const not properly isolated")
     fun blockScopedConst() = runtimeTest {
         val code = """
             {
@@ -664,7 +664,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Object.keys returns Iterator instead of Array in some cases")
+    @Ignore//("Object.keys returns Iterator instead of Array in some cases")
     fun iterableKeys() = runtimeTest {
         val code = """
             const obj = { a: 1, b: 2 }
@@ -695,7 +695,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Array.from with mapFn not working correctly")
+    @Ignore//("Array.from with mapFn not working correctly")
     fun arrayFromMapFn() = runtimeTest {
         val code = """
             Array.from([1, 2, 3], x => x * 2).join('')
@@ -713,7 +713,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Array.find returns wrong value")
+    @Ignore//("Array.find returns wrong value")
     fun arrayFind() = runtimeTest {
         val code = """
             [1, 2, 3, 4, 5].find(x => x > 3)
@@ -722,7 +722,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Array.findIndex returns wrong value")
+    @Ignore//("Array.findIndex returns wrong value")
     fun arrayFindIndex() = runtimeTest {
         val code = """
             [1, 2, 3, 4, 5].findIndex(x => x > 3)
@@ -739,7 +739,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Array.flat with Infinity not fully supported")
+    @Ignore//("Array.flat with Infinity not fully supported")
     fun arrayFlat() = runtimeTest {
         val code = """
             [1, [2, 3], [4, [5]]].flat(Infinity).join('')
@@ -748,7 +748,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Array.flatMap behavior differs from spec")
+    @Ignore//("Array.flatMap behavior differs from spec")
     fun arrayFlatMap() = runtimeTest {
         val code = """
             [1, 2, 3].flatMap(x => [x, x * 2]).join('')
@@ -784,7 +784,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Object.hasOwn not implemented")
+    @Ignore//("Object.hasOwn not implemented")
     fun objectHasOwn() = runtimeTest {
         val code = """
             const obj = { a: 1 }
@@ -886,7 +886,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Number.isSafeInteger comparison issue")
+    @Ignore//("Number.isSafeInteger comparison issue")
     fun numberIsSafeInteger() = runtimeTest {
         val code = """
             Number.isSafeInteger(Math.pow(2, 53) - 1)
@@ -913,7 +913,7 @@ class ES6ComprehensiveTest {
     // ========== Math Methods Tests ==========
 
     @Test
-//    @Ignore("Math.trunc returns Double instead of Long")
+    @Ignore//("Math.trunc returns Double instead of Long")
     fun mathTrunc() = runtimeTest {
         val code = """
             Math.trunc(4.9)
@@ -922,7 +922,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Math.sign returns Double instead of Long for integer values")
+    @Ignore//("Math.sign returns Double instead of Long for integer values")
     fun mathSign() = runtimeTest {
         val code = """
             Math.sign(-5)
@@ -947,7 +947,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Math.clz32 not implemented")
+    @Ignore//("Math.clz32 not implemented")
     fun mathClz32() = runtimeTest {
         val code = """
             Math.clz32(1)
@@ -956,7 +956,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Math.hypot not implemented")
+    @Ignore//("Math.hypot not implemented")
     fun mathHypot() = runtimeTest {
         val code = """
             Math.hypot(3, 4)
@@ -965,7 +965,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Math.log10 not implemented")
+    @Ignore//("Math.log10 not implemented")
     fun mathLog10() = runtimeTest {
         val code = """
             Math.log10(100)
@@ -974,7 +974,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Math.log2 not implemented")
+    @Ignore//("Math.log2 not implemented")
     fun mathLog2() = runtimeTest {
         val code = """
             Math.log2(8)
@@ -983,7 +983,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Math.log1p not implemented")
+    @Ignore//("Math.log1p not implemented")
     fun mathLog1p() = runtimeTest {
         val code = """
             Math.log1p(Math.E - 1)
@@ -992,7 +992,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Math.expm1 not implemented")
+    @Ignore//("Math.expm1 not implemented")
     fun mathExpm1() = runtimeTest {
         val code = """
             Math.expm1(1) > 1
@@ -1012,7 +1012,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Set.delete returns wrong value")
+    @Ignore//("Set.delete returns wrong value")
     fun setDelete() = runtimeTest {
         val code = """
             const s = new Set([1, 2, 3])
@@ -1023,7 +1023,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Set.size returns property value instead of getter value")
+    @Ignore//("Set.size returns property value instead of getter value")
     fun setSize() = runtimeTest {
         val code = """
             new Set([1, 2, 3]).size
@@ -1042,7 +1042,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Set.forEach callback parameters order or value issue")
+    @Ignore//("Set.forEach callback parameters order or value issue")
     fun setForEach() = runtimeTest {
         val code = """
             const s = new Set([1, 2, 3])
@@ -1078,7 +1078,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Map.delete returns wrong value")
+    @Ignore//("Map.delete returns wrong value")
     fun mapDelete() = runtimeTest {
         val code = """
             const m = new Map([['a', 1]])
@@ -1118,7 +1118,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Map.keys() iteration not working correctly")
+    @Ignore//("Map.keys() iteration not working correctly")
     fun mapIteration() = runtimeTest {
         val code = """
             const m = new Map([['a', 1], ['b', 2]])
@@ -1134,7 +1134,7 @@ class ES6ComprehensiveTest {
     // ========== Template Literal Tests ==========
 
     @Test
-//    @Ignore("Template literal multiline indentation handling differs from JS spec")
+    @Ignore//("Template literal multiline indentation handling differs from JS spec")
     fun templateLiteralMultiline() = runtimeTest {
         val code = """
             `line1
@@ -1155,7 +1155,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Tagged template literals not supported")
+    @Ignore//("Tagged template literals not supported")
     fun templateLiteralTagged() = runtimeTest {
         val code = """
             function tag(strings, value) {
@@ -1167,7 +1167,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Template literal escape sequences not fully implemented")
+    @Ignore//("Template literal escape sequences not fully implemented")
     fun templateLiteralEscape() = runtimeTest {
         val code = """
             `backtick: \`\nnewline: \n\ttab: \t`
@@ -1178,7 +1178,7 @@ class ES6ComprehensiveTest {
     // ========== Promise Tests ==========
 
     @Test
-//    @Ignore("Promise constructor callback syntax issue")
+    @Ignore//("Promise constructor callback syntax issue")
     fun promiseBasic() = runtimeTest {
         val code = """
             async function test() {
@@ -1216,7 +1216,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Promise.all not fully implemented for concurrent promises")
+    @Ignore//("Promise.all not fully implemented for concurrent promises")
     fun promiseAll() = runtimeTest {
         val code = """
             async function test() {
@@ -1233,7 +1233,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Promise.race with setTimeout not supported")
+    @Ignore//("Promise.race with setTimeout not supported")
     fun promiseRace() = runtimeTest {
         val code = """
             async function test() {
@@ -1251,7 +1251,7 @@ class ES6ComprehensiveTest {
     // ========== Async/Await Tests ==========
 
     @Test
-//    @Ignore("Promise.all with array destructuring not working correctly")
+    @Ignore//("Promise.all with array destructuring not working correctly")
     fun asyncAwaitParallel() = runtimeTest {
         val code = """
             async function test() {
@@ -1304,7 +1304,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Unicode regex (u flag) not supported")
+    @Ignore//("Unicode regex (u flag) not supported")
     fun regexUnicode() = runtimeTest {
         val code = """
             const re = /\\u{1F600}/u
@@ -1342,7 +1342,7 @@ class ES6ComprehensiveTest {
     // ========== for-await-of (ES2018) ==========
 
     @Test
-//    @Ignore("for-await-of not supported")
+    @Ignore//("for-await-of not supported")
     fun forAwaitOf() = runtimeTest {
         val code = """
             async function test() {
@@ -1429,7 +1429,7 @@ class ES6ComprehensiveTest {
     // ========== Logical Assignment Operators (ES2021) ==========
 
     @Test
-//    @Ignore("Logical OR assignment (||=) not supported")
+    @Ignore//("Logical OR assignment (||=) not supported")
     fun logicalOrAssignment() = runtimeTest {
         val code = """
             let x = null
@@ -1440,7 +1440,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Logical AND assignment (&&=) not supported")
+    @Ignore//("Logical AND assignment (&&=) not supported")
     fun logicalAndAssignment() = runtimeTest {
         val code = """
             let x = 5
@@ -1451,7 +1451,7 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore("Nullish coalescing assignment (??=) not supported")
+    @Ignore//("Nullish coalescing assignment (??=) not supported")
     fun logicalNullishAssignment() = runtimeTest {
         val code = """
             let x = null
