@@ -160,11 +160,10 @@ class ES6ComprehensiveTest {
     }
 
     @Test
-//    @Ignore
     fun destructuringInLoop() = runtimeTest {
         val code = """
             const arr = [{a: 1, b: 2}, {a: 3, b: 4}]
-            let value = 0
+            var value = 0
             for (const {a, b} of arr) {
                 value += a + b
             }

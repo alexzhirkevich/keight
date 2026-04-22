@@ -118,39 +118,34 @@ internal class OpForOfLoop(
         runtime.withScope {
             val iterableObj = iterable(it)
 
-            syntaxCheck(iterableObj is JsAny){
+            syntaxCheck(iterableObj is JsAny) {
                 "$iterableObj is not iterable"
             }
 
             // Get iterator by calling Symbol.iterator on the iterable object
             val iteratorFn = iterableObj.get(JsSymbol.iterator, it)
-                ?: return@withScope Undefined
+                ?: return@withScope
 
             val callable = iteratorFn.callableOrNull()
-                ?: return@withScope Undefined
+                ?: return@withScope
 
-            val iterator = callable
-                .call(iterableObj, emptyList(), it)
-                ?: return@withScope Undefined
+            val iterator = callable.call(iterableObj, emptyList(), it)
+                ?: return@withScope
 
             while (true) {
+                val result = iterator
+                    .get(Constants.next.js, it)
+                    ?.callableOrNull()
+                    ?.call(iterator, emptyList(), it)
+                    ?: break
 
-                val result = iterator.call(
-                    func = Constants.next.js,
-                    thisRef = iterator,
-                    args = emptyList(),
-                    isOptional = false,
-                    runtime = it
-                ) ?: break
+                val done = result.get(Constants.done.js, it)
 
-                val done = !it.isFalse(result.get(Constants.done.js, it))
-
-                if (done) {
+                if (!it.isFalse(done)) {
                     break
                 }
 
                 val value = result.get(Constants.value.js, it)
-
                 try {
                     assign(it, value)
                     body(it)

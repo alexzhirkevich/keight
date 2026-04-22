@@ -102,24 +102,7 @@ internal fun OpCall(
         }
     }
 }
-internal suspend fun JsAny.call(
-    func : JsAny?,
-    thisRef : JsAny?,
-    args: List<JsAny?>,
-    isOptional : Boolean,
-    runtime: ScriptRuntime,
-) : JsAny? {
-    val v = get(func, runtime)
-    val callable = v?.callableOrNull()
 
-    if (callable == null && isOptional) {
-        return Undefined
-    }
-    runtime.typeCheck(callable != null) {
-        "$func is not a function".js
-    }
-    return callable.call(thisRef, args, runtime)
-}
 
 internal fun Function<*>.asCallable() : Callable = KotlinCallable(this)
 
