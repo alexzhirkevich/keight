@@ -1,5 +1,7 @@
 package io.github.alexzhirkevich.keight
 
+import org.intellij.lang.annotations.Language
+
 public interface ScriptEngine<out R : ScriptRuntime> {
 
     /**
@@ -19,12 +21,12 @@ public interface ScriptEngine<out R : ScriptRuntime> {
      * executed multiple times in parallel - it will wait for the previous execution to finish
      * - Script is always executed in the coroutine context of the engine runtime
      * */
-    public fun compile(script: String, name : String? = null) : Script
+    public fun compile(@Language("JavaScript") script: String, name : String? = null) : Script
 
     /**
      * Compile and invoke [script]. Result is converted to Kotlin type
      * */
-    public suspend fun evaluate(script: String) : Any? {
+    public suspend fun evaluate(@Language("JavaScript") script: String) : Any? {
         return compile(script).invoke()?.toKotlin(runtime)
     }
 

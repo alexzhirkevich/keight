@@ -10,12 +10,20 @@ import io.github.alexzhirkevich.keight.js.interpreter.string
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 
 internal fun JSON() = Object("JSON") {
-    "parse".js.func("string") {
+    "parse".js.func(
+        FunctionParam("text"),
+        "reviver" defaults OpArgOmitted
+    ) {
         toString(it[0]).toList().listIterator().parseJSON()
     }
 
-    "stringify".js.func("object") {
-        it[0].stringify(this).js
+    "stringify".js.func(
+        FunctionParam("value"),
+        "replacer" defaults OpArgOmitted,
+        "space"    defaults OpArgOmitted
+    ) { args ->
+        val indent = args.argOrNull(2).resolveIndent(this)
+        args[0].stringify(this, indent).js
     }
 }
 
@@ -95,40 +103,90 @@ private fun ListIterator<Char>.parsePrimitive() : JsAny? {
     }
 }
 
-private tailrec suspend fun Any?.stringify(runtime: ScriptRuntime) : String {
-    return when (this) {
-        null -> "null"
-        Undefined -> "undefined"
-        is List<*> -> stringify(runtime)
-        is JsObject -> stringify(runtime)
-        is Number -> toString()
-        is Boolean -> toString()
-        is Wrapper<*> -> value.stringify(runtime)
-        is JsAny -> "\"${runtime.toString(this).escape()}\""
-        else -> "\"${toString().escape()}\""
+// ---------------------------------------------------------------------------
+// indent resolver
+// ---------------------------------------------------------------------------
+
+/**
+ * Converts the raw `space` argument to a concrete indent string:
+ * - Number  → up to 10 spaces
+ * - String  → first 10 characters
+ * - Omitted → "" (compact)
+ */
+private suspend fun JsAny?.resolveIndent(runtime: ScriptRuntime): String = when {
+    this == null || this === Undefined || this === ArgOmitted -> ""
+    this is JsNumberWrapper -> " ".repeat(value.toInt().coerceIn(0, 10))
+    this is JsStringWrapper -> value.take(10)
+    else -> {
+        val s = runtime.toString(this)
+        s.toIntOrNull()?.let { " ".repeat(it.coerceIn(0, 10)) } ?: s.take(10)
     }
 }
 
-private suspend fun JsObject.stringify(runtime: ScriptRuntime) : String {
-    return buildString {
-        append('{')
-        for (k in keys(runtime)) {
-            append('"')
-            append(k)
-            append('"')
-            append(':')
-            append(get(k, runtime).stringify(runtime))
-            append(',')
-        }
-    }.removeSuffix(",") + "}"
+// ---------------------------------------------------------------------------
+// stringify
+// ---------------------------------------------------------------------------
+
+private tailrec suspend fun Any?.stringify(runtime: ScriptRuntime, indent: String = "", depth: Int = 0): String {
+    return when (this) {
+        null          -> "null"
+        Undefined     -> "undefined"
+        is List<*>    -> stringify(runtime, indent, depth)
+        is JsObject   -> stringify(runtime, indent, depth)
+        is Number     -> toString()
+        is Boolean    -> toString()
+        is Wrapper<*> -> value.stringify(runtime, indent, depth)
+        is JsAny      -> "\"${runtime.toString(this).escape()}\""
+        else          -> "\"${toString().escape()}\""
+    }
 }
 
-private suspend fun List<*>.stringify(runtime: ScriptRuntime) : String {
+private suspend fun JsObject.stringify(runtime: ScriptRuntime, indent: String, depth: Int): String {
+    val keys = keys(runtime)
+    if (keys.isEmpty()) return "{}"
+
+    if (indent.isEmpty()) {
+        return buildString {
+            append('{')
+            for (k in keys) {
+                append('"'); append(k); append('"'); append(':')
+                append(get(k, runtime).stringify(runtime, indent, depth))
+                append(',')
+            }
+        }.removeSuffix(",") + "}"
+    }
+
+    val childPad  = indent.repeat(depth + 1)
+    val closePad  = indent.repeat(depth)
     return buildString {
-        append('[')
-        fastForEach {
-            append(it.stringify(runtime))
-            append(',')
+        append("{\n")
+        for (k in keys) {
+            append(childPad)
+            append('"'); append(k); append('"'); append(": ")
+            append(get(k, runtime).stringify(runtime, indent, depth + 1))
+            append(",\n")
         }
-    }.removeSuffix(",") + "]"
+    }.removeSuffix(",\n") + "\n${closePad}}"
+}
+
+private suspend fun List<*>.stringify(runtime: ScriptRuntime, indent: String, depth: Int): String {
+    if (isEmpty()) return "[]"
+
+    if (indent.isEmpty()) {
+        return buildString {
+            append('[')
+            fastForEach { append(it.stringify(runtime, indent, depth)); append(',') }
+        }.removeSuffix(",") + "]"
+    }
+
+    val childPad = indent.repeat(depth + 1)
+    val closePad = indent.repeat(depth)
+    return buildString {
+        append("[\n")
+        fastForEach {
+            append(childPad)
+            append(it.stringify(runtime, indent, depth + 1))
+            append(",\n")
+        }
+    }.removeSuffix(",\n") + "\n${closePad}]"
 }
