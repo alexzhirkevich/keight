@@ -21,12 +21,12 @@ public val Set<JsAny?>.js : JsAny
 public val Map<JsAny?, JsAny?>.js : JsAny
     get() = if (this is JsAny) this else JsMapWrapper(toMutableMap())
 
-public val IntArray.js get() = map { it.js }.js
-public val ShortArray.js get() = map { it.js }.js
-public val ByteArray.js get() = map { it.js }.js
-public val FloatArray.js get() = map { it.js }.js
-public val DoubleArray.js get() = map { it.js }.js
-public val LongArray.js get() = map { it.js }.js
+public val IntArray.js: JsAny get() = map { it.js }.js
+public val ShortArray.js: JsAny get() = map { it.js }.js
+public val ByteArray.js: JsAny get() = map { it.js }.js
+public val FloatArray.js: JsAny get() = map { it.js }.js
+public val DoubleArray.js: JsAny get() = map { it.js }.js
+public val LongArray.js: JsAny get() = map { it.js }.js
 
 public val Number.js : JsAny get() = if (this is JsAny) this else JsNumberWrapper(
     when(this){
