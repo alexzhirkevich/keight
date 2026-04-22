@@ -1,11 +1,8 @@
 package io.github.alexzhirkevich.keight.js
 
-import io.github.alexzhirkevich.keight.Callable
-import io.github.alexzhirkevich.keight.JSRuntime
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findJsRoot
-import io.github.alexzhirkevich.keight.findRoot
 import kotlin.jvm.JvmInline
 
 internal class JsStringObject(
@@ -45,24 +42,7 @@ internal value class JsStringWrapper(
         return when(property) {
             "length".js -> value.length.toLong().js
             CONSTRUCTOR -> runtime.findJsRoot().String
-            JsSymbol.iterator -> stringIterator(runtime)
             else -> super.get(property, runtime)
-        }
-    }
-
-    private fun stringIterator(runtime: ScriptRuntime): JsAny {
-        // Return a function that creates the string iterator when called
-        // This matches JavaScript semantics: Symbol.iterator is a method that returns an iterator
-        val stringValue = value
-        return Callable {
-            val chars = stringValue.map { it.toString().js }
-            runtime.helperIterator { index ->
-                if (index < chars.size) {
-                    IteratorEntry(chars[index])
-                } else {
-                    IteratorDone()
-                }
-            }
         }
     }
 

@@ -161,6 +161,11 @@ internal class JSStringFunction : JSFunction(
                 .callableOrThrow(this)
                 .call(it[0], thisRef.listOf(), this)
         }
+        JsSymbol.iterator.func {
+            thisRef<CharSequence>()
+                .map { it.toString().js }
+                .iterator().js
+        }
     },
     properties = mutableMapOf(
         "fromCharCode".js to "fromCharCode".func(FunctionParam("codes", isVararg = true)) {
