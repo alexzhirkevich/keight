@@ -18,7 +18,7 @@ internal class OpColonAssignment(
 
 
     init {
-        if (value is Labeled){
+        if (value is Labeled && key != null){
             value.label = key.toString()
         }
     }

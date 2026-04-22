@@ -23,12 +23,37 @@ public interface JsAny {
             return proto(runtime)?.get(runtime)
         }
 
-        return when(val proto = proto(runtime)) {
-            is Undefined -> Undefined
-            is JsAny -> proto.get(property, runtime)
-            else -> Undefined
-        }?.get(runtime)
+        // When property is found in prototype chain, the result is JsPropertyAccessor
+        // which needs to be resolved with thisArg (the original object, not the prototype)
+        return when (val result = protoChainGet(property, runtime, this)) {
+            is JsPropertyAccessor -> result.getAccessor(this, runtime)
+            else -> result
+        }
+    }
 
+    /**
+     * Internal method for prototype chain lookup with explicit thisArg.
+     * The thisArg should always be the original object (receiver) from which
+     * the property access was initiated, not the prototype object.
+     */
+    public suspend fun protoChainGet(property: JsAny?, runtime: ScriptRuntime, thisArg: JsAny?): JsAny? {
+
+        if (property == runtime.fromKotlin("__proto__")){
+            return proto(runtime)?.get(runtime)
+        }
+
+        val result = when(val proto = proto(runtime)) {
+            is Undefined -> Undefined
+            is JsAny -> proto.protoChainGet(property, runtime, thisArg)
+            else -> Undefined
+        }
+
+        // When property is found in prototype chain, the result is JsPropertyAccessor
+        // which needs to be resolved with thisArg (the original object, not the prototype)
+        return when (result) {
+            is JsPropertyAccessor -> result.getAccessor(thisArg, runtime)
+            else -> result
+        }
     }
 
     public suspend fun contains(property: JsAny?, runtime: ScriptRuntime): Boolean =

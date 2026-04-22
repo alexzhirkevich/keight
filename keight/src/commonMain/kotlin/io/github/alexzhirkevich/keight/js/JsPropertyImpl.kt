@@ -5,12 +5,12 @@ import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.sameValue
 
-public fun JsProperty.descriptor(): JsObject = Object {
+public fun JsProperty.descriptor(thisArg: JsObject): JsObject = Object {
     when (val v = value) {
         is JsPropertyAccessor.Value -> Constants.value.js eq v.field
         is JsPropertyAccessor.BackedField -> {
-            Constants.get.func { v.get(this) }
-            Constants.set.func("v") { v.set(it[0], this); Undefined }
+            Constants.get.func { v.getAccessor(thisArg, this) }
+            Constants.set.func("v") { v.setAccessor(thisArg, it[0], this); Undefined }
         }
     }
     Constants.writable.js eq JSBooleanWrapper(writable != false)
@@ -25,12 +25,12 @@ internal class JSPropertyImpl(
     override var configurable : Boolean? = null,
 ) : JsProperty {
 
-    fun descriptor(): JsObject = Object {
+    fun descriptor(thisArg: JsObject): JsObject = Object {
         when (val v = value) {
             is JsPropertyAccessor.Value -> Constants.value.js eq v
             is JsPropertyAccessor.BackedField -> {
-               Constants.get.func { v.get(this) }
-               Constants.set.func("v") { v.set(it[0], this); Undefined }
+               Constants.get.func { v.getAccessor(thisArg, this) }
+               Constants.set.func("v") { v.setAccessor(thisArg, it[0], this); Undefined }
             }
         }
         Constants.writable.js eq JSBooleanWrapper(writable != false)
@@ -154,7 +154,7 @@ internal suspend fun JsAny.validateAndApplyPropertyDescriptor(
                     return false
                 }
                 return desc.contains(Constants.value.js, runtime) &&
-                        desc.get(Constants.value.js, runtime).sameValue(current.value.get(runtime))
+                        desc.get(Constants.value.js, runtime).sameValue(current.value.getAccessor(null, runtime))
             }
         }
     }

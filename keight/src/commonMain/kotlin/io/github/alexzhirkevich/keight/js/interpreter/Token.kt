@@ -184,7 +184,9 @@ internal sealed interface Token {
             Export,
             Import,
             Extends,
-            Debugger;
+            Debugger,
+            Of,
+            Super;
 
             override val identifier: String = name.lowercase()
         }

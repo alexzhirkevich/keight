@@ -27,9 +27,9 @@ public fun <T : JsAny?> LazyGetter(producer : suspend (ScriptRuntime) -> T): Get
     }
 }
 
-internal suspend fun Any.get(runtime: ScriptRuntime) : JsAny? = when (this) {
-    is Getter<*> -> get(runtime)?.get(runtime)
-    is JsPropertyAccessor -> get(runtime)?.get(runtime)
+internal suspend fun Any.get(runtime: ScriptRuntime, thisArg: JsAny? = null) : JsAny? = when (this) {
+    is Getter<*> -> get(runtime)?.get(runtime, thisArg)
+    is JsPropertyAccessor -> getAccessor(thisArg, runtime)?.get(runtime)
     is JsAny -> this
     else -> error("$this is not a JS object")
 }

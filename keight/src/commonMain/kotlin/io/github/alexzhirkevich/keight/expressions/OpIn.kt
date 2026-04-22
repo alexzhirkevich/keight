@@ -13,8 +13,11 @@ internal class OpIn(
     val inObject : Expression
 )  : Expression() {
 
-    // for (let x in y)
+    // for (let x in y) or for (let x of y)
     var variableType : VariableType ?= null
+    
+    // true for for...of loop, false for for...in loop
+    var isForOf : Boolean = false
 
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         syntaxCheck(variableType == null){

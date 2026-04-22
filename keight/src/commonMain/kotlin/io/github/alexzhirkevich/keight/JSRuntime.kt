@@ -555,7 +555,7 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JsObject {
         configurable: Boolean?,
         writable: Boolean?
     ) {
-        set(property, value.get(runtime), runtime)
+        set(property, value.getAccessor(null, runtime), runtime)
     }
 
     override suspend fun hasOwnProperty(name: JsAny?, runtime: ScriptRuntime): Boolean {
@@ -576,7 +576,7 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JsObject {
 
 private tailrec suspend fun JsAny.unpack(runtime: ScriptRuntime) : JsAny? =
     if (this is JsPropertyAccessor)
-        get(runtime)?.unpack(runtime)
+        getAccessor(null, runtime)?.unpack(runtime)
     else this
 
 internal fun ScriptRuntime.findJsRoot() : JSRuntime = findRoot() as JSRuntime

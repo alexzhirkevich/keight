@@ -5,18 +5,18 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 
 public interface JsPropertyAccessor : JsAny {
 
-    public suspend fun get(runtime: ScriptRuntime): JsAny?
+    public suspend fun getAccessor(thisArg: JsAny?, runtime: ScriptRuntime): JsAny?
 
-    public suspend fun set(value: JsAny?, runtime: ScriptRuntime)
+    public suspend fun setAccessor(thisArg: JsAny?, value: JsAny?, runtime: ScriptRuntime)
 
     public class Value(field: JsAny?) : JsPropertyAccessor {
 
         public var field : JsAny? = field
             internal set
 
-        override suspend fun get(runtime: ScriptRuntime): JsAny? = field
+        override suspend fun getAccessor(thisArg: JsAny?, runtime: ScriptRuntime): JsAny? = field
 
-        override suspend fun set(value: JsAny?, runtime: ScriptRuntime) {
+        override suspend fun setAccessor(thisArg: JsAny?, value: JsAny?, runtime: ScriptRuntime) {
             field = value
         }
     }
@@ -26,15 +26,15 @@ public interface JsPropertyAccessor : JsAny {
         private val setter: Callable? = null
     ) : JsPropertyAccessor, JsAny  {
 
-        override suspend fun get(runtime: ScriptRuntime): JsAny? {
+        override suspend fun getAccessor(thisArg: JsAny?, runtime: ScriptRuntime): JsAny? {
             return if (getter != null) {
-                getter.invoke(emptyList(), runtime)
+                getter.call(thisArg, emptyList(), runtime)
             } else {
                 Undefined
             }
         }
 
-        override suspend fun set(value: JsAny?, runtime: ScriptRuntime) {
+        override suspend fun setAccessor(thisArg: JsAny?, value: JsAny?, runtime: ScriptRuntime) {
             if (setter == null && !runtime.isStrict){
                 runtime.typeError(
                     runtime.fromKotlin("Cannot set property of which has only a getter")
@@ -42,7 +42,7 @@ public interface JsPropertyAccessor : JsAny {
             }
 
 
-            setter?.invoke(listOf(value), runtime)
+            setter?.call(thisArg, listOf(value), runtime)
         }
     }
 }
