@@ -45,7 +45,7 @@ internal class JSStringFunction : JSFunction(
             if (position == null) {
                 value.endsWith(searchString)
             } else {
-                value.take(position.toInt()).endsWith(searchString)
+                value.take(position).endsWith(searchString)
             }.js
         }
         "split".js.func("delim") {

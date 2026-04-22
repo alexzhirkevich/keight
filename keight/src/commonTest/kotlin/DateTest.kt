@@ -17,7 +17,7 @@ class DateTest {
         val now = nowInstant.toLocalDateTime(TimeZone.currentSystemDefault())
         assertTrue { ("Date.now()".eval() as Long) - nowInstant.toEpochMilliseconds() in 0L..300 }
         "const d = new Date('$now')".eval(it)
-        "d.getDate()".eval(it).assertEqualsTo(now.dayOfMonth.toLong())
+        "d.getDate()".eval(it).assertEqualsTo(now.day.toLong())
         "d.getDay()".eval(it).assertEqualsTo(now.dayOfWeek.isoDayNumber.toLong() % 7L)
         "d.getFullYear()".eval(it).assertEqualsTo(now.year.toLong())
         "d.getYear()".eval(it).assertEqualsTo(now.year.toLong())

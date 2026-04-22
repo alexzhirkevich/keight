@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Wrapper
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.number
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.ExperimentalTime
@@ -21,9 +22,9 @@ internal class JSDateWrapper(
 
     fun set(
         year : Int = value.year,
-        month : Int = value.monthNumber,
-        day : Int = value.dayOfMonth,
-        hour : Int = value.dayOfMonth,
+        month : Int = value.month.number,
+        day : Int = value.day,
+        hour : Int = value.day,
         minute : Int = value.minute,
         second : Int = value.second,
     ) {
@@ -32,9 +33,9 @@ internal class JSDateWrapper(
 
     fun setUTC(
         year : Int = value.year,
-        month : Int = value.monthNumber,
-        day : Int = value.dayOfMonth,
-        hour : Int = value.dayOfMonth,
+        month : Int = value.month.number,
+        day : Int = value.day,
+        hour : Int = value.day,
         minute : Int = value.minute,
         second : Int = value.second,
     ) {
@@ -45,15 +46,15 @@ internal class JSDateWrapper(
 
     fun copy(
         year : Int = value.year,
-        month : Int = value.monthNumber,
-        day : Int = value.dayOfMonth,
-        hour : Int = value.dayOfMonth,
+        month : Int = value.month.number,
+        day : Int = value.day,
+        hour : Int = value.day,
         minute : Int = value.minute,
         second : Int = value.second,
     ) = LocalDateTime(
         year = year,
-        monthNumber = month,
-        dayOfMonth = day,
+        month = month,
+        day = day,
         hour = hour,
         minute = minute,
         second = second,

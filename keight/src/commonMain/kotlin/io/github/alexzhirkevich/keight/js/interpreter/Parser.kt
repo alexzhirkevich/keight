@@ -142,7 +142,7 @@ private fun List<Token>.sanitize() : List<Token> {
     }
 }
 
-private inline fun ListIterator<Token>.eat(token: Token) : Boolean {
+private fun ListIterator<Token>.eat(token: Token) : Boolean {
     val i = nextIndex()
     if (nextSignificant() == token){
         return true
@@ -956,9 +956,6 @@ private fun ListIterator<Token>.parseNew() : Expression {
     val next = nextSignificant()
 
     if (next is Token.Identifier.Property) {
-        syntaxCheck(next is Token.Identifier.Property) {
-            "Invalid syntax after 'new'"
-        }
 
         val args = if (nextIsInstance<Token.Operator.Bracket.RoundOpen>()) {
             parseExpressionGrouping().expressions

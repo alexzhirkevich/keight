@@ -160,14 +160,15 @@ class ES6ComprehensiveTest {
     }
 
     @Test
+//    @Ignore
     fun destructuringInLoop() = runtimeTest {
         val code = """
             const arr = [{a: 1, b: 2}, {a: 3, b: 4}]
-            let sum = 0
+            let value = 0
             for (const {a, b} of arr) {
-                sum += a + b
+                value += a + b
             }
-            sum
+            value
         """.trimIndent()
         code.eval(it).assertEqualsTo(10L)
     }
