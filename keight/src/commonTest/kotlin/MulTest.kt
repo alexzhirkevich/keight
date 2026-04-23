@@ -6,17 +6,20 @@ class MulTest {
 
     @Test
     fun numbers() = runTest {
+        "10.5 * 5.5".eval().assertEqualsTo(57.75)
         "13 * 17.0".eval().assertEqualsTo(221.0)
         "-13 * -17".eval().assertEqualsTo(221L)
         "-13.0 * 17 * 2".eval().assertEqualsTo(-442.0)
+        "10.5 * 3".eval().assertEqualsTo(31.5)
     }
 
     @Test
-    fun string()= runTest {
+    fun string() = runTest {
         "'10' * '3'".eval().assertEqualsTo(30L)
         "10 * '3'".eval().assertEqualsTo(30L)
         "'10' * 3".eval().assertEqualsTo(30L)
 
+        "10.5 * 3".eval().assertEqualsTo(31.5)
         "'10.5' * '3'".eval().assertEqualsTo(31.5)
         "10.5 * '3'".eval().assertEqualsTo(31.5)
         "'10.5' * 3".eval().assertEqualsTo(31.5)

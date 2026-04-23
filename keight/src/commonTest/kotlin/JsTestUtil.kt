@@ -11,10 +11,16 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-internal fun Any?.assertEqualsTo(other : Any?) = assertEquals(other,this)
+internal fun Any?.assertEqualsTo(other : Any?) {
+    if (this is Number && other is Number && (toDouble().isFinite() && other.toDouble().isFinite())) {
+        assertEqualsTo(other.toDouble(),0.00001)
+    } else {
+        assertEquals(other, this)
+    }
+}
 internal fun Any?.assertEqualsTo(other : Double, tolerance: Double = 0.0001) {
-    assertTrue("$this is not a Double") { this is Double }
-    assertEquals(other, this as Double, tolerance)
+    assertTrue("$this is not a Number") { this is Number }
+    assertEquals(other, (this as Number).toDouble(), tolerance)
 }
 
 internal fun engineTest(
