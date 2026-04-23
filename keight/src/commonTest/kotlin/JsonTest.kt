@@ -352,4 +352,57 @@ class JsonTest {
         // scientific notation format may vary (1e10 vs 1.0E10)
         """JSON.parse("1e10")""".eval(it).assertEqualsTo(1e10)
     }
+
+    @Test
+    fun stringify_space_number() = runtimeTest {
+        // space=2 → 2-space indent
+        """JSON.stringify({a:1,b:2}, null, 2)""".eval(it).assertEqualsTo(
+            "{\n  \"a\": 1,\n  \"b\": 2\n}"
+        )
+        // space=4
+        """JSON.stringify([1,2], null, 4)""".eval(it).assertEqualsTo(
+            "[\n    1,\n    2\n]"
+        )
+        // space=0 → compact (same as no space)
+        """JSON.stringify({a:1}, null, 0)""".eval(it).assertEqualsTo("""{"a":1}""")
+        // space clamped to 10 max
+        """JSON.stringify({x:1}, null, 20)""".eval(it).assertEqualsTo(
+            "{\n          \"x\": 1\n}"
+        )
+    }
+
+    @Test
+    fun stringify_space_string() = runtimeTest {
+        // tab indent
+        """JSON.stringify({a:1,b:2}, null, "\t")""".eval(it).assertEqualsTo(
+            "{\n\t\"a\": 1,\n\t\"b\": 2\n}"
+        )
+        // custom string
+        """JSON.stringify([1,2], null, "--")""".eval(it).assertEqualsTo(
+            "[\n--1,\n--2\n]"
+        )
+        // string clamped to 10 chars
+        """JSON.stringify({x:1}, null, "1234567890abc")""".eval(it).assertEqualsTo(
+            "{\n1234567890\"x\": 1\n}"
+        )
+    }
+
+    @Test
+    fun stringify_space_nested() = runtimeTest {
+        // nested object with space
+        """JSON.stringify({a:{b:1}}, null, 2)""".eval(it).assertEqualsTo(
+            "{\n  \"a\": {\n    \"b\": 1\n  }\n}"
+        )
+        // nested array
+        """JSON.stringify([[1,2],[3,4]], null, 2)""".eval(it).assertEqualsTo(
+            "[\n  [\n    1,\n    2\n  ],\n  [\n    3,\n    4\n  ]\n]"
+        )
+    }
+
+    @Test
+    fun stringify_space_empty_containers() = runtimeTest {
+        // empty object/array stay compact even with space
+        """JSON.stringify({}, null, 2)""".eval(it).assertEqualsTo("{}")
+        """JSON.stringify([], null, 2)""".eval(it).assertEqualsTo("[]")
+    }
 }

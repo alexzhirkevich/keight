@@ -15,5 +15,9 @@ kotlin {
         jvmTest.dependencies {
             implementation("org.yaml:snakeyaml:2.3")
         }
+
+        all {
+            compilerOptions.freeCompilerArgs.add("-XXLanguage:+ContextParameters")
+        }
     }
 }
