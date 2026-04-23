@@ -1,4 +1,7 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
 import com.android.build.api.dsl.LibraryExtension
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.FileInputStream
 import java.util.Properties
@@ -65,7 +68,7 @@ subprojects {
             browser()
         }
 
-        wasmJs() {
+        wasmJs {
             nodejs()
             browser()
         }
@@ -76,15 +79,12 @@ subprojects {
         iosArm64()
         iosX64()
         iosSimulatorArm64()
-        macosX64()
         macosArm64()
         watchosSimulatorArm64()
-        watchosX64()
         watchosArm32()
         watchosArm64()
         watchosDeviceArm64()
         tvosSimulatorArm64()
-        tvosX64()
         tvosArm64()
 
         linuxX64()

@@ -6,6 +6,7 @@ import io.github.alexzhirkevich.keight.js.JsAny
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import org.intellij.lang.annotations.Language
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -46,4 +47,25 @@ internal suspend fun String.eval(
     runtime: JSRuntime = JSRuntime(context = Job(), console = io)
 ) : Any? {
     return JSEngine(runtime).evaluate(this)
+}
+
+internal fun runtimeContentTest(
+    runtime : (CoroutineContext) -> JSRuntime = {JSRuntime(it)},
+    before : suspend context(JSRuntime) TestScope.() -> Unit = {},
+    test : suspend context(JSRuntime) TestScope.() -> Unit
+) = runTest {
+    with(runtime(backgroundScope.coroutineContext)) {
+        before()
+        test()
+    }
+}
+
+context(runtime: JSRuntime)
+internal suspend fun eval(@Language("JavaScript") script: String) : Any? {
+    return JSEngine(runtime).evaluate(script)
+}
+
+context(runtime: JSRuntime)
+internal suspend fun evalRaw(@Language("JavaScript") script: String) : JsAny? {
+    return JSEngine(runtime).compile(script).invoke()
 }

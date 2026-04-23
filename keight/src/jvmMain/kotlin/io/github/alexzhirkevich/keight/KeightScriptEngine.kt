@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight
 import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import org.intellij.lang.annotations.Language
 import java.io.Reader
 import javax.script.Bindings
 import javax.script.ScriptContext
@@ -14,7 +15,7 @@ internal class KeightScriptEngine(
     private var engine : JSEngine<*>
 ) : JXScriptEngine {
 
-    override fun eval(script: String?, context: ScriptContext?): Any? {
+    override fun eval(@Language("JavaScript") script: String?, context: ScriptContext?): Any? {
         TODO("Not yet implemented")
     }
 
@@ -22,16 +23,16 @@ internal class KeightScriptEngine(
         TODO("Not yet implemented")
     }
 
-    override fun eval(script: String): Any? {
+    override fun eval(@Language("JavaScript") script: String): Any? {
         val v = runBlocking { engine.evaluate(script) }
         return v
     }
 
-    override fun eval(reader: Reader): Any? {
+    override fun eval(@Language("JavaScript") reader: Reader): Any? {
         return eval(reader.readText())
     }
 
-    override fun eval(p0: String?, p1: Bindings?): Any {
+    override fun eval(@Language("JavaScript") p0: String?, p1: Bindings?): Any {
         TODO("Not yet implemented")
     }
 
