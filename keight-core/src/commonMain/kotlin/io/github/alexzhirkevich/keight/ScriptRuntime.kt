@@ -28,6 +28,31 @@ public interface ScriptRuntime : CoroutineScope {
 
     public fun isEmpty(): Boolean
 
+    /**
+     * Current call stack frames (most recent call last).
+     * Used by JSError to generate stack traces.
+     */
+    public val callStack: MutableList<CallFrame>
+
+    /**
+     * Push a call frame onto the call stack.
+     */
+    public fun pushCallFrame(frame: CallFrame) {
+        callStack.add(frame)
+    }
+
+    /**
+     * Pop the most recent call frame from the call stack.
+     */
+    public fun popCallFrame(): CallFrame? {
+        return if (callStack.isNotEmpty()) callStack.removeAt(callStack.lastIndex) else null
+    }
+
+    /**
+     * Get a snapshot of the current call stack.
+     */
+    public fun captureCallStack(): List<CallFrame> = callStack.toList()
+
     public suspend fun delete(property: JsAny?, ignoreConstraints: Boolean = false): Boolean
 
     public suspend fun contains(property: JsAny?): Boolean

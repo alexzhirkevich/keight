@@ -29,6 +29,15 @@ public abstract class DefaultRuntime : ScriptRuntime {
 
     internal val variables: MutableMap<JsAny?, Pair<VariableType?, JsAny?>> = ObjectMap(mutableMapOf())
 
+    /**
+     * The actual call stack storage. Only the root runtime owns the list;
+     * child runtimes delegate via findRoot().
+     */
+    private val _callStack: MutableList<CallFrame> = mutableListOf()
+
+    override val callStack: MutableList<CallFrame>
+        get() = if (parent != null) findRoot().callStack else _callStack
+
     override suspend fun contains(property: JsAny?): Boolean {
         return property in variables
     }

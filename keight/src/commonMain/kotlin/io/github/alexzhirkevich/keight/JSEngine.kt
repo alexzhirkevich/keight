@@ -21,24 +21,23 @@ public open class JSEngine<out R : JSRuntime>(
 ) : ScriptEngine<R> {
 
     override fun compile(script: String, name: String?): Script {
-        return "{\n$script\n}"
-            .tokenize()
-            .parse()
-            .let {
-                if (name == null) {
-                    JSScript(runtime, it)
-                } else {
-                    JSModule(runtime, it).also { m ->
-                        runtime.addModule(name, m)
-                    }
-                }
+        val tokens = "{\n$script\n}".tokenize()
+        val expression = tokens.parse(name)
+
+        return if (name == null) {
+            JSScript(runtime, expression, name)
+        } else {
+            JSModule(runtime, expression, name).also { m ->
+                runtime.addModule(name, m)
             }
+        }
     }
 }
 
 private open class JSScript(
     override val runtime: ScriptRuntime,
-    private val expression: Expression
+    private val expression: Expression,
+    private val scriptName: String? = null
 ) : Script {
 
     protected val mutex = Mutex()
@@ -57,17 +56,26 @@ private open class JSScript(
         } catch (c: CancellationException) {
             throw c
         } catch (c: JSError) {
+            // Attach script name if not already set
+            if (c.fileName == null && scriptName != null) {
+                c.fileName = scriptName
+            }
             throw c
         } catch (t: Throwable) {
-            throw JSError("Kotlin exception occurred during JS code evaluation", cause = t)
+            val error = JSError("Kotlin exception occurred during JS code evaluation", cause = t)
+            if (scriptName != null) {
+                error.fileName = scriptName
+            }
+            throw error
         }
     }
 }
 
 private class JSModule(
     parent: JSRuntime,
-    expression: Expression
-) : JSScript(parent, expression), Module {
+    expression: Expression,
+    name: String
+) : JSScript(parent, expression, name), Module {
 
     override val runtime: ModuleRuntime = ModuleRuntime(parent)
 

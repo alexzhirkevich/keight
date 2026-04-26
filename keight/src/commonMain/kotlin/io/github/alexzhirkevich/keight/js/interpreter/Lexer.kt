@@ -1,18 +1,128 @@
 package io.github.alexzhirkevich.keight.js.interpreter
 
+import io.github.alexzhirkevich.keight.SourceLocation
 import io.github.alexzhirkevich.keight.js.SyntaxError
 
 
 internal fun String.tokenize(
     ignoreWhitespaces: Boolean =  true
-) : List<Token> = toList()
+) : List<LocatedToken> = toList()
     .listIterator()
-    .tokenize(
+    .tokenizeImpl(
         untilEndOfBlock = false,
         ignoreWhitespaces = ignoreWhitespaces
     )
 
-private fun ListIterator<Char>.tokenize(
+/**
+ * Tokenize without location tracking.
+ * Used internally for template string recursion where nested tokens
+ * don't need source location tracking.
+ */
+internal fun String.tokenizeRaw(
+    ignoreWhitespaces: Boolean = true
+) : List<Token> = toList()
+    .listIterator()
+    .tokenizeRawImpl(
+        untilEndOfBlock = false,
+        ignoreWhitespaces = ignoreWhitespaces
+    )
+
+private fun ListIterator<Char>.tokenizeImpl(
+    untilEndOfBlock : Boolean,
+    ignoreWhitespaces : Boolean = false
+) : List<LocatedToken> {
+    val result = mutableListOf<LocatedToken>()
+    var line = 1
+    var column = 1
+
+    fun advancePosition(c: Char) {
+        if (c.code in LSEP) {
+            line++
+            column = 1
+        } else {
+            column++
+        }
+    }
+
+    try {
+        var blockStack = 0
+
+        while (hasNext()) {
+            val startLine = line
+            val startColumn = column
+            val c = next()
+            advancePosition(c)
+
+            val token = when (c) {
+                '=' -> assign()
+                '+' -> plus()
+                '-' -> minus()
+                '*' -> mul()
+                '/' -> {
+                    val t = div(result.lastOrNull()?.token)
+                    if (t is Token.Comment && (t.isSingleLine || t.value.any { it.code in LSEP })) {
+                        result.add(LocatedToken(Token.NewLine, SourceLocation(startLine, startColumn)))
+                        continue
+                    }
+                    t
+                }
+
+                '#' -> hashbangComment()
+                '%' -> mod()
+                '&' -> and()
+                '|' -> or()
+                '^' -> xor()
+                '<' -> less()
+                '>' -> greater()
+                '!' -> not()
+                '.' -> period()
+                '?' -> questionMark()
+                '~' -> Token.Operator.Bitwise.Reverse
+                '{' -> Token.Operator.Bracket.CurlyOpen.also {
+                    blockStack++
+                }
+
+                '}' -> Token.Operator.Bracket.CurlyClose.also {
+                    if (--blockStack < 0 && untilEndOfBlock) {
+                        result.add(LocatedToken(it, SourceLocation(startLine, startColumn)))
+                        return@tokenizeImpl result
+                    }
+                }
+
+                '(' -> Token.Operator.Bracket.RoundOpen
+                ')' -> Token.Operator.Bracket.RoundClose
+                '[' -> Token.Operator.Bracket.SquareOpen
+                ']' -> Token.Operator.Bracket.SquareClose
+                ':' -> Token.Operator.Colon
+                ';' -> Token.Operator.SemiColon
+                ',' -> Token.Operator.Comma
+                '\n', ' ' -> Token.NewLine
+                '`' -> templateString(ignoreWhitespaces)
+                in STRING_START -> string(c)
+                in NUMBERS -> number(c)
+                else -> {
+                    val isWhiteSpace = c.isWhitespace()
+                    when {
+                        isWhiteSpace && ignoreWhitespaces -> continue
+                        isWhiteSpace -> Token.Whitespace(c)
+                        c.isUnicodeIdentifierStart() -> identifier(c)
+                        else -> Token.Identifier.Property(c.toString())
+                    }
+                }
+            }
+
+            result.add(LocatedToken(token, SourceLocation(startLine, startColumn)))
+        }
+    } catch (_: NoSuchElementException) {
+        throw SyntaxError("Invalid or unexpected token")
+    }
+    return result
+}
+
+/**
+ * Tokenize without location tracking (for backward compatibility and internal use).
+ */
+private fun ListIterator<Char>.tokenizeRawImpl(
     untilEndOfBlock : Boolean,
     ignoreWhitespaces : Boolean = false
 ) : List<Token> {
@@ -22,11 +132,11 @@ private fun ListIterator<Char>.tokenize(
 
             while (hasNext()) {
                 this += when (val c = next()) {
-                    '=' -> assign() // +eq, arrow
+                    '=' -> assign()
                     '+' -> plus()
                     '-' -> minus()
-                    '*' -> mul() // +exp
-                    '/' -> div(lastOrNull()).also { // +comment, regex
+                    '*' -> mul()
+                    '/' -> div(lastOrNull()).also {
                         if (it is Token.Comment && (it.isSingleLine || it.value.any { it.code in LSEP })) {
                             add(Token.NewLine)
                         }
@@ -37,11 +147,11 @@ private fun ListIterator<Char>.tokenize(
                     '&' -> and()
                     '|' -> or()
                     '^' -> xor()
-                    '<' -> less() // +shl
-                    '>' -> greater() // +shr, ushr
-                    '!' -> not() // + neq
-                    '.' -> period() // + spread
-                    '?' -> questionMark() // for ternary + nullish coalescing, optional chaining
+                    '<' -> less()
+                    '>' -> greater()
+                    '!' -> not()
+                    '.' -> period()
+                    '?' -> questionMark()
                     '~' -> Token.Operator.Bitwise.Reverse
                     '{' -> Token.Operator.Bracket.CurlyOpen.also {
                         blockStack++
@@ -69,9 +179,7 @@ private fun ListIterator<Char>.tokenize(
                         when {
                             isWhiteSpace && ignoreWhitespaces -> continue
                             isWhiteSpace -> Token.Whitespace(c)
-                            // Use Unicode-aware check for identifier start
                             c.isUnicodeIdentifierStart() -> identifier(c)
-                            // Single-character operators or invalid tokens
                             else -> Token.Identifier.Property(c.toString())
                         }
                     }
@@ -652,7 +760,7 @@ private fun ListIterator<Char>.templateString(
                             buildList {
                                 add(Token.Operator.Bracket.CurlyOpen)
                                 addAll(
-                                    tokenize(
+                                    tokenizeRawImpl(
                                         untilEndOfBlock = true,
                                         ignoreWhitespaces = ignoreWhitespaces
                                     )
