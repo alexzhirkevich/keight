@@ -5,6 +5,7 @@ import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.js.Constants
 import io.github.alexzhirkevich.keight.js.JSBooleanWrapper
+import io.github.alexzhirkevich.keight.js.JSDateWrapper
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsNumberObject
 import io.github.alexzhirkevich.keight.js.JsNumberWrapper
@@ -173,6 +174,7 @@ internal fun CharSequence.esStringToNumber() : Number {
  * */
 internal tailrec suspend fun Any?.esToNumber(runtime: ScriptRuntime) : Number {
     return when(this) {
+        is JSDateWrapper -> toInstant().toEpochMilliseconds()
         is Wrapper<*> -> value.esToNumber(runtime)
         is Byte -> toLong()
         is UByte -> toLong()

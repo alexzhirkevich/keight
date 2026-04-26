@@ -188,6 +188,12 @@ internal class JSStringFunction : JSFunction(
     override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JsObject {
         return JsStringObject(JsStringWrapper(invoke(args, runtime).toString()))
     }
+
+    override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
+        return constructObject(args, runtime).also {
+            it.setProto(runtime, get(PROTOTYPE, runtime))
+        }
+    }
 }
 
 private suspend fun CharSequence.replace(

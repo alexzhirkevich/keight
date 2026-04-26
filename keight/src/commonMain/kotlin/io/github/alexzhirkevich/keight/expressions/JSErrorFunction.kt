@@ -9,6 +9,7 @@ import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JsObjectImpl
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.Object
+import io.github.alexzhirkevich.keight.js.PROTOTYPE
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
@@ -29,6 +30,12 @@ internal open class JSErrorFunction<E : JSError>(
 ) {
     override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): E {
         return make(args.getOrElse(0) { "Uncaught $name" })
+    }
+
+    override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
+        return constructObject(args, runtime).also {
+            it.setProto(runtime, get(PROTOTYPE, runtime))
+        }
     }
 }
 

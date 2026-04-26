@@ -24,7 +24,7 @@ internal class JSDateWrapper(
         year : Int = value.year,
         month : Int = value.month.number,
         day : Int = value.day,
-        hour : Int = value.day,
+        hour : Int = value.hour,
         minute : Int = value.minute,
         second : Int = value.second,
     ) {
@@ -35,7 +35,7 @@ internal class JSDateWrapper(
         year : Int = value.year,
         month : Int = value.month.number,
         day : Int = value.day,
-        hour : Int = value.day,
+        hour : Int = value.hour,
         minute : Int = value.minute,
         second : Int = value.second,
     ) {
