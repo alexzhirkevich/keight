@@ -35,6 +35,7 @@ import io.github.alexzhirkevich.keight.js.Constants
 import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.JsObjectImpl
 import io.github.alexzhirkevich.keight.js.ReferenceError
+import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
 import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.argOrElse
@@ -400,22 +401,21 @@ public open class JSRuntime(
                     }
                 }
 
-                s.toLongOrNull() ?: s.toDoubleOrNull()
+                if (s.contains('.')|| s.contains('e', true)){
+                    s.toDoubleOrNull()
+                } else {
+                    s.toLongOrNull()
+                }
             }
 
             else -> null
         }
-
-        is Byte -> toLong()
-        is UByte -> toLong()
-        is Short -> toLong()
-        is UShort -> toLong()
-        is Int -> toLong()
-        is UInt -> toLong()
-        is ULong -> toLong()
-        is Float -> toDouble()
         is Long -> this
         is Double -> this
+        is Float -> toDouble()
+        is Byte -> toLong()
+        is Short -> toLong()
+        is Int -> toLong()
         is List<*> -> {
             if (withNaNs) {
                 singleOrNull()?.numberOrNull(withNaNs)
@@ -598,7 +598,6 @@ private fun jsmul(a : Any?, b : Any?) : JsAny {
         a == null || b == null -> 0L.js
         a is Long && b is Long -> (a*b).js
         a is Double && b is Double -> (a*b).js
-        a is Long && b is Long -> (a * b).js
         a is Number && b is Number -> (a.toDouble() * b.toDouble()).js
         a is List<*> && b is Number -> {
             a as List<Number>
@@ -624,7 +623,7 @@ private fun jsdiv(a : Any?, b : Any?) : JsAny {
                 || ((b as? CharSequence)?.toString()?.toDoubleOrNull() == 0.0 && a == null) -> Double.NaN.js
 
         a is Long && b is Long -> when {
-            b == 0 -> a / b.toDouble()
+            b == 0L -> a / b.toDouble()
             a % b == 0L -> a / b
             else -> a.toDouble() / b
         }.js

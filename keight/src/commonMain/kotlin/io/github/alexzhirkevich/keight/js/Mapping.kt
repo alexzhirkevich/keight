@@ -30,10 +30,12 @@ public val LongArray.js: JsAny get() = map { it.js }.js
 
 public val Number.js : JsAny get() = if (this is JsAny) this else JsNumberWrapper(
     when(this){
+        is Long -> this
+        is Double -> this
+        is Float -> toDouble()
         is Int -> toLong()
         is Short -> toLong()
         is Byte -> toLong()
-        is Float -> toDouble()
         else -> this
     }
 )

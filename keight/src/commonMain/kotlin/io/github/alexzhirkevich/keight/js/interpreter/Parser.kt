@@ -71,6 +71,7 @@ import io.github.alexzhirkevich.keight.expressions.ImportEntry
 import io.github.alexzhirkevich.keight.expressions.OpAggregatingExport
 import io.github.alexzhirkevich.keight.expressions.OpExport
 import io.github.alexzhirkevich.keight.expressions.OpImport
+import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
