@@ -450,7 +450,7 @@ internal fun ListIterator<Char>.string(start : Char) : Token.Str {
                 n = next()
             }
         }
-    } catch (t: NoSuchElementException) {
+    } catch (_: NoSuchElementException) {
         throw SyntaxError("Unexpected string")
     }
 

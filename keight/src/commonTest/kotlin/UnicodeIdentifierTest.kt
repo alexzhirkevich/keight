@@ -1,9 +1,4 @@
-import io.github.alexzhirkevich.keight.js.JsObject
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-import kotlin.test.assertFalse
 
 /**
  * Tests for Unicode identifier support in JavaScript.
@@ -292,7 +287,6 @@ class UnicodeIdentifierTest {
     fun unicodeEscapeInProperty() = runtimeTest { runtime ->
         // Test Unicode escape in object property name
         // Note: In Kotlin, "\\u" produces literal "\u" string
-        val escaped = "\u4e2d\u6587" // This is actually "中文" in Kotlin
         """
             var obj = { "\u4e2d\u6587": "Chinese" };
             obj["\u4e2d\u6587"]
