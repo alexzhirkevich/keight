@@ -157,6 +157,7 @@ internal class JSStringFunction : JSFunction(
             "regexp" defaults OpConstant(JsRegexWrapper())
         ) {
             findJsRoot().RegExp
+                .prototype!!
                 .get(JsSymbol.match, this)
                 .callableOrThrow(this)
                 .call(it[0], thisRef.listOf(), this)
