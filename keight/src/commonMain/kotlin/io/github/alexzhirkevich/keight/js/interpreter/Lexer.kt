@@ -69,7 +69,10 @@ private fun ListIterator<Char>.tokenize(
                         when {
                             isWhiteSpace && ignoreWhitespaces -> continue
                             isWhiteSpace -> Token.Whitespace(c)
-                            else -> identifier(c)
+                            // Use Unicode-aware check for identifier start
+                            c.isUnicodeIdentifierStart() -> identifier(c)
+                            // Single-character operators or invalid tokens
+                            else -> Token.Identifier.Property(c.toString())
                         }
                     }
                 }
@@ -594,7 +597,8 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
     while (hasNext()) {
         val next = next()
 
-        if (next !in PROPERTY_ALPHABET_WITH_NUM) {
+        // Use Unicode-aware check for identifier continuation
+        if (!next.isUnicodeIdentifierPart()) {
             previous()
             break
         }
@@ -679,3 +683,51 @@ private val NumberFormatIndicators = NumberFormat.entries.mapNotNull { it.prefix
 
 private val IDENTIFIER_ALPHABET = (('a'..'z').toList() + ('A'..'Z').toList() + '$' + '_' ).toHashSet()
 private val PROPERTY_ALPHABET_WITH_NUM = (IDENTIFIER_ALPHABET + NUMBERS).toHashSet()
+
+/**
+ * Checks if a character can be the first character of a Unicode identifier.
+ * Based on ECMAScript specification (UnicodeIDStart).
+ * Uses Kotlin's CharCategory which is cross-platform compatible.
+ */
+private fun Char.isUnicodeIdentifierStart(): Boolean {
+    // ASCII characters
+    if (this in IDENTIFIER_ALPHABET) return true
+    
+    // Unicode letter categories (Lu, Ll, Lt, Lm, Lo, Nl)
+    return when (category) {
+        CharCategory.UPPERCASE_LETTER,      // Lu
+        CharCategory.LOWERCASE_LETTER,      // Ll
+        CharCategory.TITLECASE_LETTER,       // Lt
+        CharCategory.MODIFIER_LETTER,        // Lm
+        CharCategory.OTHER_LETTER,           // Lo
+        CharCategory.LETTER_NUMBER           // Nl
+        -> true
+        else -> false
+    }
+}
+
+/**
+ * Checks if a character can be part of a Unicode identifier.
+ * Based on ECMAScript specification (UnicodeIDContinue).
+ * Uses Kotlin's CharCategory which is cross-platform compatible.
+ */
+private fun Char.isUnicodeIdentifierPart(): Boolean {
+    // ASCII characters including numbers
+    if (this in PROPERTY_ALPHABET_WITH_NUM) return true
+    
+    // Unicode identifier continuation categories
+    return when (category) {
+        CharCategory.UPPERCASE_LETTER,      // Lu
+        CharCategory.LOWERCASE_LETTER,      // Ll
+        CharCategory.TITLECASE_LETTER,       // Lt
+        CharCategory.MODIFIER_LETTER,        // Lm
+        CharCategory.OTHER_LETTER,           // Lo
+        CharCategory.LETTER_NUMBER,          // Nl
+        CharCategory.NON_SPACING_MARK,       // Mn (e.g., combining marks)
+        CharCategory.COMBINING_SPACING_MARK, // Mc
+        CharCategory.DECIMAL_DIGIT_NUMBER,   // Nd
+        CharCategory.CONNECTOR_PUNCTUATION  // Pc (e.g., underscore-like)
+        -> true
+        else -> false
+    }
+}
