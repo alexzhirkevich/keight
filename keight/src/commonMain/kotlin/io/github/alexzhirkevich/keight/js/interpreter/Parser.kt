@@ -1223,29 +1223,35 @@ private fun ListIterator<LocatedToken>.parseMemberOf(receiver: Expression): Expr
     return when (nextSignificant()){
 
         is Token.Operator.Period, is Token.Operator.DoublePeriod -> {
+            val propLoc = nextSignificantLocation()  // peek at property name location
             val next = nextSignificant()
             syntaxCheck(next is Token.Identifier) {
                 "Illegal symbol after '.'"
             }
             OpGetProperty(name = next.identifier, receiver = receiver)
+                .at(propLoc)
         }
         is Token.Operator.Bracket.SquareOpen -> {
+            val bracketLoc = nextSignificantLocation()  // peek at index location
+            val index = parseStatement(blockType = ExpectedBlockType.Object)
             OpIndex(
                 receiver = receiver,
-                index = parseStatement(blockType = ExpectedBlockType.Object)
+                index = index
             ).also {
                 syntaxCheck(nextSignificant() is Token.Operator.Bracket.SquareClose) {
                     "Missing ']'"
                 }
-            }
+            }.at(bracketLoc)
         }
         else -> throw IllegalStateException("Illegal 'member of' syntax")
     }
 }
 
 private fun ListIterator<LocatedToken>.parseOptionalChaining(receiver: Expression): Expression {
+    val loc = nextSignificantLocation()  // peek at the next token's location before consuming
     return when(val next = nextSignificant()){
         is Token.Operator.Bracket.SquareOpen -> {
+            val indexLoc = nextSignificantLocation()  // peek at index location
             OpIndex(
                 receiver = receiver,
                 index = parseStatement(blockType = ExpectedBlockType.Object),
@@ -1254,7 +1260,7 @@ private fun ListIterator<LocatedToken>.parseOptionalChaining(receiver: Expressio
                 syntaxCheck(nextSignificant() is Token.Operator.Bracket.SquareClose) {
                     "Missing ']'"
                 }
-            }
+            }.at(indexLoc)
         }
         is Token.Operator.Bracket.RoundOpen -> {
             prevSignificant()
@@ -1265,7 +1271,7 @@ private fun ListIterator<LocatedToken>.parseOptionalChaining(receiver: Expressio
                 name = next.identifier,
                 receiver = receiver,
                 isOptional = true
-            )
+            ).at(loc)
         }
         else -> throw SyntaxError("Invalid usage of ?. operator")
     }

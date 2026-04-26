@@ -1,5 +1,6 @@
 import io.github.alexzhirkevich.keight.JSEngine
 import io.github.alexzhirkevich.keight.JSRuntime
+import io.github.alexzhirkevich.keight.js.JSError
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.TypeError
@@ -100,6 +101,78 @@ class SourceLocationTest {
         assertFailsWith<TypeError> {
             "42()".eval()
         }
+    }
+
+    @Test
+    fun typeErrorNotAFunctionHasStackAndLocation() = runTest {
+        var error: JSError? = null
+        try {
+            """
+            function foo() {
+                bar();
+            }
+            foo();
+            """.trimIndent().eval()
+        } catch (e: JSError) {
+            error = e
+        }
+        checkNotNull(error) { "Expected error to be thrown" }
+        assertTrue("lineNumber should be set") { error.lineNumber != null }
+        assertTrue("stack should contain 'at foo'") { (error.stack ?: "").contains("at foo") }
+    }
+
+    @Test
+    fun typeErrorUndefinedNotAFunctionHasStack() = runTest {
+        var error: JSError? = null
+        try {
+            """
+            var x;
+            x();
+            """.trimIndent().eval()
+        } catch (e: JSError) {
+            error = e
+        }
+        checkNotNull(error) { "Expected TypeError to be thrown" }
+        assertTrue("Should be TypeError") { error is TypeError }
+        assertTrue("lineNumber should be set") { error.lineNumber != null }
+        assertTrue("stack should contain 'TypeError'") { (error.stack ?: "").contains("TypeError") }
+        assertTrue("stack should contain line info") { (error.stack ?: "").contains("3:1") }
+    }
+
+    @Test
+    fun typeErrorStackFromJsTryCatch() = runTest {
+        // Test that JS code can see the stack/lineNumber/fileName in a caught TypeError
+        val result = """
+            (function() {
+                try {
+                    var x;
+                    x();
+                } catch(e) {
+                    return e.stack || 'NO STACK';
+                }
+            })()
+        """.trimIndent().eval()
+        val str = result?.toString() ?: ""
+        assertTrue("JS stack should contain 'TypeError': got '$str'") { str.contains("TypeError") }
+        assertTrue("JS stack should contain line info: got '$str'") { str.contains("5") }
+    }
+
+    @Test
+    fun typeErrorMethodCallOnObjectHasLocation() = runTest {
+        var error: JSError? = null
+        try {
+            """
+            var obj = {};
+            obj.nonExistentMethod();
+            """.trimIndent().eval()
+        } catch (e: JSError) {
+            error = e
+        }
+        checkNotNull(error) { "Expected TypeError to be thrown" }
+        assertTrue("Should be TypeError") { error is TypeError }
+        assertTrue("lineNumber should be set") { error.lineNumber != null }
+        assertTrue("columnNumber should be set") { error.columnNumber != null }
+        assertTrue("stack should contain 'TypeError'") { (error.stack ?: "").contains("TypeError") }
     }
 
     @Test
