@@ -160,7 +160,7 @@ internal class JSStringFunction : JSFunction(
                 .prototype!!
                 .get(JsSymbol.match, this)
                 .callableOrThrow(this)
-                .call(it[0], thisRef.listOf(), this)
+                .call(findJsRoot().RegExp.construct(listOf(it[0]),this), thisRef.listOf(), this)
         }
         JsSymbol.iterator.func {
             thisRef<CharSequence>()

@@ -1,9 +1,9 @@
 [versions]
-kotlin="2.3.0"
-agp = "8.12.1"
-coroutines="1.9.0"
+kotlin="2.3.21"
+agp = "8.13.2"
+coroutines="1.10.2"
 datetime="0.7.1"
-maven-publish="0.34.0"
+maven-publish="0.36.0"
 jetbrains-annotations = "26.1.0"
 
 [libraries]

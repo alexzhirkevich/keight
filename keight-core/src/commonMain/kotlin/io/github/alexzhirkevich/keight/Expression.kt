@@ -44,7 +44,7 @@ public abstract class Expression {
         try {
             val attachable = error as? LocationAttachable ?: return
             if (hasLocation) {
-                attachable.attachLocation(loc!!.line, loc!!.column, loc!!.fileName)
+                attachable.attachLocation(loc.line, loc.column, loc.fileName)
             }
             if (hasCallStack) {
                 attachable.attachCallStack(runtime.captureCallStack())

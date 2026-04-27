@@ -56,10 +56,9 @@ internal class StringTest {
     }
 
     @Test
-    @Ignore()
     fun match() = runTest {
-        "'a'.match('[a-z]')".eval().assertEqualsTo(true)
-        "'A'.match('[a-z]')".eval().assertEqualsTo(false)
+        "'a'.match('[a-z]') != null".eval().assertEqualsTo(true)
+        "'A'.match('[a-z]') != null".eval().assertEqualsTo(false)
     }
 
     @Test
