@@ -5,6 +5,8 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
+import io.github.alexzhirkevich.keight.js.interpreter.UNICODE_REGEX_SURROGATE_ANY
+import io.github.alexzhirkevich.keight.js.interpreter.toUnicodePoint
 
 private const val LAST_INDEX = "lastIndex"
 
@@ -61,20 +63,16 @@ internal fun String.toRegexOptions() : Set<RegexOptions>{
 }
 
 /**
- * Converts JS Unicode escape sequences to actual Unicode characters.
- * Handles \u{XXXX} syntax used in JavaScript regex patterns with 'u' flag.
+ * Converts JS Unicode escape sequences (\u{XXXX}) to actual Unicode characters.
+ * Uses the precompiled [UNICODE_REGEX_SURROGATE] regex from Lexer.kt.
  */
 private fun String.convertJsUnicodeEscapes(): String {
-    // Pattern for \u{XXXX} where X is 1-6 hex digits (JS supports 0-10FFFF)
-    val unicodeEscapeRegex = Regex("""\\u\{([0-9a-fA-F]+)}""")
-    return unicodeEscapeRegex.replace(this) { matchResult ->
-        val codePoint = matchResult.groupValues[1].toInt(16)
-        // Convert code point to string using Kotlin's native method
-        // For code points > 0xFFFF (surrogate pairs), use intArrayOf
+    // Match \u{XXXX} with 1-6 hex digits (covers both BMP and extended code points)
+    return UNICODE_REGEX_SURROGATE_ANY.replace(this) { matchResult ->
+        val codePoint = matchResult.value.toUnicodePoint()
         if (codePoint <= 0xFFFF) {
             codePoint.toChar().toString()
         } else {
-            // Calculate surrogate pair for code points > 0xFFFF
             val adjusted = codePoint - 0x10000
             val highSurrogate = ((adjusted ushr 10) + 0xD800).toChar()
             val lowSurrogate = ((adjusted and 0x3FF) + 0xDC00).toChar()

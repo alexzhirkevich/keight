@@ -566,9 +566,11 @@ internal fun ListIterator<Char>.string(start : Char) : Token.Str {
 }
 
 private val UNICODE_REGEX = "\\\\u[{]?[0-9a-fA-F]{4}[}]?".toRegex()
-private val UNICODE_REGEX_SURROGATE = "\\\\u[{][0-9a-fA-F]{5,6}[}]".toRegex()
+internal val UNICODE_REGEX_SURROGATE = "\\\\u[{][0-9a-fA-F]{5,6}[}]".toRegex()
+/** Matches \u{1-6 hex digits} — used for JS regex Unicode escapes */
+internal val UNICODE_REGEX_SURROGATE_ANY = "\\\\u[{][0-9a-fA-F]{1,6}[}]".toRegex()
 
-private fun String.toUnicodePoint() =
+internal fun String.toUnicodePoint() =
     removePrefix("\\u")
         .removePrefix("{")
         .removeSuffix("}")
@@ -608,6 +610,25 @@ internal fun String.escape() : String {
         .replace("\t", "\\t")
         .replace("\b", "\\b")
         .replace("\"", "\\\\")
+}
+
+/**
+ * Escapes a string for embedding in a JSON value (between double-quotes).
+ *
+ * Differences from [escape]:
+ * - Single-quote `'` is NOT escaped — it is a plain character in JSON.
+ * - Only the characters mandated by the JSON spec (RFC 8259) are escaped:
+ *   `"`, `\`, and the C0 control characters.
+ */
+internal fun String.escapeForJson(): String {
+    return replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+        .replace("\b", "\\b")
+        // \f (form-feed) is also required by the spec
+        .replace("\u000C", "\\f")
 }
 
 internal fun ListIterator<Char>.number(start : Char) : Token.Num {

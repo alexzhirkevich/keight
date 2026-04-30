@@ -156,11 +156,12 @@ internal class JSStringFunction : JSFunction(
         "match".js.func(
             "regexp" defaults OpConstant(JsRegexWrapper())
         ) {
-            findJsRoot().RegExp
+            val RegExp = findJsRoot().RegExp
+            RegExp
                 .prototype!!
                 .get(JsSymbol.match, this)
                 .callableOrThrow(this)
-                .call(findJsRoot().RegExp.construct(listOf(it[0]),this), thisRef.listOf(), this)
+                .call(RegExp.construct(listOf(it[0]),this), thisRef.listOf(), this)
         }
         JsSymbol.iterator.func {
             thisRef<CharSequence>()

@@ -36,18 +36,7 @@ internal class OpCall(
             return Undefined
         }
 
-        // Expand spread arguments
-        val expandedArgs = mutableListOf<JsAny?>()
-        for (arg in args) {
-            if (arg is OpSpread) {
-                val spreadValue = arg.invoke(runtime)
-                if (spreadValue is Iterable<*>) {
-                    expandedArgs.addAll(spreadValue as Iterable<JsAny?>)
-                }
-            } else {
-                expandedArgs.add(arg.invoke(runtime))
-            }
-        }
+        val expandedArgs = args.expandArgs(runtime)
 
         // Push call frame for stack trace generation
         val loc = sourceLocation
@@ -125,17 +114,7 @@ internal fun OpCall(
                     if ((callableResult == null || callableResult is Undefined) && isOptional) {
                         return Undefined
                     }
-                    val expandedArgs = mutableListOf<JsAny?>()
-                    for (arg in arguments) {
-                        if (arg is OpSpread) {
-                            val spreadValue = arg.invoke(runtime)
-                            if (spreadValue is Iterable<*>) {
-                                expandedArgs.addAll(spreadValue as Iterable<JsAny?>)
-                            }
-                        } else {
-                            expandedArgs.add(arg.invoke(runtime))
-                        }
-                    }
+                    val expandedArgs = arguments.expandArgs(runtime)
                     val loc = sourceLocation
                     val funcName = (callableResult as? JSFunction)?.name?.takeIf { it.isNotEmpty() }
                     val frame = CallFrame(
@@ -352,4 +331,23 @@ private inline fun <T> withInvalidArgsCheck(block : () -> T): T {
 }
 
 private fun notEnoughArgs() : Nothing = throw SyntaxError("Not enough arguments passed to the function call")
+
+/**
+ * Evaluates a list of argument expressions, expanding any [OpSpread] arguments inline.
+ */
+private suspend fun List<Expression>.expandArgs(runtime: ScriptRuntime): List<JsAny?> {
+    val result = mutableListOf<JsAny?>()
+    for (arg in this) {
+        if (arg is OpSpread) {
+            val spreadValue = arg.invoke(runtime)
+            if (spreadValue is Iterable<*>) {
+                @Suppress("UNCHECKED_CAST")
+                result.addAll(spreadValue as Iterable<JsAny?>)
+            }
+        } else {
+            result.add(arg.invoke(runtime))
+        }
+    }
+    return result
+}
 
