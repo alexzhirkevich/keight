@@ -82,7 +82,10 @@ internal class ObjectMap<V>(
     }
 
     private fun mapKey(key: JsAny?) : JsAny? {
-        return key
+        return when(key) {
+            is JsNumberWrapper,is JsNumberObject -> key.value.toString().js
+            else -> key
+        }
     }
 }
 
@@ -110,32 +113,38 @@ public open class JsObjectImpl(
         excludeSymbols: Boolean,
         excludeNonEnumerables: Boolean
     ): List<JsAny?> {
-        return map
-            .filter {
-                (!excludeSymbols || it.key !is JsSymbol) &&
-                        (!excludeNonEnumerables || it.value.enumerable != false)
+        data class IndexKey(val key: JsAny?, val index: Long)
+        data class KeyCategories(
+            val arrayIndexKeys: MutableList<IndexKey> = mutableListOf(),
+            val stringKeys: MutableList<JsAny?> = mutableListOf(),
+            val symbolKeys: MutableList<JsAny?> = mutableListOf()
+        )
+
+        return map.entries
+            .filter { (key, prop) ->
+                (!excludeSymbols || key !is JsSymbol) &&
+                        (!excludeNonEnumerables || prop.enumerable != false)
             }
-            .keys
-            .groupBy {
-                val v = it?.toKotlin(runtime)
-                v is Long && v > 0
-            }
-            .let {
-                mapOf(
-                    true to it[true].orEmpty(),
-                    false to it[false].orEmpty()
-                )
-            }
-            .flatMap {
-                it.value.sortedByDescending { v ->
-                    when {
-                        v is JsNumberWrapper && v.value.toLong() > 0 -> v.value.toLong()
-                        v is JsNumberObject && v.value.toLong() > 0 -> v.value.toLong()
-                        v is JsStringWrapper || v is JsStringObject -> -1L
-                        v is JsSymbol -> -2L
-                        else -> -3L
+            .map { it.key }
+            .fold(KeyCategories()) { categories, key ->
+                when (key) {
+                    is JsSymbol -> categories.symbolKeys.add(key)
+                    is JsStringWrapper, is JsStringObject -> {
+                        val keyStr = key.toString()
+                        val num = keyStr.toLongOrNull()
+                        if (num != null && num >= 0 && num <= 9007199254740991L && num.toString() == keyStr) {
+                            categories.arrayIndexKeys.add(IndexKey(key, num))
+                        } else {
+                            categories.stringKeys.add(key)
+                        }
                     }
+
+                    else -> categories.stringKeys.add(key)
                 }
+                categories
+            }
+            .let { (array, string, symbol) ->
+                array.sortedBy { it.index }.map { it.key } + string + if (excludeSymbols) emptyList() else symbol
             }
     }
 

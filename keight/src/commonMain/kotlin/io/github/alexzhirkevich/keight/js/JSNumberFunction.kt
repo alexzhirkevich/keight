@@ -3,6 +3,7 @@ package io.github.alexzhirkevich.keight.js
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.expressions.OpConstant
+import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -18,8 +19,8 @@ internal fun numberMethods() : List<JSFunction> {
         },
         "isInteger".func("number") {
             val arg = it.getOrNull(0) ?: return@func false.js
-            val num = toNumber(arg)
-            (num is Long || num is Int || num is Short || num is Byte).js
+            val num = toNumber(arg).toDouble()
+            (!num.isNaN() && num.isFinite() && num % 1.0 == 0.0).js
         },
         "parseInt".func(
             FunctionParam("number"),
@@ -34,7 +35,9 @@ internal fun numberMethods() : List<JSFunction> {
         },
         "isSafeInteger".func("number") {
             val arg = it.getOrNull(0) ?: return@func false.js
-            (toNumber(arg) is Long).js
+            val num = toNumber(arg).toDouble()
+            (!num.isNaN() && num.isFinite() && num % 1.0 == 0.0 &&
+                abs(num) <= 9007199254740991.0).js
         },
         "parseFloat".func("number") {
             val arg = it.getOrNull(0) ?: return@func false.js

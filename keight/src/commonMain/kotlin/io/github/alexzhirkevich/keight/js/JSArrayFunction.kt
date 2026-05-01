@@ -2,11 +2,13 @@ package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Uninitialized
+import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.expressions.OpConstant
 import io.github.alexzhirkevich.keight.expressions.OpEqualsImpl
 import io.github.alexzhirkevich.keight.fastForEachIndexed
 import io.github.alexzhirkevich.keight.findJsRoot
+import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.requireThisRef
 import io.github.alexzhirkevich.keight.thisRef
 import kotlin.math.abs
@@ -23,8 +25,30 @@ internal class JSArrayFunction : JSFunction(
         "from".js to "from".func("source"){
             val source = it[0]
             buildList {
-                source?.arrayForEachIndexed(this@func){ _, it ->
-                    add(it)
+                if (source != null && source !is List<*>) {
+                    // Check if source has Symbol.iterator (is iterable)
+                    val iteratorMethod = source.get(JsSymbol.iterator, this@func)
+                        ?.callableOrNull()
+                        ?.call(source, emptyList(), this@func)
+
+                    if (iteratorMethod != null && iteratorMethod != Undefined) {
+                        // Source is iterable - consume its iterator directly
+                        val iter = iteratorMethod
+                        while (true) {
+                            val result = iter.next(this@func)
+                            if (result.done(this@func)) break
+                            add(result.value(this@func))
+                        }
+                    } else {
+                        // Source is array-like object - use length + index access
+                        source.arrayForEachIndexed(this@func) { _, item ->
+                            add(item)
+                        }
+                    }
+                } else {
+                    source?.arrayForEachIndexed(this@func) { _, item ->
+                        add(item)
+                    }
                 }
             }.js
         },

@@ -121,7 +121,7 @@ internal suspend inline fun JsAny.value(runtime: ScriptRuntime) : JsAny? {
     return get(Constants.value.js, runtime)
 }
 
-private suspend inline fun JsAny.done(runtime: ScriptRuntime) : Boolean {
+internal suspend inline fun JsAny.done(runtime: ScriptRuntime) : Boolean {
     return contains(Constants.done.js, runtime)
             && !runtime.isFalse(get(Constants.done.js, runtime))
 }

@@ -176,16 +176,16 @@ internal tailrec suspend fun Any?.esToNumber(runtime: ScriptRuntime) : Number {
     return when(this) {
         is JSDateWrapper -> toInstant().toEpochMilliseconds()
         is Wrapper<*> -> value.esToNumber(runtime)
-        is Byte -> toLong()
-        is UByte -> toLong()
-        is Short -> toLong()
-        is UShort -> toLong()
-        is Int -> toLong()
-        is UInt -> toLong()
-        is ULong -> toLong()
-        is Float -> toDouble()
-        is Long -> this
         is Double -> this
+        is Long -> this
+        is Float -> toDouble()
+        is ULong -> toLong()
+        is UInt -> toLong()
+        is Int -> toLong()
+        is UShort -> toLong()
+        is Short -> toLong()
+        is UByte -> toLong()
+        is Byte -> toLong()
         is JsSymbol -> runtime.typeError { "Symbol cannot be converted to a number".js }
         is Unit, is Undefined -> return Double.NaN
         null, false -> +0L

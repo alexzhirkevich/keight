@@ -9,6 +9,7 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.Constants
 import io.github.alexzhirkevich.keight.js.JSFunction
+import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.expressions.OpAssign
 import io.github.alexzhirkevich.keight.expressions.OpAssignByIndex
 import io.github.alexzhirkevich.keight.expressions.OpBlock
