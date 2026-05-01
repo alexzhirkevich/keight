@@ -1,18 +1,128 @@
 package io.github.alexzhirkevich.keight.js.interpreter
 
+import io.github.alexzhirkevich.keight.SourceLocation
 import io.github.alexzhirkevich.keight.js.SyntaxError
 
 
 internal fun String.tokenize(
     ignoreWhitespaces: Boolean =  true
-) : List<Token> = toList()
+) : List<LocatedToken> = toList()
     .listIterator()
-    .tokenize(
+    .tokenizeImpl(
         untilEndOfBlock = false,
         ignoreWhitespaces = ignoreWhitespaces
     )
 
-private fun ListIterator<Char>.tokenize(
+/**
+ * Tokenize without location tracking.
+ * Used internally for template string recursion where nested tokens
+ * don't need source location tracking.
+ */
+internal fun String.tokenizeRaw(
+    ignoreWhitespaces: Boolean = true
+) : List<Token> = toList()
+    .listIterator()
+    .tokenizeRawImpl(
+        untilEndOfBlock = false,
+        ignoreWhitespaces = ignoreWhitespaces
+    )
+
+private fun ListIterator<Char>.tokenizeImpl(
+    untilEndOfBlock : Boolean,
+    ignoreWhitespaces : Boolean = false
+) : List<LocatedToken> {
+    val result = mutableListOf<LocatedToken>()
+    var line = 1
+    var column = 1
+
+    fun advancePosition(c: Char) {
+        if (c.code in LSEP) {
+            line++
+            column = 1
+        } else {
+            column++
+        }
+    }
+
+    try {
+        var blockStack = 0
+
+        while (hasNext()) {
+            val startLine = line
+            val startColumn = column
+            val c = next()
+            advancePosition(c)
+
+            val token = when (c) {
+                '=' -> assign()
+                '+' -> plus()
+                '-' -> minus()
+                '*' -> mul()
+                '/' -> {
+                    val t = div(result.lastOrNull()?.token)
+                    if (t is Token.Comment && (t.isSingleLine || t.value.any { it.code in LSEP })) {
+                        result.add(LocatedToken(Token.NewLine, SourceLocation(startLine, startColumn)))
+                        continue
+                    }
+                    t
+                }
+
+                '#' -> hashbangComment()
+                '%' -> mod()
+                '&' -> and()
+                '|' -> or()
+                '^' -> xor()
+                '<' -> less()
+                '>' -> greater()
+                '!' -> not()
+                '.' -> period()
+                '?' -> questionMark()
+                '~' -> Token.Operator.Bitwise.Reverse
+                '{' -> Token.Operator.Bracket.CurlyOpen.also {
+                    blockStack++
+                }
+
+                '}' -> Token.Operator.Bracket.CurlyClose.also {
+                    if (--blockStack < 0 && untilEndOfBlock) {
+                        result.add(LocatedToken(it, SourceLocation(startLine, startColumn)))
+                        return@tokenizeImpl result
+                    }
+                }
+
+                '(' -> Token.Operator.Bracket.RoundOpen
+                ')' -> Token.Operator.Bracket.RoundClose
+                '[' -> Token.Operator.Bracket.SquareOpen
+                ']' -> Token.Operator.Bracket.SquareClose
+                ':' -> Token.Operator.Colon
+                ';' -> Token.Operator.SemiColon
+                ',' -> Token.Operator.Comma
+                '\n', ' ' -> Token.NewLine
+                '`' -> templateString(ignoreWhitespaces)
+                in STRING_START -> string(c)
+                in NUMBERS -> number(c)
+                else -> {
+                    val isWhiteSpace = c.isWhitespace()
+                    when {
+                        isWhiteSpace && ignoreWhitespaces -> continue
+                        isWhiteSpace -> Token.Whitespace(c)
+                        c.isUnicodeIdentifierStart() -> identifier(c)
+                        else -> Token.Identifier.Property(c.toString())
+                    }
+                }
+            }
+
+            result.add(LocatedToken(token, SourceLocation(startLine, startColumn)))
+        }
+    } catch (_: NoSuchElementException) {
+        throw SyntaxError("Invalid or unexpected token")
+    }
+    return result
+}
+
+/**
+ * Tokenize without location tracking (for backward compatibility and internal use).
+ */
+private fun ListIterator<Char>.tokenizeRawImpl(
     untilEndOfBlock : Boolean,
     ignoreWhitespaces : Boolean = false
 ) : List<Token> {
@@ -22,11 +132,11 @@ private fun ListIterator<Char>.tokenize(
 
             while (hasNext()) {
                 this += when (val c = next()) {
-                    '=' -> assign() // +eq, arrow
+                    '=' -> assign()
                     '+' -> plus()
                     '-' -> minus()
-                    '*' -> mul() // +exp
-                    '/' -> div(lastOrNull()).also { // +comment, regex
+                    '*' -> mul()
+                    '/' -> div(lastOrNull()).also {
                         if (it is Token.Comment && (it.isSingleLine || it.value.any { it.code in LSEP })) {
                             add(Token.NewLine)
                         }
@@ -37,11 +147,11 @@ private fun ListIterator<Char>.tokenize(
                     '&' -> and()
                     '|' -> or()
                     '^' -> xor()
-                    '<' -> less() // +shl
-                    '>' -> greater() // +shr, ushr
-                    '!' -> not() // + neq
-                    '.' -> period() // + spread
-                    '?' -> questionMark() // for ternary + nullish coalescing, optional chaining
+                    '<' -> less()
+                    '>' -> greater()
+                    '!' -> not()
+                    '.' -> period()
+                    '?' -> questionMark()
                     '~' -> Token.Operator.Bitwise.Reverse
                     '{' -> Token.Operator.Bracket.CurlyOpen.also {
                         blockStack++
@@ -69,7 +179,8 @@ private fun ListIterator<Char>.tokenize(
                         when {
                             isWhiteSpace && ignoreWhitespaces -> continue
                             isWhiteSpace -> Token.Whitespace(c)
-                            else -> identifier(c)
+                            c.isUnicodeIdentifierStart() -> identifier(c)
+                            else -> Token.Identifier.Property(c.toString())
                         }
                     }
                 }
@@ -447,7 +558,7 @@ internal fun ListIterator<Char>.string(start : Char) : Token.Str {
                 n = next()
             }
         }
-    } catch (t: NoSuchElementException) {
+    } catch (_: NoSuchElementException) {
         throw SyntaxError("Unexpected string")
     }
 
@@ -455,9 +566,11 @@ internal fun ListIterator<Char>.string(start : Char) : Token.Str {
 }
 
 private val UNICODE_REGEX = "\\\\u[{]?[0-9a-fA-F]{4}[}]?".toRegex()
-private val UNICODE_REGEX_SURROGATE = "\\\\u[{][0-9a-fA-F]{5,6}[}]".toRegex()
+internal val UNICODE_REGEX_SURROGATE = "\\\\u[{][0-9a-fA-F]{5,6}[}]".toRegex()
+/** Matches \u{1-6 hex digits} — used for JS regex Unicode escapes */
+internal val UNICODE_REGEX_SURROGATE_ANY = "\\\\u[{][0-9a-fA-F]{1,6}[}]".toRegex()
 
-private fun String.toUnicodePoint() =
+internal fun String.toUnicodePoint() =
     removePrefix("\\u")
         .removePrefix("{")
         .removeSuffix("}")
@@ -497,6 +610,25 @@ internal fun String.escape() : String {
         .replace("\t", "\\t")
         .replace("\b", "\\b")
         .replace("\"", "\\\\")
+}
+
+/**
+ * Escapes a string for embedding in a JSON value (between double-quotes).
+ *
+ * Differences from [escape]:
+ * - Single-quote `'` is NOT escaped — it is a plain character in JSON.
+ * - Only the characters mandated by the JSON spec (RFC 8259) are escaped:
+ *   `"`, `\`, and the C0 control characters.
+ */
+internal fun String.escapeForJson(): String {
+    return replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+        .replace("\b", "\\b")
+        // \f (form-feed) is also required by the spec
+        .replace("\u000C", "\\f")
 }
 
 internal fun ListIterator<Char>.number(start : Char) : Token.Num {
@@ -594,7 +726,8 @@ private fun ListIterator<Char>.identifier(start : Char) : Token {
     while (hasNext()) {
         val next = next()
 
-        if (next !in PROPERTY_ALPHABET_WITH_NUM) {
+        // Use Unicode-aware check for identifier continuation
+        if (!next.isUnicodeIdentifierPart()) {
             previous()
             break
         }
@@ -648,7 +781,7 @@ private fun ListIterator<Char>.templateString(
                             buildList {
                                 add(Token.Operator.Bracket.CurlyOpen)
                                 addAll(
-                                    tokenize(
+                                    tokenizeRawImpl(
                                         untilEndOfBlock = true,
                                         ignoreWhitespaces = ignoreWhitespaces
                                     )
@@ -679,3 +812,51 @@ private val NumberFormatIndicators = NumberFormat.entries.mapNotNull { it.prefix
 
 private val IDENTIFIER_ALPHABET = (('a'..'z').toList() + ('A'..'Z').toList() + '$' + '_' ).toHashSet()
 private val PROPERTY_ALPHABET_WITH_NUM = (IDENTIFIER_ALPHABET + NUMBERS).toHashSet()
+
+/**
+ * Checks if a character can be the first character of a Unicode identifier.
+ * Based on ECMAScript specification (UnicodeIDStart).
+ * Uses Kotlin's CharCategory which is cross-platform compatible.
+ */
+private fun Char.isUnicodeIdentifierStart(): Boolean {
+    // ASCII characters
+    if (this in IDENTIFIER_ALPHABET) return true
+    
+    // Unicode letter categories (Lu, Ll, Lt, Lm, Lo, Nl)
+    return when (category) {
+        CharCategory.UPPERCASE_LETTER,      // Lu
+        CharCategory.LOWERCASE_LETTER,      // Ll
+        CharCategory.TITLECASE_LETTER,       // Lt
+        CharCategory.MODIFIER_LETTER,        // Lm
+        CharCategory.OTHER_LETTER,           // Lo
+        CharCategory.LETTER_NUMBER           // Nl
+        -> true
+        else -> false
+    }
+}
+
+/**
+ * Checks if a character can be part of a Unicode identifier.
+ * Based on ECMAScript specification (UnicodeIDContinue).
+ * Uses Kotlin's CharCategory which is cross-platform compatible.
+ */
+private fun Char.isUnicodeIdentifierPart(): Boolean {
+    // ASCII characters including numbers
+    if (this in PROPERTY_ALPHABET_WITH_NUM) return true
+    
+    // Unicode identifier continuation categories
+    return when (category) {
+        CharCategory.UPPERCASE_LETTER,      // Lu
+        CharCategory.LOWERCASE_LETTER,      // Ll
+        CharCategory.TITLECASE_LETTER,       // Lt
+        CharCategory.MODIFIER_LETTER,        // Lm
+        CharCategory.OTHER_LETTER,           // Lo
+        CharCategory.LETTER_NUMBER,          // Nl
+        CharCategory.NON_SPACING_MARK,       // Mn (e.g., combining marks)
+        CharCategory.COMBINING_SPACING_MARK, // Mc
+        CharCategory.DECIMAL_DIGIT_NUMBER,   // Nd
+        CharCategory.CONNECTOR_PUNCTUATION  // Pc (e.g., underscore-like)
+        -> true
+        else -> false
+    }
+}

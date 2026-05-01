@@ -170,6 +170,12 @@ internal class JSNumberFunction : JSFunction(
     override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JsObject {
         return JsNumberObject(JsNumberWrapper(runtime.toNumber(args.getOrNull(0))))
     }
+
+    override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
+        return constructObject(args, runtime).also {
+            it.setProto(runtime, get(PROTOTYPE, runtime))
+        }
+    }
 }
 
 private fun Number.toFixed(digits: Int, runtime: ScriptRuntime) : String {

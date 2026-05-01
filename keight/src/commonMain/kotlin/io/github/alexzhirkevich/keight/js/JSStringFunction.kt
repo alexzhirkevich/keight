@@ -156,10 +156,12 @@ internal class JSStringFunction : JSFunction(
         "match".js.func(
             "regexp" defaults OpConstant(JsRegexWrapper())
         ) {
-            findJsRoot().RegExp
+            val RegExp = findJsRoot().RegExp
+            RegExp
+                .prototype!!
                 .get(JsSymbol.match, this)
                 .callableOrThrow(this)
-                .call(it[0], thisRef.listOf(), this)
+                .call(RegExp.construct(listOf(it[0]),this), thisRef.listOf(), this)
         }
         JsSymbol.iterator.func {
             thisRef<CharSequence>()
@@ -186,6 +188,12 @@ internal class JSStringFunction : JSFunction(
 
     override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JsObject {
         return JsStringObject(JsStringWrapper(invoke(args, runtime).toString()))
+    }
+
+    override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
+        return constructObject(args, runtime).also {
+            it.setProto(runtime, get(PROTOTYPE, runtime))
+        }
     }
 }
 

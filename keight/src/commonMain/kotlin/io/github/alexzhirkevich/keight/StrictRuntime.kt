@@ -1,5 +1,6 @@
 package io.github.alexzhirkevich.keight
 
+import io.github.alexzhirkevich.keight.CallFrame
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.ReferenceError
@@ -47,6 +48,7 @@ internal class StrictRuntime(
     )
     override suspend fun <T> useStrict(block: suspend (ScriptRuntime) -> T): T = block(this)
     override fun reset() = parent.reset()
+    override val callStack: MutableList<CallFrame> get() = parent.callStack
 
 
     override fun fromKotlin(value: Any): JsAny = parent.fromKotlin(value)

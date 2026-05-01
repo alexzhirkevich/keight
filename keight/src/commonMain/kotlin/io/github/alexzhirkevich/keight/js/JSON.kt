@@ -4,7 +4,7 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.fastForEach
 import io.github.alexzhirkevich.keight.js.interpreter.NumberFormat
-import io.github.alexzhirkevich.keight.js.interpreter.escape
+import io.github.alexzhirkevich.keight.js.interpreter.escapeForJson
 import io.github.alexzhirkevich.keight.js.interpreter.number
 import io.github.alexzhirkevich.keight.js.interpreter.string
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
@@ -136,8 +136,8 @@ private tailrec suspend fun Any?.stringify(runtime: ScriptRuntime, indent: Strin
         is Number     -> toString()
         is Boolean    -> toString()
         is Wrapper<*> -> value.stringify(runtime, indent, depth)
-        is JsAny      -> "\"${runtime.toString(this).escape()}\""
-        else          -> "\"${toString().escape()}\""
+        is JsAny      -> "\"${runtime.toString(this).escapeForJson()}\""
+        else          -> "\"${toString().escapeForJson()}\""
     }
 }
 

@@ -5,6 +5,8 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
+import io.github.alexzhirkevich.keight.js.interpreter.UNICODE_REGEX_SURROGATE_ANY
+import io.github.alexzhirkevich.keight.js.interpreter.toUnicodePoint
 
 private const val LAST_INDEX = "lastIndex"
 
@@ -55,17 +57,51 @@ internal class JsRegexWrapper(
 }
 
 internal fun String.toRegexOptions() : Set<RegexOptions>{
-    return mapNotNullTo(mutableSetOf()) {
-        RegexOptions.entries.firstOrNull { e -> e.char == it }
+    return RegexOptions.entries.filterTo(mutableSetOf()) { entry ->
+        any { it == entry.char }
+    }
+}
+
+/**
+ * Converts JS Unicode escape sequences (\u{XXXX}) to actual Unicode characters.
+ * Uses the precompiled [UNICODE_REGEX_SURROGATE] regex from Lexer.kt.
+ */
+private fun String.convertJsUnicodeEscapes(): String {
+    // Match \u{XXXX} with 1-6 hex digits (covers both BMP and extended code points)
+    return UNICODE_REGEX_SURROGATE_ANY.replace(this) { matchResult ->
+        val codePoint = matchResult.value.toUnicodePoint()
+        if (codePoint <= 0xFFFF) {
+            codePoint.toChar().toString()
+        } else {
+            val adjusted = codePoint - 0x10000
+            val highSurrogate = ((adjusted ushr 10) + 0xD800).toChar()
+            val lowSurrogate = ((adjusted and 0x3FF) + 0xDC00).toChar()
+            charArrayOf(highSurrogate, lowSurrogate).concatToString()
+        }
     }
 }
 
 
 internal fun String.toJsRegex(options : Set<RegexOptions>? = null) : JsRegexWrapper {
+    val rawPattern = removePrefix("/")
+        .substringBeforeLast("/")
+    val rawFlags = substringAfterLast("/")
+    val flags = options ?: rawFlags.toRegexOptions()
+    
+    // Check if 'u' flag is present - only then convert \u{...} escapes
+    val hasUnicodeFlag = RegexOptions.IgnoreCase in flags  // Use a placeholder check, we'll add Unicode later
+        || rawFlags.contains('u')
+        || (options?.any { it.char == 'u' } == true)
+    
+    val convertedPattern = if (hasUnicodeFlag) {
+        rawPattern.convertJsUnicodeEscapes()
+    } else {
+        rawPattern
+    }
+    
     return JsRegexWrapper(
-        pattern = removePrefix("/")
-            .substringBeforeLast("/"),
-        options = options ?: substringAfterLast("/").toRegexOptions()
+        pattern = convertedPattern,
+        options = flags
     )
 }
 

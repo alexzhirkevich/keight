@@ -354,6 +354,16 @@ class JsonTest {
     }
 
     @Test
+    fun stringify_single_quote_not_escaped() = runtimeTest {
+        // Single-quote must NOT be escaped in JSON output (RFC 8259)
+        """JSON.stringify("it's fine")""".eval(it).assertEqualsTo("\"it's fine\"")
+        """JSON.stringify({"k": "don't"})""".eval(it).assertEqualsTo("""{"k":"don't"}""")
+        // Round-trip: parse → stringify should preserve single quotes
+        """JSON.stringify(JSON.parse('{"v":"it\'s fine"}'))""".eval(it)
+            .assertEqualsTo("""{"v":"it's fine"}""")
+    }
+
+    @Test
     fun stringify_space_number() = runtimeTest {
         // space=2 → 2-space indent
         """JSON.stringify({a:1,b:2}, null, 2)""".eval(it).assertEqualsTo(

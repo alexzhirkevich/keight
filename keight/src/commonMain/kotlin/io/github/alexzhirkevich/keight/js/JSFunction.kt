@@ -106,13 +106,6 @@ public open class JSFunction(
     private var bindedArgs = emptyList<JsAny?>()
     internal var closure : ScriptRuntime? = null
 
-    private val superConstructorPropertyMap =
-        if (superConstructor != null) {
-            mapOf("super" to Pair(VariableType.Const, superConstructor))
-        } else {
-            emptyMap()
-        }
-
     init {
         properties.forEach {
             val v = it.value

@@ -1,12 +1,14 @@
 package io.github.alexzhirkevich.keight.js.interpreter
 
 import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.CallFrame
 import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Delegate
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.Constants
+import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.expressions.OpAssign
 import io.github.alexzhirkevich.keight.expressions.OpAssignByIndex
 import io.github.alexzhirkevich.keight.expressions.OpBlock
@@ -51,13 +53,11 @@ import io.github.alexzhirkevich.keight.expressions.OpTryCatch
 import io.github.alexzhirkevich.keight.expressions.OpWhileLoop
 import io.github.alexzhirkevich.keight.expressions.PropertyAccessorFactory
 import io.github.alexzhirkevich.keight.expressions.ThrowableValue
-import io.github.alexzhirkevich.keight.expressions.Destruction
 import io.github.alexzhirkevich.keight.expressions.asDestruction
 import io.github.alexzhirkevich.keight.fastAll
 import io.github.alexzhirkevich.keight.fastMap
 import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.js.JSError
-import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.OpClassInit
 import io.github.alexzhirkevich.keight.js.OpFunctionInit
@@ -71,7 +71,6 @@ import io.github.alexzhirkevich.keight.expressions.ImportEntry
 import io.github.alexzhirkevich.keight.expressions.OpAggregatingExport
 import io.github.alexzhirkevich.keight.expressions.OpExport
 import io.github.alexzhirkevich.keight.expressions.OpImport
-import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.joinSuccess
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.js.listOf
@@ -102,9 +101,31 @@ import kotlin.collections.singleOrNull
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 import kotlin.math.pow
+import io.github.alexzhirkevich.keight.SourceLocation
 
-internal fun List<Token>.parse() : Expression {
+internal fun List<LocatedToken>.parse() : Expression {
     return sanitize()
+        .listIterator()
+        .parseBlock(
+            scoped = false,
+            isExpressible = true,
+            blockContext = emptyList(),
+            type = ExpectedBlockType.Block
+        )
+}
+
+/**
+ * Parse with a script name for error reporting.
+ */
+internal fun List<LocatedToken>.parse(scriptName: String? = null) : Expression {
+    val tokens = if (scriptName != null) {
+        sanitize().map { lt ->
+            LocatedToken(lt.token, lt.location.copy(fileName = scriptName))
+        }
+    } else {
+        sanitize()
+    }
+    return tokens
         .listIterator()
         .parseBlock(
             scoped = false,
@@ -129,7 +150,25 @@ internal enum class BlockContext {
 
 private fun unexpected(expr : String) : String = "Unexpected token '$expr'"
 
-private fun List<Token>.sanitize() : List<Token> {
+private fun List<LocatedToken>.sanitize() : List<LocatedToken> {
+
+    return fold(mutableListOf<LocatedToken>()) { l, lt ->
+        val token = lt.token
+        // skip comments, double newlines and newlines after semicolon
+        if (
+            token !is Token.Comment &&
+            (token !is Token.NewLine || (l.lastOrNull()?.token !is Token.NewLine && l.lastOrNull()?.token !is Token.Operator.SemiColon))
+        ) {
+            l.add(lt)
+        }
+        l
+    }
+}
+
+/**
+ * Sanitize a plain token list (used for template string internal tokens).
+ */
+private fun List<Token>.sanitizeTokens() : List<Token> {
 
     return fold(mutableListOf<Token>()) { l, token ->
         // skip comments, double newlines and newlines after semicolon
@@ -143,7 +182,7 @@ private fun List<Token>.sanitize() : List<Token> {
     }
 }
 
-private fun ListIterator<Token>.eat(token: Token) : Boolean {
+private fun ListIterator<LocatedToken>.eat(token: Token) : Boolean {
     val i = nextIndex()
     if (nextSignificant() == token){
         return true
@@ -153,7 +192,7 @@ private fun ListIterator<Token>.eat(token: Token) : Boolean {
     }
 }
 
-private inline fun <reified R : Token> ListIterator<Token>.nextIsInstance() : Boolean {
+private inline fun <reified R : Token> ListIterator<LocatedToken>.nextIsInstance() : Boolean {
     if (!hasNext())
         return false
 
@@ -162,29 +201,61 @@ private inline fun <reified R : Token> ListIterator<Token>.nextIsInstance() : Bo
     return (nextSignificant() is R).also { returnToIndex(i) }
 }
 
-private fun ListIterator<Token>.nextSignificant() : Token {
-    var n = next()
+private fun ListIterator<LocatedToken>.nextSignificant() : Token {
+    var n = next().token
     while (n is Token.NewLine){
-        n = next()
+        n = next().token
     }
     return n
 }
 
-private fun ListIterator<Token>.returnToIndex(idx : Int){
+/**
+ * Get the next significant LocatedToken (skipping newlines), or null if exhausted.
+ */
+private fun ListIterator<LocatedToken>.nextSignificantLocated() : LocatedToken? {
+    if (!hasNext()) return null
+    val i = nextIndex()
+    var lt = next()
+    while (lt.token is Token.NewLine) {
+        if (!hasNext()) { returnToIndex(i); return null }
+        lt = next()
+    }
+    return lt
+}
+
+private fun ListIterator<LocatedToken>.returnToIndex(idx : Int){
     while (nextIndex() > idx){
         previous()
     }
 }
 
-private fun ListIterator<Token>.prevSignificant() : Token {
-    var n = previous()
+private fun ListIterator<LocatedToken>.prevSignificant() : Token {
+    var n = previous().token
     while (n is Token.NewLine){
-        n = previous()
+        n = previous().token
     }
     return n
 }
 
-private fun ListIterator<Token>.parseStatement(
+/**
+ * Get the location of the next significant token, or null.
+ */
+private fun ListIterator<LocatedToken>.nextSignificantLocation() : SourceLocation? {
+    val i = nextIndex()
+    val lt = nextSignificantLocated()
+    returnToIndex(i)
+    return lt?.location
+}
+
+/**
+ * Helper to set source location on an expression from a LocatedToken.
+ */
+private fun Expression.at(location: SourceLocation?) : Expression {
+    if (location != null) this.sourceLocation = location
+    return this
+}
+
+private fun ListIterator<LocatedToken>.parseStatement(
     blockContext: List<BlockContext> = emptyList(),
     maxPrecedence: Int = 14,
     blockType: ExpectedBlockType,
@@ -551,18 +622,21 @@ private fun ListIterator<Token>.parseStatement(
     return x
 }
 
-private fun ListIterator<Token>.parseFactor(
+private fun ListIterator<LocatedToken>.parseFactor(
     blockContext: List<BlockContext>,
     blockType: ExpectedBlockType = ExpectedBlockType.None
 ): Expression {
+    val loc = nextSignificantLocation()
     val expr =  when (val next = nextSignificant()) {
-        is Token.Str -> OpConstant(next.value.js)
-        is Token.Regex -> OpConstant(next.value.toJsRegex())
+        is Token.Str -> OpConstant(next.value.js).at(loc)
+        is Token.Regex -> OpConstant(next.value.toJsRegex()).at(loc)
         is Token.TemplateString -> {
             val expressions = next.tokens.fastMap {
                 when (it) {
                     is TemplateStringToken.Str -> OpConstant(it.value.js)
-                    is TemplateStringToken.Template -> it.value.sanitize().listIterator()
+                    is TemplateStringToken.Template -> it.value.sanitizeTokens()
+                        .map { LocatedToken(it, SourceLocation(0, 0)) }
+                        .listIterator()
                         .parseBlock(
                             type = ExpectedBlockType.Block,
                             isExpressible = true,
@@ -578,7 +652,7 @@ private fun ListIterator<Token>.parseFactor(
             val num = if (next is Token.Num) {
                 next.value
             } else {
-                val number = next()
+                val number = next().token
                 syntaxCheck(
                     number is Token.Num
                             && !number.isFloat
@@ -662,7 +736,7 @@ private fun ListIterator<Token>.parseFactor(
                 parseArrayCreation()
             }
         }
-        is Token.Operator.New -> parseNew()
+        is Token.Operator.New -> parseNew(loc)
         is Token.Operator.Typeof -> parseTypeof()
         is Token.Operator.Void -> parseVoid()
         is Token.Operator.Delete -> parseDelete()
@@ -679,18 +753,18 @@ private fun ListIterator<Token>.parseFactor(
                     OpSetter(parseFunction(name = n.identifier, blockContext = blockContext))
                 else -> {
                     returnToIndex(i)
-                    OpGetProperty(next.identifier, receiver = null)
+                    OpGetProperty(next.identifier, receiver = null).at(loc)
                 }
             }
         }
-        is Token.Operator.SemiColon -> Expression { Undefined }
+        is Token.Operator.SemiColon -> Expression { Undefined }.at(loc)
         else -> throw SyntaxError(unexpected(next::class.simpleName.orEmpty()))
     }
 
     return expr
 }
 
-private fun ListIterator<Token>.parseAssignmentValue(
+private fun ListIterator<LocatedToken>.parseAssignmentValue(
     x: Expression,
     blockContext: List<BlockContext>,
     merge: (suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?)? = null
@@ -777,7 +851,7 @@ private fun getMergeForAssignment(operator: Token.Operator.Assign): (suspend Scr
     }
 }
 
-private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, blockContext: List<BlockContext>): Expression {
+private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Keyword, blockContext: List<BlockContext>): Expression {
     return when(keyword){
         Token.Identifier.Keyword.Var,
         Token.Identifier.Keyword.Let,
@@ -812,7 +886,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
         Token.Identifier.Keyword.While -> parseWhileLoop(blockContext)
         Token.Identifier.Keyword.Do -> parseDoWhileLoop(blockContext)
         Token.Identifier.Keyword.Continue -> {
-            val label = (next() as? Token.Identifier)?.identifier ?: null.also { previous() }
+            val label = (next().token as? Token.Identifier)?.identifier ?: null.also { previous() }
             OpContinue(label).also {
                 syntaxCheck(blockContext.lastOrNull() == BlockContext.Loop) {
                     unexpected("continue")
@@ -820,7 +894,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
             }
         }
         Token.Identifier.Keyword.Break -> {
-            val label = (next() as? Token.Identifier)?.identifier ?: null.also { previous() }
+            val label = (next().token as? Token.Identifier)?.identifier ?: null.also { previous() }
             OpBreak(label).also {
                 val context = blockContext.lastOrNull()
                 syntaxCheck(context == BlockContext.Loop || context == BlockContext.Switch || label != null) {
@@ -841,7 +915,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
             syntaxCheck(BlockContext.Function in blockContext) {
                 unexpected("return")
             }
-            val next = next()
+            val next = next().token
             if (next == Token.NewLine || next == Token.Operator.SemiColon){
                 OpReturn(OpConstant(Undefined))
             } else {
@@ -902,7 +976,7 @@ private fun ListIterator<Token>.parseKeyword(keyword: Token.Identifier.Keyword, 
  * - [expr] (computed property access on parent prototype)
  * - (args) (parent constructor call)
  */
-private fun ListIterator<Token>.parseSuper(blockContext: List<BlockContext>): Expression {
+private fun ListIterator<LocatedToken>.parseSuper(blockContext: List<BlockContext>): Expression {
     syntaxCheck(BlockContext.Class in blockContext) {
         "'super' can only be used in class methods"
     }
@@ -939,7 +1013,7 @@ private fun ListIterator<Token>.parseSuper(blockContext: List<BlockContext>): Ex
  * Parse super(...) constructor call.
  * super() should use the 'super' variable that was passed as extraArgs in JSFunction.construct()
  */
-private fun ListIterator<Token>.parseSuperConstructorCall(blockContext: List<BlockContext>): Expression {
+private fun ListIterator<LocatedToken>.parseSuperConstructorCall(blockContext: List<BlockContext>): Expression {
     val args = parseExpressionGrouping(blockContext).expressions
     // The 'super' variable is injected by JSFunction.construct() via extraArgs
     return Expression { runtime ->
@@ -952,7 +1026,11 @@ private fun ListIterator<Token>.parseSuperConstructorCall(blockContext: List<Blo
     }
 }
 
-private fun ListIterator<Token>.parseNew() : Expression {
+private fun ListIterator<LocatedToken>.parseNew(loc: SourceLocation?) : Expression {
+    // JSEngine.compile() wraps script in "{\n$script\n}", which adds an
+    // extra line at the top. Compensate so line numbers match the user's source.
+    val adjustedLine = loc?.line?.let { maxOf(1, it - 1) }
+
     val index = nextIndex()
     val next = nextSignificant()
 
@@ -964,12 +1042,31 @@ private fun ListIterator<Token>.parseNew() : Expression {
             emptyList()
         }
 
-        return Expression { runtime ->
-            val constructor = runtime.get(next.identifier.js)
-            runtime.typeCheck(constructor is Constructor) {
+        return Expression {
+            val constructor = it.get(next.identifier.js)
+            it.typeCheck(constructor is Constructor) {
                 "'$constructor' (${next.identifier}) is not a constructor".js
             }
-            constructor.construct(args.fastMap { it(runtime) }, runtime)
+            val frame = CallFrame(
+                functionName = next.identifier,
+                fileName = loc?.fileName,
+                lineNumber = adjustedLine,
+                columnNumber = loc?.column,
+                isConstructor = true
+            )
+            it.pushCallFrame(frame)
+            try {
+                constructor.construct(args.fastMap { arg -> arg(it) }, it).also { result ->
+                    if (adjustedLine != null && loc != null && result is Expression.LocationAttachable) {
+                        result.attachLocation(adjustedLine, loc.column, loc.fileName)
+                    }
+                    if (result is JSError) {
+                        result.callStackFrames = it.captureCallStack()
+                    }
+                }
+            } finally {
+                it.popCallFrame()
+            }
         }
     } else {
         returnToIndex(index)
@@ -977,20 +1074,39 @@ private fun ListIterator<Token>.parseNew() : Expression {
             blockContext = emptyList(),
             blockType = ExpectedBlockType.Object
         )
-        return Expression { runtime ->
-            val c = constructor.invoke(runtime)
-            runtime.typeCheck(c is Constructor) {
+        return Expression {
+            val c = constructor.invoke(it)
+            it.typeCheck(c is Constructor) {
                 "'$c' is not a constructor".js
             }
-            runtime.typeCheck(c !is JSFunction || !c.isArrow){
+            it.typeCheck(c !is JSFunction || !c.isArrow){
                 "(intermediate value) is not a constructor".js
             }
-            c.construct(emptyList(), runtime)
+            val frame = CallFrame(
+                functionName = (c as? JSFunction)?.name?.takeIf { n -> n.isNotEmpty() },
+                fileName = loc?.fileName,
+                lineNumber = adjustedLine,
+                columnNumber = loc?.column,
+                isConstructor = true
+            )
+            it.pushCallFrame(frame)
+            try {
+                c.construct(emptyList(), it).also { result ->
+                    if (adjustedLine != null && result is Expression.LocationAttachable) {
+                        result.attachLocation(adjustedLine, loc.column, loc.fileName)
+                    }
+                    if (result is JSError) {
+                        result.callStackFrames = it.captureCallStack()
+                    }
+                }
+            } finally {
+                it.popCallFrame()
+            }
         }
     }
 }
 
-private fun ListIterator<Token>.parseVoid() : Expression {
+private fun ListIterator<LocatedToken>.parseVoid() : Expression {
     val isArg = nextIsInstance<Token.Operator.Bracket.RoundOpen>()
     val expr = if (isArg) {
         parseExpressionGrouping()
@@ -1003,7 +1119,7 @@ private fun ListIterator<Token>.parseVoid() : Expression {
     }
 }
 
-private fun ListIterator<Token>.parseTypeof() : Expression {
+private fun ListIterator<LocatedToken>.parseTypeof() : Expression {
     val isArg = nextIsInstance<Token.Operator.Bracket.RoundOpen>()
     val expr = if (isArg) {
         parseExpressionGrouping()
@@ -1019,7 +1135,7 @@ private fun ListIterator<Token>.parseTypeof() : Expression {
     }
 }
 
-private fun ListIterator<Token>.parseDelete() : Expression {
+private fun ListIterator<LocatedToken>.parseDelete() : Expression {
     val x = parseStatement(maxPrecedence = 1, blockType = ExpectedBlockType.Object)
 
     val (subj, obj) = when (x) {
@@ -1036,7 +1152,7 @@ private fun ListIterator<Token>.parseDelete() : Expression {
 }
 
 
-private fun ListIterator<Token>.parseArrayCreation(): Expression {
+private fun ListIterator<LocatedToken>.parseArrayCreation(): Expression {
     check(eat(Token.Operator.Bracket.SquareOpen))
 
     val expressions = buildList {
@@ -1062,7 +1178,7 @@ private fun ListIterator<Token>.parseArrayCreation(): Expression {
  * Parses a computed property name in an object literal context.
  * Syntax: { [expression]: value } or { [expression]() {} }
  */
-private fun ListIterator<Token>.parseComputedPropertyName(): Expression {
+private fun ListIterator<LocatedToken>.parseComputedPropertyName(): Expression {
     check(eat(Token.Operator.Bracket.SquareOpen))
     
     // Parse the key expression - use low precedence to get only the next token/expression
@@ -1082,7 +1198,7 @@ private fun ListIterator<Token>.parseComputedPropertyName(): Expression {
     return OpComputedPropertyName(keyExpr)
 }
 
-private fun ListIterator<Token>.parseExpressionGrouping(blockContext: List<BlockContext> = emptyList()): OpTouple {
+private fun ListIterator<LocatedToken>.parseExpressionGrouping(blockContext: List<BlockContext> = emptyList()): OpTouple {
     check(eat(Token.Operator.Bracket.RoundOpen))
 
     val expressions = if (nextIsInstance<Token.Operator.Bracket.RoundClose>()) {
@@ -1103,33 +1219,39 @@ private fun ListIterator<Token>.parseExpressionGrouping(blockContext: List<Block
     return OpTouple(expressions)
 }
 
-private fun ListIterator<Token>.parseMemberOf(receiver: Expression): Expression {
+private fun ListIterator<LocatedToken>.parseMemberOf(receiver: Expression): Expression {
     return when (nextSignificant()){
 
         is Token.Operator.Period, is Token.Operator.DoublePeriod -> {
+            val propLoc = nextSignificantLocation()  // peek at property name location
             val next = nextSignificant()
             syntaxCheck(next is Token.Identifier) {
                 "Illegal symbol after '.'"
             }
             OpGetProperty(name = next.identifier, receiver = receiver)
+                .at(propLoc)
         }
         is Token.Operator.Bracket.SquareOpen -> {
+            val bracketLoc = nextSignificantLocation()  // peek at index location
+            val index = parseStatement(blockType = ExpectedBlockType.Object)
             OpIndex(
                 receiver = receiver,
-                index = parseStatement(blockType = ExpectedBlockType.Object)
+                index = index
             ).also {
                 syntaxCheck(nextSignificant() is Token.Operator.Bracket.SquareClose) {
                     "Missing ']'"
                 }
-            }
+            }.at(bracketLoc)
         }
         else -> throw IllegalStateException("Illegal 'member of' syntax")
     }
 }
 
-private fun ListIterator<Token>.parseOptionalChaining(receiver: Expression): Expression {
+private fun ListIterator<LocatedToken>.parseOptionalChaining(receiver: Expression): Expression {
+    val loc = nextSignificantLocation()  // peek at the next token's location before consuming
     return when(val next = nextSignificant()){
         is Token.Operator.Bracket.SquareOpen -> {
+            val indexLoc = nextSignificantLocation()  // peek at index location
             OpIndex(
                 receiver = receiver,
                 index = parseStatement(blockType = ExpectedBlockType.Object),
@@ -1138,7 +1260,7 @@ private fun ListIterator<Token>.parseOptionalChaining(receiver: Expression): Exp
                 syntaxCheck(nextSignificant() is Token.Operator.Bracket.SquareClose) {
                     "Missing ']'"
                 }
-            }
+            }.at(indexLoc)
         }
         is Token.Operator.Bracket.RoundOpen -> {
             prevSignificant()
@@ -1149,13 +1271,13 @@ private fun ListIterator<Token>.parseOptionalChaining(receiver: Expression): Exp
                 name = next.identifier,
                 receiver = receiver,
                 isOptional = true
-            )
+            ).at(loc)
         }
         else -> throw SyntaxError("Invalid usage of ?. operator")
     }
 }
 
-private fun ListIterator<Token>.parseFunctionCall(
+private fun ListIterator<LocatedToken>.parseFunctionCall(
     function : Expression,
     optional : Boolean = false,
     blockContext: List<BlockContext>
@@ -1175,7 +1297,7 @@ private fun ListIterator<Token>.parseFunctionCall(
     if (isMethodShorthand) {
         // Peek at the next token without consuming it
         val nextIndex = nextIndex()
-        val nextToken = if (hasNext()) next() else null
+        val nextToken = if (hasNext()) next().token else null
         returnToIndex(nextIndex)
 
         if (nextToken == Token.Operator.Bracket.CurlyOpen) {
@@ -1215,10 +1337,10 @@ private fun ListIterator<Token>.parseFunctionCall(
         callable = function,
         arguments = arguments,
         isOptional = optional
-    )
+    ).at(function.sourceLocation)
 }
 
-private fun ListIterator<Token>.parseMethodBody(
+private fun ListIterator<LocatedToken>.parseMethodBody(
     name: String,
     arguments: List<Expression>,
     blockContext: List<BlockContext>
@@ -1241,7 +1363,7 @@ private fun ListIterator<Token>.parseMethodBody(
 }
 
 
-private fun ListIterator<Token>.parseInOperator(subject : Expression, precedence: Int) : Expression {
+private fun ListIterator<LocatedToken>.parseInOperator(subject : Expression, precedence: Int) : Expression {
     val obj = parseStatement(maxPrecedence = precedence, blockType = ExpectedBlockType.Object)
     return OpIn(
         property = subject,
@@ -1249,7 +1371,7 @@ private fun ListIterator<Token>.parseInOperator(subject : Expression, precedence
     )
 }
 
-private fun ListIterator<Token>.parseOfOperator(subject : Expression, precedence: Int) : Expression {
+private fun ListIterator<LocatedToken>.parseOfOperator(subject : Expression, precedence: Int) : Expression {
     val obj = parseStatement(maxPrecedence = precedence, blockType = ExpectedBlockType.Object)
     return OpIn(
         property = subject,
@@ -1257,7 +1379,7 @@ private fun ListIterator<Token>.parseOfOperator(subject : Expression, precedence
     ).also { it.isForOf = true }
 }
 
-private fun ListIterator<Token>.parseInstanceOfOperator(subject : Expression, precedence: Int) : Expression {
+private fun ListIterator<LocatedToken>.parseInstanceOfOperator(subject : Expression, precedence: Int) : Expression {
     val obj = parseStatement(maxPrecedence = precedence,blockType = ExpectedBlockType.Object)
     return Expression {
         val o = obj(it)
@@ -1268,7 +1390,7 @@ private fun ListIterator<Token>.parseInstanceOfOperator(subject : Expression, pr
     }
 }
 
-private fun ListIterator<Token>.parseTernary(
+private fun ListIterator<LocatedToken>.parseTernary(
     condition : Expression,
     precedence: Int,
     blockContext: List<BlockContext>
@@ -1296,7 +1418,7 @@ private fun ListIterator<Token>.parseTernary(
     )
 }
 
-private fun ListIterator<Token>.parseClass() : OpClassInit {
+private fun ListIterator<LocatedToken>.parseClass() : OpClassInit {
 
     val i = nextIndex()
     val name = nextSignificant().let {
@@ -1371,7 +1493,7 @@ private fun ListIterator<Token>.parseClass() : OpClassInit {
     )
 }
 
-private fun ListIterator<Token>.parseStaticClassMember() : StaticClassMember {
+private fun ListIterator<LocatedToken>.parseStaticClassMember() : StaticClassMember {
 
     val name = nextSignificant()
 
@@ -1404,7 +1526,7 @@ private fun ListIterator<Token>.parseStaticClassMember() : StaticClassMember {
 }
 
 
-private fun ListIterator<Token>.parseSwitch(blockContext: List<BlockContext>) : Expression {
+private fun ListIterator<LocatedToken>.parseSwitch(blockContext: List<BlockContext>) : Expression {
     val value = parseStatement(blockType = ExpectedBlockType.Object) as OpTouple
     val body = parseBlock(
         type = ExpectedBlockType.Block,
@@ -1417,7 +1539,7 @@ private fun ListIterator<Token>.parseSwitch(blockContext: List<BlockContext>) : 
     )
 }
 
-private fun ListIterator<Token>.parseForLoop(parentBlockContext: List<BlockContext>): Expression {
+private fun ListIterator<LocatedToken>.parseForLoop(parentBlockContext: List<BlockContext>): Expression {
 
     syntaxCheck(nextSignificant() is Token.Operator.Bracket.RoundOpen) {
         "For loop must be followed by '('"
@@ -1481,7 +1603,7 @@ private fun ListIterator<Token>.parseForLoop(parentBlockContext: List<BlockConte
     )
 }
 
-private fun ListIterator<Token>.parseForInLoop(opIn: OpIn, parentBlockContext : List<BlockContext>) : Expression {
+private fun ListIterator<LocatedToken>.parseForInLoop(opIn: OpIn, parentBlockContext : List<BlockContext>) : Expression {
     syntaxCheck(nextSignificant() is Token.Operator.Bracket.RoundClose) {
         "Invalid for loop"
     }
@@ -1505,7 +1627,7 @@ private fun ListIterator<Token>.parseForInLoop(opIn: OpIn, parentBlockContext : 
     )
 }
 
-private fun ListIterator<Token>.parseForOfLoop(opIn: OpIn, parentBlockContext: List<BlockContext>): Expression {
+private fun ListIterator<LocatedToken>.parseForOfLoop(opIn: OpIn, parentBlockContext: List<BlockContext>): Expression {
     syntaxCheck(nextSignificant() is Token.Operator.Bracket.RoundClose) {
         "Invalid for loop"
     }
@@ -1532,14 +1654,14 @@ private fun ListIterator<Token>.parseForOfLoop(opIn: OpIn, parentBlockContext: L
     )
 }
 
-private fun ListIterator<Token>.parseWhileLoop(parentBlockContext: List<BlockContext>): Expression {
+private fun ListIterator<LocatedToken>.parseWhileLoop(parentBlockContext: List<BlockContext>): Expression {
     return OpWhileLoop(
         condition = parseExpressionGrouping(),
         body = parseBlock(blockContext = parentBlockContext + BlockContext.Loop),
     )
 }
 
-private fun ListIterator<Token>.parseDoWhileLoop(blockContext: List<BlockContext>) : Expression {
+private fun ListIterator<LocatedToken>.parseDoWhileLoop(blockContext: List<BlockContext>) : Expression {
     val body = parseBlock(
         type = ExpectedBlockType.Block,
         blockContext = blockContext + BlockContext.Loop,
@@ -1557,7 +1679,7 @@ private fun ListIterator<Token>.parseDoWhileLoop(blockContext: List<BlockContext
     )
 }
 
-private fun ListIterator<Token>.parseAsync(blockContext: List<BlockContext>): Expression {
+private fun ListIterator<LocatedToken>.parseAsync(blockContext: List<BlockContext>): Expression {
     // Check if we're in object context and the next token is an identifier (method shorthand)
     val isInObjectContext = blockContext.lastOrNull() == BlockContext.Object
     
@@ -1606,7 +1728,7 @@ private fun ListIterator<Token>.parseAsync(blockContext: List<BlockContext>): Ex
     }
 }
 
-private fun ListIterator<Token>.parseAwait(): Expression {
+private fun ListIterator<LocatedToken>.parseAwait(): Expression {
     val subject = parseStatement(blockType = ExpectedBlockType.Object)
 
     return Expression {
@@ -1629,7 +1751,7 @@ private fun ListIterator<Token>.parseAwait(): Expression {
     }
 }
 
-private fun ListIterator<Token>.parseTryCatch(blockContext: List<BlockContext>): Expression {
+private fun ListIterator<LocatedToken>.parseTryCatch(blockContext: List<BlockContext>): Expression {
     val tryBlock = parseBlock(type = ExpectedBlockType.Block, blockContext = blockContext)
     val catchBlock = if (eat(Token.Identifier.Keyword.Catch)) {
         if (eat(Token.Operator.Bracket.RoundOpen)) {
@@ -1658,7 +1780,7 @@ private fun ListIterator<Token>.parseTryCatch(blockContext: List<BlockContext>):
     )
 }
 
-private fun ListIterator<Token>.parseArrowFunction(blockContext: List<BlockContext>, args: Expression) : JSFunction {
+private fun ListIterator<LocatedToken>.parseArrowFunction(blockContext: List<BlockContext>, args: Expression) : JSFunction {
     val fArgs = when(args){
         is OpTouple -> args.expressions
         else -> listOf(args)
@@ -1684,7 +1806,7 @@ private fun ListIterator<Token>.parseArrowFunction(blockContext: List<BlockConte
     )
 }
 
-private fun ListIterator<Token>.parseFunction(
+private fun ListIterator<LocatedToken>.parseFunction(
     name: String? = null,
     blockContext: List<BlockContext>
 ) : JSFunction {
@@ -1720,7 +1842,7 @@ private fun ListIterator<Token>.parseFunction(
     )
 }
 
-private fun ListIterator<Token>.parseImport() : Expression {
+private fun ListIterator<LocatedToken>.parseImport() : Expression {
 
     val entries = buildList {
         while (true) {
@@ -1764,7 +1886,7 @@ private fun ListIterator<Token>.parseImport() : Expression {
     )
 }
 
-private fun ListIterator<Token>.parseImportEntry(
+private fun ListIterator<LocatedToken>.parseImportEntry(
     isInBrackets : Boolean
 ) : ImportEntry {
     return if (isInBrackets) {
@@ -1811,7 +1933,7 @@ private fun Token.identifier() : String {
     return identifier
 }
 
-private fun ListIterator<Token>.parseExport(isDefault : Boolean = false) : Expression {
+private fun ListIterator<LocatedToken>.parseExport(isDefault : Boolean = false) : Expression {
 
     if (!isDefault){
         val i = nextIndex()
@@ -1862,7 +1984,7 @@ private fun ListIterator<Token>.parseExport(isDefault : Boolean = false) : Expre
     }
 }
 
-private fun ListIterator<Token>.parseExportAliasAndType() : Pair<String?, Boolean> {
+private fun ListIterator<LocatedToken>.parseExportAliasAndType() : Pair<String?, Boolean> {
     val n = nextSignificant()
     syntaxCheck(n is Token.Identifier){
         "Invalid export"
@@ -1883,7 +2005,7 @@ private fun Token.asExportAliasAndType() : Pair<String?, Boolean> {
     }
 }
 
-private fun ListIterator<Token>.parseAggregatingExportEntry() : AggregatingExportEntry {
+private fun ListIterator<LocatedToken>.parseAggregatingExportEntry() : AggregatingExportEntry {
     val import = nextSignificant()
 
     syntaxCheck(import is Token.Identifier) {
@@ -1904,7 +2026,7 @@ private fun ListIterator<Token>.parseAggregatingExportEntry() : AggregatingExpor
 }
 
 
-private fun ListIterator<Token>.parseExportDeclaration(isDefault: Boolean = false) : Expression {
+private fun ListIterator<LocatedToken>.parseExportDeclaration(isDefault: Boolean = false) : Expression {
     val expr = parseStatement(blockType = ExpectedBlockType.Block)
 
     if (isDefault){
@@ -1922,7 +2044,7 @@ private fun ListIterator<Token>.parseExportDeclaration(isDefault: Boolean = fals
     return OpExport(name, property)
 }
 
-private fun ListIterator<Token>.parseBlock(
+private fun ListIterator<LocatedToken>.parseBlock(
     scoped: Boolean = true,
     type: ExpectedBlockType = ExpectedBlockType.None,
     isExpressible: Boolean = false,
@@ -1946,8 +2068,8 @@ private fun ListIterator<Token>.parseBlock(
                 )
 
                 // hoisted
-                when {
-                    expr is OpClassInit -> {
+                when (expr) {
+                    is OpClassInit -> {
                         val assign = OpAssign(
                             type = VariableType.Local,
                             variableName = expr.name,
@@ -1961,7 +2083,7 @@ private fun ListIterator<Token>.parseBlock(
                         )
                     }
 
-                    expr is OpFunctionInit && !expr.function.isArrow -> {
+                    is OpFunctionInit if !expr.function.isArrow -> {
                         // In object context, OpFunctionInit is a method, not a hoisted function
                         if (type == ExpectedBlockType.Object) {
                             add(expr)
@@ -1986,7 +2108,7 @@ private fun ListIterator<Token>.parseBlock(
                         }
                     }
 
-                    expr is OpExport && expr.property is OpClassInit -> {
+                    is OpExport if expr.property is OpClassInit -> {
                         val assign = OpAssign(
                             type = VariableType.Local,
                             variableName = expr.property.name,
@@ -2004,7 +2126,7 @@ private fun ListIterator<Token>.parseBlock(
                         )
                     }
 
-                    expr is OpExport && expr.property is OpFunctionInit && !expr.property.function.isArrow -> {
+                    is OpExport if expr.property is OpFunctionInit && !expr.property.function.isArrow -> {
 
                         val name = expr.property.function.name
 
@@ -2028,13 +2150,13 @@ private fun ListIterator<Token>.parseBlock(
                             }
                         )
                     }
-                    expr is OpImport -> add(hoistedIndex++, expr)
 
+                    is OpImport -> add(hoistedIndex++, expr)
                     else -> add(expr)
                 }
                 var hasSeparator = false
                 while (hasNext()) {
-                    val next = next()
+                    val next = next().token
                     if (next !is Token.NewLine && next !is Token.Operator.SemiColon && next !is Token.Operator.Comma) {
                         previous()
                         break
@@ -2042,7 +2164,7 @@ private fun ListIterator<Token>.parseBlock(
                     hasSeparator = true
                 }
                 syntaxCheck(hasSeparator || nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
-                    unexpected(next().toString())
+                    unexpected(next().token::class.simpleName.orEmpty())
                 }
             }
 
@@ -2107,7 +2229,7 @@ private fun ListIterator<Token>.parseBlock(
     }
 }
 
-private fun ListIterator<Token>.parseVariable(type: VariableType) : Expression {
+private fun ListIterator<LocatedToken>.parseVariable(type: VariableType) : Expression {
     val expressions = buildList {
         do {
             val variable = when (val expr = parseStatement(blockType = ExpectedBlockType.None)) {

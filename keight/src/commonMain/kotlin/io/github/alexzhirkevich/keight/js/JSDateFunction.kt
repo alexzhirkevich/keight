@@ -34,7 +34,7 @@ internal class JSDateFunction : JSFunction(
         "getHours".js.func { thisDate.hour.js }
         "getMilliseconds".js.func { thisDate.nanosecond.nanoseconds.inWholeMilliseconds.js }
         "getMinutes".js.func { thisDate.minute.js }
-        "getMonth".js.func { thisDate.month.number.js }
+        "getMonth".js.func { thisDate.month.ordinal.js }
         "getSeconds".js.func { thisDate.second.js }
         "getTime".js.func { thisDateWrapper.toInstant().toEpochMilliseconds().js }
         "getTimeZoneOffset".js.func {
@@ -46,34 +46,35 @@ internal class JSDateFunction : JSFunction(
         "getUTCHours".js.func { thisDateWrapper.utc().hour.js }
         "getUTCMilliseconds".js.func { thisDateWrapper.utc().nanosecond.nanoseconds.inWholeMilliseconds.js }
         "getUTCMinutes".js.func { thisDateWrapper.utc().minute.js }
-        "getUTCMonth".js.func { thisDateWrapper.utc().month.number.js }
+        "getUTCMonth".js.func { thisDateWrapper.utc().month.ordinal.js }
         "getUTCSeconds".js.func { thisDateWrapper.utc().second.js }
 
-        "setDate".js.func { thisDateWrapper.set(day = toNumber(it[0]).toInt()); Undefined }
-        "setFullYear".js.func { thisDateWrapper.set(year = toNumber(it[0]).toInt()); Undefined }
-        "setYear".js.func { thisDateWrapper.set(year = toNumber(it[0]).toInt()); Undefined }
-        "setHours".js.func { thisDateWrapper.set(hour = toNumber(it[0]).toInt()) ; Undefined}
-        "setMinutes".js.func { thisDateWrapper.set(minute = toNumber(it[0]).toInt()); Undefined }
-        "setMonth".js.func { thisDateWrapper.set(month = toNumber(it[0]).toInt()); Undefined }
-        "setSeconds".js.func { thisDateWrapper.set(second = toNumber(it[0]).toInt()); Undefined  }
-        "setTime".js.func {
+        "setDate".js.func("day") { thisDateWrapper.set(day = toNumber(it[0]).toInt()); Undefined }
+        "setFullYear".js.func("year") { thisDateWrapper.set(year = toNumber(it[0]).toInt()); Undefined }
+        "setYear".js.func("year") { thisDateWrapper.set(year = toNumber(it[0]).toInt()); Undefined }
+        "setHours".js.func("hour") { thisDateWrapper.set(hour = toNumber(it[0]).toInt()) ; Undefined}
+        "setMinutes".js.func("minute") { thisDateWrapper.set(minute = toNumber(it[0]).toInt()); Undefined }
+        "setMonth".js.func("month") { thisDateWrapper.set(month = toNumber(it[0]).toInt() + 1); Undefined }
+        "setSeconds".js.func("second") { thisDateWrapper.set(second = toNumber(it[0]).toInt()); Undefined  }
+        "setTime".js.func("epochMilliseconds") {
             thisDateWrapper.value = Instant
                 .fromEpochMilliseconds(toNumber(it[0]).toLong())
                 .toLocalDateTime(thisDateWrapper.timeZone);
             Undefined
         }
-        "setUTCDate".js.func { thisDateWrapper.setUTC(day = toNumber(it[0]).toInt()); Undefined }
-        "setUTCFullYear".js.func { thisDateWrapper.setUTC(year = toNumber(it[0]).toInt()); Undefined }
-        "setUTCYear".js.func { thisDateWrapper.setUTC(year = toNumber(it[0]).toInt()); Undefined }
-        "setUTCHours".js.func { thisDateWrapper.setUTC(hour = toNumber(it[0]).toInt()); Undefined }
-        "setUTCMinutes".js.func { thisDateWrapper.setUTC(minute = toNumber(it[0]).toInt()); Undefined }
-        "setUTCMonth".js.func { thisDateWrapper.setUTC(month = toNumber(it[0]).toInt()); Undefined }
-        "setUTCSeconds".js.func { thisDateWrapper.setUTC(second = toNumber(it[0]).toInt()); Undefined }
+        "setUTCDate".js.func("day") { thisDateWrapper.setUTC(day = toNumber(it[0]).toInt()); Undefined }
+        "setUTCFullYear".js.func("year") { thisDateWrapper.setUTC(year = toNumber(it[0]).toInt()); Undefined }
+        "setUTCYear".js.func("year") { thisDateWrapper.setUTC(year = toNumber(it[0]).toInt()); Undefined }
+        "setUTCHours".js.func("hour") { thisDateWrapper.setUTC(hour = toNumber(it[0]).toInt()); Undefined }
+        "setUTCMinutes".js.func("minute") { thisDateWrapper.setUTC(minute = toNumber(it[0]).toInt()); Undefined }
+        "setUTCMonth".js.func("month") { thisDateWrapper.setUTC(month = toNumber(it[0]).toInt() + 1); Undefined }
+        "setUTCSeconds".js.func("second") { thisDateWrapper.setUTC(second = toNumber(it[0]).toInt()); Undefined }
 
         "toDateString".js.func { thisDate.date.toString().js }
         "toLocaleDateString".js.func { thisDate.date.toString().js }
         "toTimeString".js.func { thisDate.time.toString().js }
         "toLocaleTimeString".js.func { thisDate.time.toString().js }
+        "toLocaleString".js.func { thisDate.toString().js }
         "toISOString".js.func { thisDate.toString().js }
         "toUTCString".js.func { thisDateWrapper.utc().toString().js }
         "toJSON".js.func { thisDate.toString().js }
@@ -92,9 +93,9 @@ internal class JSDateFunction : JSFunction(
         "now".func {
             Clock.System.now().toEpochMilliseconds().js
         },
-        "parse".func {
-            val str = toString(it[0])
-            Instant.parse(str).toEpochMilliseconds().js
+        "parse".func("input") {
+            val input = toString(it[0])
+            Instant.parse(input).toEpochMilliseconds().js
         }
     ).associateBy { it.name.js }.toMutableMap(),
     parameters = listOf(FunctionParam("date")),
@@ -104,6 +105,12 @@ internal class JSDateFunction : JSFunction(
 ) {
     override suspend fun constructObject(args: List<JsAny?>, runtime: ScriptRuntime): JsObject {
         return runtime.constructDate(args)
+    }
+
+    override suspend fun construct(args: List<JsAny?>, runtime: ScriptRuntime): JsAny {
+        return constructObject(args, runtime).also {
+            it.setProto(runtime, get(PROTOTYPE, runtime))
+        }
     }
 }
 
@@ -115,7 +122,18 @@ private suspend fun ScriptRuntime.constructDate(args: List<JsAny?>) : JSDateWrap
     }
 
     return when (val  a = args[0]?.toKotlin(this)) {
-        is String -> JSDateWrapper(LocalDateTime.parse(a), tz)
+        is String -> {
+            runCatching {
+                JSDateWrapper(LocalDateTime.parse(a),tz)
+            }.getOrElse {
+                val instant = Instant.parse(a)
+
+                val isUtc = a.endsWith("Z", true) || a.contains(Regex("[+-]\\d{2}"))
+                val zone = if (isUtc) TimeZone.UTC else tz
+
+                JSDateWrapper(instant.toLocalDateTime(zone), zone)
+            }
+        }
         is LocalDateTime -> JSDateWrapper(a, tz)
         else -> {
             val num = toNumber(args[0])

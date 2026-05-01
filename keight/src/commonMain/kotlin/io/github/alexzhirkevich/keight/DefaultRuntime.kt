@@ -18,16 +18,21 @@ internal suspend inline fun ScriptRuntime.requireThisRef(caller : String? = null
 }
 
 internal suspend inline fun <reified T > ScriptRuntime.thisRef() : T {
-    return try {
-        thisRef as T
-    } catch (t: ClassCastException){
-        typeError("Cannot convert $thisRef to ${T::class}".js)
-    }
+    return (thisRef as? T) ?: typeError("Cannot convert $thisRef to ${T::class}".js)
 }
 
 public abstract class DefaultRuntime : ScriptRuntime {
 
     internal val variables: MutableMap<JsAny?, Pair<VariableType?, JsAny?>> = ObjectMap(mutableMapOf())
+
+    /**
+     * The actual call stack storage. Only the root runtime owns the list;
+     * child runtimes delegate via findRoot().
+     */
+    private val _callStack: MutableList<CallFrame> = mutableListOf()
+
+    override val callStack: MutableList<CallFrame>
+        get() = if (parent != null) findRoot().callStack else _callStack
 
     override suspend fun contains(property: JsAny?): Boolean {
         return property in variables

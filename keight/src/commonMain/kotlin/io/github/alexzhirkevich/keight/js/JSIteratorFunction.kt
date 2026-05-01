@@ -239,28 +239,33 @@ private suspend inline fun JsAny.flatMap(runtime: ScriptRuntime, block : Callabl
     }
 }
 
-private suspend inline fun JsAny.filter(runtime: ScriptRuntime, block : Callable) : JsAny {
-    var i = -1
-    return runtime.helperIterator {
-        var res: JsAny? = Undefined
-        var done: Boolean
-        do {
-            val next = next(this)
-            val v = next.value(this)
-            done = next.done(this)
-            if (done) {
-                break
-            }
-            if (!runtime.isFalse(block.invoke(listOf(v, (++i).js), this))) {
-                res = v
-                break
-            }
-        } while (!done)
+private data class FilterResult(val value: JsAny?, val done: Boolean)
 
-        Object {
-            Constants.value.js eq res
-            Constants.done.js eq done.js
+private suspend fun filterNext(
+    iter: JsAny,
+    runtime: ScriptRuntime,
+    block: Callable,
+    indexRef: IntArray
+): FilterResult {
+    while (true) {
+        val next = iter.next(runtime)
+        val v = next.value(runtime)
+        val done = next.done(runtime)
+        if (done) return FilterResult(Undefined, true)
+        if (!runtime.isFalse(block.invoke(listOf(v, (indexRef[0]++).js), runtime))) {
+            return FilterResult(v, false)
         }
+    }
+    @Suppress("UNREACHABLE_CODE")
+    error("unreachable")
+}
+
+private suspend fun JsAny.filter(runtime: ScriptRuntime, block : Callable) : JsAny {
+    val iter = this
+    val indexRef = intArrayOf(0)
+    return runtime.helperIterator {
+        val result = filterNext(iter, this, block, indexRef)
+        if (result.done) IteratorDone() else IteratorEntry(result.value)
     }
 }
 

@@ -3,9 +3,11 @@ package io.github.alexzhirkevich.keight.expressions
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.CallFrame
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.fastMap
+import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
@@ -34,24 +36,28 @@ internal class OpCall(
             return Undefined
         }
 
-        // Expand spread arguments
-        val expandedArgs = mutableListOf<JsAny?>()
-        for (arg in args) {
-            if (arg is OpSpread) {
-                val spreadValue = arg.invoke(runtime)
-                if (spreadValue is Iterable<*>) {
-                    expandedArgs.addAll(spreadValue as Iterable<JsAny?>)
-                }
-            } else {
-                expandedArgs.add(arg.invoke(runtime))
-            }
-        }
+        val expandedArgs = args.expandArgs(runtime)
 
-        return callable.callableOrThrow(runtime).call(
-            thisArg = thisRef,
-            args = expandedArgs,
-            runtime = runtime
+        // Push call frame for stack trace generation
+        val loc = sourceLocation
+        val funcName = (callable as? JSFunction)?.name?.takeIf { it.isNotEmpty() }
+        val frame = CallFrame(
+            functionName = funcName,
+            fileName = loc?.fileName,
+            lineNumber = loc?.line?.let { maxOf(1, it - 1) },
+            columnNumber = loc?.column
         )
+        runtime.pushCallFrame(frame)
+
+        return try {
+            callable.callableOrThrow(runtime).call(
+                thisArg = thisRef,
+                args = expandedArgs,
+                runtime = runtime
+            )
+        } finally {
+            runtime.popCallFrame()
+        }
     }
 }
 
@@ -61,15 +67,15 @@ internal fun OpCall(
     isOptional : Boolean = false
 ) : Expression {
 
-    return when {
-        callable is OpIndex -> OpCall(
+    return when (callable) {
+        is OpIndex -> OpCall(
             receiver = callable.receiver,
             func = callable,
             args = arguments,
             isOptional = callable.isOptional
         )
 
-        callable is OpGetProperty && callable.receiver != null -> OpCall(
+        is OpGetProperty if callable.receiver != null -> OpCall(
             receiver = callable.receiver,
             func = callable,
             args = arguments,
@@ -77,28 +83,56 @@ internal fun OpCall(
         )
 
         // Handle super.method() calls - use OpCall to ensure JSFunction.call is invoked
-        callable is OpSuperGetProperty -> OpCall(
+        is OpSuperGetProperty -> OpCall(
             receiver = null,
             func = callable,
             args = arguments,
             isOptional = isOptional
         )
 
-        callable is OpSuperGetPropertyComputed -> OpCall(
+        is OpSuperGetPropertyComputed -> OpCall(
             receiver = null,
             func = callable,
             args = arguments,
             isOptional = isOptional
         )
 
-        else -> Expression { r ->
-            callable.invoke(r).let {
-                if (isOptional && (it == null || it is Undefined)) {
-                    Undefined
-                } else {
-                    it.callableOrThrow(r).invoke(arguments.fastMap { it(r) }, r)
+        else -> {
+            // For simple function calls (no receiver), we still need to go through
+            // OpCall for call stack tracking and proper thisArg handling.
+            // But we preserve the original behavior of using invoke for thisArg.
+            val callExpr = OpCall(
+                receiver = null,
+                func = callable,
+                args = arguments,
+                isOptional = isOptional
+            )
+            // Override execute to pass undefined as thisArg (matching original behavior)
+            object : Expression() {
+                override suspend fun execute(runtime: ScriptRuntime): JsAny? {
+                    val callableResult = callable.invoke(runtime)
+                    if ((callableResult == null || callableResult is Undefined) && isOptional) {
+                        return Undefined
+                    }
+                    val expandedArgs = arguments.expandArgs(runtime)
+                    val loc = sourceLocation
+                    val funcName = (callableResult as? JSFunction)?.name?.takeIf { it.isNotEmpty() }
+                    val frame = CallFrame(
+                        functionName = funcName,
+                        fileName = loc?.fileName,
+                        lineNumber = loc?.line?.let { maxOf(1, it - 1) },
+                        columnNumber = loc?.column
+                    )
+                    runtime.pushCallFrame(frame)
+                    return try {
+                        callableResult.callableOrThrow(runtime).invoke(
+                            expandedArgs, runtime
+                        )
+                    } finally {
+                        runtime.popCallFrame()
+                    }
                 }
-            }
+            }.also { it.sourceLocation = callExpr.sourceLocation }
         }
     }
 }
@@ -297,4 +331,23 @@ private inline fun <T> withInvalidArgsCheck(block : () -> T): T {
 }
 
 private fun notEnoughArgs() : Nothing = throw SyntaxError("Not enough arguments passed to the function call")
+
+/**
+ * Evaluates a list of argument expressions, expanding any [OpSpread] arguments inline.
+ */
+private suspend fun List<Expression>.expandArgs(runtime: ScriptRuntime): List<JsAny?> {
+    val result = mutableListOf<JsAny?>()
+    for (arg in this) {
+        if (arg is OpSpread) {
+            val spreadValue = arg.invoke(runtime)
+            if (spreadValue is Iterable<*>) {
+                @Suppress("UNCHECKED_CAST")
+                result.addAll(spreadValue as Iterable<JsAny?>)
+            }
+        } else {
+            result.add(arg.invoke(runtime))
+        }
+    }
+    return result
+}
 
