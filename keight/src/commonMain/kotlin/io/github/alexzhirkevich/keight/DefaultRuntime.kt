@@ -18,11 +18,7 @@ internal suspend inline fun ScriptRuntime.requireThisRef(caller : String? = null
 }
 
 internal suspend inline fun <reified T > ScriptRuntime.thisRef() : T {
-    return try {
-        thisRef as T
-    } catch (t: ClassCastException){
-        typeError("Cannot convert $thisRef to ${T::class}".js)
-    }
+    return (thisRef as? T) ?: typeError("Cannot convert $thisRef to ${T::class}".js)
 }
 
 public abstract class DefaultRuntime : ScriptRuntime {
