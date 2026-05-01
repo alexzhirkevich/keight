@@ -68,6 +68,7 @@ class NumberTest {
 //        "new Number(1) === Number(1)".eval().assertEqualsTo(false)
 //        "new Number('1') == Number(true)".eval().assertEqualsTo(true)
 //        "new Number('2') > Number(true)".eval().assertEqualsTo(true)
+        "Number(-123.0)".eval().assertEqualsTo(-123.0)
     }
     @Test
     fun static_props()= runTest {
@@ -93,6 +94,7 @@ class NumberTest {
             "${it}isSafeInteger(123)".eval(runtime).assertEqualsTo(true)
             "${it}parseFloat('123.3')".eval(runtime).assertEqualsTo(123.3)
             "${it}parseFloat('123.3sdfsdf')".eval(runtime).assertEqualsTo(123.3)
+            "${it}parseFloat('-123.3')".eval(runtime).assertEqualsTo(-123.3)
             "${it}parseInt('123')".eval(runtime).assertEqualsTo(123L)
             "${it}parseInt('123.3')".eval(runtime).assertEqualsTo(123L)
             "${it}parseInt('123.3sdfsdf')".eval(runtime).assertEqualsTo(123L)

@@ -41,10 +41,12 @@ internal fun numberMethods() : List<JSFunction> {
 
             var dotCnt = 0
             var eCount = 0
+            var pos = 0
             val num = arg.toString().trim().takeWhile { c ->
-                (c.isDigit() || c == '.' && dotCnt == 0 || c == 'e' && eCount == 0).also {
+                (c.isDigit() || c == '.' && dotCnt == 0 || c == 'e' && eCount == 0 || c == '-' && pos == 0).also {
                     if (c == '.') dotCnt++
                     if (c == 'e') eCount++
+                    pos++
                 }
             }
             (num.toDoubleOrNull() ?: 0L).js
