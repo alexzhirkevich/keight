@@ -265,7 +265,7 @@ private suspend fun JsAny.filter(runtime: ScriptRuntime, block : Callable) : JsA
     val indexRef = intArrayOf(0)
     return runtime.helperIterator {
         val result = filterNext(iter, this, block, indexRef)
-        IteratorEntry(result.value).takeIf { !result.done } ?: IteratorDone()
+        if (result.done) IteratorDone() else IteratorEntry(result.value)
     }
 }
 
