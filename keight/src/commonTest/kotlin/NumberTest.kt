@@ -1,3 +1,4 @@
+import io.github.alexzhirkevich.keight.js.Constants
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -55,24 +56,24 @@ class NumberTest {
         "Number(\"123.0\")".eval().assertEqualsTo(123.0)
         "Number(\"unicorn\")".eval().assertEqualsTo(Double.NaN)
         "Number(undefined)".eval().assertEqualsTo(Double.NaN)
-//        "Number(true)".eval().assertEqualsTo(1L)
-//        "Number(false)".eval().assertEqualsTo(0L)
-//        "1 === Number(1)".eval().assertEqualsTo(true)
-//        "1 == Number(1)".eval().assertEqualsTo(true)
-//        "1 == true".eval().assertEqualsTo(true)
-//        "0 == false".eval().assertEqualsTo(true)
-//        "new Number(1)".eval().assertEqualsTo(1L)
-//        "new Number('1')".eval().assertEqualsTo(1L)
-//        "new Number(1) === 1".eval().assertEqualsTo(false)
-//        "new Number(1) == 1".eval().assertEqualsTo(true)
-//        "new Number(1) === Number(1)".eval().assertEqualsTo(false)
-//        "new Number('1') == Number(true)".eval().assertEqualsTo(true)
-//        "new Number('2') > Number(true)".eval().assertEqualsTo(true)
+        "Number(true)".eval().assertEqualsTo(1L)
+        "Number(false)".eval().assertEqualsTo(0L)
+        "1 === Number(1)".eval().assertEqualsTo(true)
+        "1 == Number(1)".eval().assertEqualsTo(true)
+        "1 == true".eval().assertEqualsTo(true)
+        "0 == false".eval().assertEqualsTo(true)
+        "new Number(1)".eval().assertEqualsTo(1L)
+        "new Number('1')".eval().assertEqualsTo(1L)
+        "new Number(1) === 1".eval().assertEqualsTo(false)
+        "new Number(1) == 1".eval().assertEqualsTo(true)
+        "new Number(1) === Number(1)".eval().assertEqualsTo(false)
+        "new Number('1') == Number(true)".eval().assertEqualsTo(true)
+        "new Number('2') > Number(true)".eval().assertEqualsTo(true)
         "Number(-123.0)".eval().assertEqualsTo(-123.0)
     }
     @Test
     fun static_props()= runTest {
-        "Number.MAX_SAFE_INTEGER".eval().assertEqualsTo(Long.MAX_VALUE)
+        "Number.MAX_SAFE_INTEGER".eval().assertEqualsTo(Constants.MAX_SAFE_INTEGER)
         "Number.MIN_SAFE_INTEGER".eval().assertEqualsTo(Long.MIN_VALUE)
         "Number.MAX_VALUE".eval().assertEqualsTo(Double.MAX_VALUE)
         "Number.EPSILON".eval().assertEqualsTo(Double.MIN_VALUE)

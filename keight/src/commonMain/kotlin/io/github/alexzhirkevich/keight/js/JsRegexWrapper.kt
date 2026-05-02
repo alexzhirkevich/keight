@@ -115,10 +115,10 @@ internal suspend fun JsRegexWrapper.exec(string: String, runtime: ScriptRuntime)
         val res = result.firstOrNull() ?: return null
         (listOf(res.value.js).js as JsObject).apply {
             val range = res.range
-            set("index".js, range.first.js, runtime)
+            set("index".js, range.first.toLong().js, runtime)
             set("input".js, string.js, runtime)
             if (hasIndices) {
-                set("indices".js, listOf(listOf(range.first.js, (range.last+1).js).js).js, runtime)
+                set("indices".js, listOf(listOf(range.first.toLong().js, (range.last.toLong()+1).js).js).js, runtime)
             }
         }
     }
@@ -133,7 +133,7 @@ internal suspend fun JsRegexWrapper.test(string: String, runtime: ScriptRuntime)
     val result = value.find(string, lastIndex)
 
     if (global) {
-        set(LAST_INDEX.js, (result?.range?.last?.plus(1) ?: 0).js, runtime)
+        set(LAST_INDEX.js, (result?.range?.last?.toLong()?.plus(1) ?: 0).js, runtime)
     }
 
     return result != null

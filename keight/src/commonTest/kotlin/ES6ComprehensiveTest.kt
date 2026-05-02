@@ -687,6 +687,73 @@ class ES6ComprehensiveTest {
     }
 
     @Test
+    fun arrayFromArrayLike() = runtimeTest {
+        // Array-like object with numeric keys and length property
+        val code = """
+            Array.from({ 0: 2, 1: 3, 2: 4, length: 3 }).join('')
+        """.trimIndent()
+        code.eval(it).assertEqualsTo("234")
+    }
+
+    @Test
+    fun objectNumericKeys() = runtimeTest {
+        // Direct numeric key access on object literal
+        val code = """
+            var obj = { 0: 2, 1: 3, 2: 4 };
+            obj[0] + ',' + obj[1] + ',' + obj[2]
+        """.trimIndent()
+        code.eval(it).assertEqualsTo("2,3,4")
+    }
+
+    @Test
+    fun objectKeys() = runtimeTest {
+        // Object.keys returns keys in insertion order (0,1,2)
+        val code = """
+            Object.keys({ 0: 2, 1: 3, 2: 4 }).join(',')
+        """.trimIndent()
+        code.eval(it).assertEqualsTo("0,1,2")
+    }
+    
+    @Test
+    fun objectKeysNumericSorted() = runtimeTest {
+        // Object.keys returns numeric keys in numeric order, not insertion order
+        // { 2: 'a', 0: 'b', 1: 'c' } should return ["0", "1", "2"], not ["2", "0", "1"]
+        val code = """
+            var x = { 2: 'a', 0: 'b', 1: 'c' };
+            Object.keys(x).join(',')
+        """.trimIndent()
+        code.eval(it).assertEqualsTo("0,1,2")
+    }
+
+    @Test
+    fun objectKeysMixed() = runtimeTest {
+        // Object.keys: numeric keys first (sorted), then string keys (insertion order)
+        val code = """
+            var x = { 'b': 1, 2: 'a', 0: 'b', 'a': 2, 1: 'c' };
+            Object.keys(x).join(',')
+        """.trimIndent()
+        code.eval(it).assertEqualsTo("0,1,2,b,a")
+    }
+
+    @Test
+    fun objectKeysLeadingZeros() = runtimeTest {
+        // "01" is NOT a numeric key (has leading zero), so it's a string key
+        val code = """
+            var x = { '01': 'a', 0: 'b' };
+            Object.keys(x).join(',')
+        """.trimIndent()
+        code.eval(it).assertEqualsTo("0,01")
+    }
+
+    @Test
+    fun objectKeysMixedNumbers() = runtimeTest {
+        val code = """
+            Object.keys({ "100": 'a', "2": 'b', "012": 'c', 0: 'd', "-1": 'e' }).join(',')
+        """.trimIndent()
+        code.eval(it).assertEqualsTo("0,2,100,012,-1")
+    }
+
+    @Test
     fun arrayFrom() = runtimeTest {
         val code = """
             Array.from([1, 2, 3]).join('')

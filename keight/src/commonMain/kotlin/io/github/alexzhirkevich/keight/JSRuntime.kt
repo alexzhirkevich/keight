@@ -30,9 +30,11 @@ import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.js.JsProperty
 import io.github.alexzhirkevich.keight.js.OpArgOmitted
 import io.github.alexzhirkevich.keight.es.abstract.esToPrimitive
+import io.github.alexzhirkevich.keight.es.abstract.esToPropertyKey
 import io.github.alexzhirkevich.keight.es.abstract.esToString
 import io.github.alexzhirkevich.keight.js.Constants
 import io.github.alexzhirkevich.keight.js.JSError
+import io.github.alexzhirkevich.keight.js.JsNumberObject
 import io.github.alexzhirkevich.keight.js.JsObjectImpl
 import io.github.alexzhirkevich.keight.js.ReferenceError
 import io.github.alexzhirkevich.keight.js.SyntaxError
@@ -316,9 +318,15 @@ public open class JSRuntime(
         val na = ta.esToNumber(this)
         val nb = tb.esToNumber(this)
 
+        if (na is Long && nb is Long) return (na + nb).js
+
+        // Ensure NaN handling is correct
+        val naDouble = na.toDouble()
+        val nbDouble = nb.toDouble()
+
         return when {
-            na is Long && nb is Long -> (na + nb).js
-            else -> (na.toDouble() + nb.toDouble()).js
+            naDouble.isNaN() || nbDouble.isNaN() -> Double.NaN.js
+            else -> (naDouble + nbDouble).js
         }
     }
 
