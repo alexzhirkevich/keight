@@ -74,7 +74,7 @@ class NumberTest {
     @Test
     fun static_props()= runTest {
         "Number.MAX_SAFE_INTEGER".eval().assertEqualsTo(Constants.MAX_SAFE_INTEGER)
-        "Number.MIN_SAFE_INTEGER".eval().assertEqualsTo(Long.MIN_VALUE)
+        "Number.MIN_SAFE_INTEGER".eval().assertEqualsTo(-Constants.MAX_SAFE_INTEGER)
         "Number.MAX_VALUE".eval().assertEqualsTo(Double.MAX_VALUE)
         "Number.EPSILON".eval().assertEqualsTo(Double.MIN_VALUE)
         "Number.POSITIVE_INFINITY".eval().assertEqualsTo(Double.POSITIVE_INFINITY)
