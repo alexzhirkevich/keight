@@ -44,11 +44,21 @@ internal fun numberMethods() : List<JSFunction> {
 
             var dotCnt = 0
             var eCount = 0
+            var prev : Char? = null
             val num = arg.toString().trim().takeWhile { c ->
-                (c.isDigit() || c == '.' && dotCnt == 0 || c == 'e' && eCount == 0).also {
-                    if (c == '.') dotCnt++
-                    if (c == 'e') eCount++
-                }
+                when {
+                    c.isDigit() -> true
+                    c == '.' && dotCnt == 0 -> {
+                        dotCnt++
+                        true
+                    }
+                    (c == 'e' || c == 'E') && eCount == 0 -> {
+                        eCount++
+                        true
+                    }
+                    c == '-' && (prev == null || prev == 'e' || prev == 'E') -> true
+                    else -> false
+                }.also { prev = c }
             }
             (num.toDoubleOrNull() ?: 0L).js
         },
