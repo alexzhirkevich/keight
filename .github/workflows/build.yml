@@ -30,8 +30,8 @@ jobs:
             os: macos-latest
           - target: wasmJsNodeTest
             os: ubuntu-latest
-#          - target: jsTest
-#            os: ubuntu-latest
+          - target: jsTest
+            os: ubuntu-latest
           - target: jvmTest
             os: ubuntu-latest
     runs-on: ${{ matrix.os }}
