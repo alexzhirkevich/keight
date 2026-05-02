@@ -69,6 +69,7 @@ class NumberTest {
         "new Number(1) === Number(1)".eval().assertEqualsTo(false)
         "new Number('1') == Number(true)".eval().assertEqualsTo(true)
         "new Number('2') > Number(true)".eval().assertEqualsTo(true)
+        "Number(-123.0)".eval().assertEqualsTo(-123.0)
     }
     @Test
     fun static_props()= runTest {
