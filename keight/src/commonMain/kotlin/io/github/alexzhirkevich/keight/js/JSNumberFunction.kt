@@ -56,7 +56,7 @@ internal fun numberMethods() : List<JSFunction> {
                         eCount++
                         true
                     }
-                    c == '-' && (prev == null || prev == 'e' || prev == 'E') -> true
+                    (c == '-' || c == '+') && (prev == null || prev == 'e' || prev == 'E') -> true
                     else -> false
                 }.also { prev = c }
             }
