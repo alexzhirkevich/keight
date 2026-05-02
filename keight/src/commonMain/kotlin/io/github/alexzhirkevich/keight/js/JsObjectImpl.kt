@@ -132,7 +132,7 @@ public open class JsObjectImpl(
                     is JsStringWrapper, is JsStringObject -> {
                         val keyStr = key.toString()
                         val num = keyStr.toLongOrNull()
-                        if (num != null && num >= 0 && num <= 9007199254740991L && num.toString() == keyStr) {
+                        if (num != null && num >= 0 && num <= Constants.MAX_SAFE_INTEGER.toLong() && num.toString() == keyStr) {
                             categories.arrayIndexKeys.add(IndexKey(key, num))
                         } else {
                             categories.stringKeys.add(key)
