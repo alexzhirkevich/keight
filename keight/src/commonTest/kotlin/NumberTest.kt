@@ -1,3 +1,4 @@
+import io.github.alexzhirkevich.keight.js.Constants
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -71,7 +72,7 @@ class NumberTest {
     }
     @Test
     fun static_props()= runTest {
-        "Number.MAX_SAFE_INTEGER".eval().assertEqualsTo(Long.MAX_VALUE)
+        "Number.MAX_SAFE_INTEGER".eval().assertEqualsTo(Constants.MAX_SAFE_INTEGER)
         "Number.MIN_SAFE_INTEGER".eval().assertEqualsTo(Long.MIN_VALUE)
         "Number.MAX_VALUE".eval().assertEqualsTo(Double.MAX_VALUE)
         "Number.EPSILON".eval().assertEqualsTo(Double.MIN_VALUE)

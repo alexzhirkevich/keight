@@ -20,7 +20,7 @@ internal fun numberMethods() : List<JSFunction> {
         "isInteger".func("number") {
             val arg = it.getOrNull(0) ?: return@func false.js
             val num = toNumber(arg).toDouble()
-            (!num.isNaN() && num.isFinite() && num % 1.0 == 0.0).js
+            (num.isFinite() && num % 1.0 == 0.0).js
         },
         "parseInt".func(
             FunctionParam("number"),
@@ -28,7 +28,7 @@ internal fun numberMethods() : List<JSFunction> {
         ) {
             val arg = it.getOrNull(0) ?: return@func false.js
             val radix = it.getOrNull(1)?.let { toNumber(it) }
-                ?.takeIf { !it.toDouble().isNaN() && it.toDouble().isFinite() }
+                ?.takeIf { it.toDouble().isFinite() }
                 ?.toInt() ?: 10
 
             toString(arg).trim().trimParseInt(radix)?.js
@@ -36,8 +36,8 @@ internal fun numberMethods() : List<JSFunction> {
         "isSafeInteger".func("number") {
             val arg = it.getOrNull(0) ?: return@func false.js
             val num = toNumber(arg).toDouble()
-            (!num.isNaN() && num.isFinite() && num % 1.0 == 0.0 &&
-                abs(num) <= 9007199254740991.0).js
+            (num.isFinite() && num % 1.0 == 0.0 &&
+                abs(num) <= Constants.MAX_SAFE_INTEGER).js
         },
         "parseFloat".func("number") {
             val arg = it.getOrNull(0) ?: return@func false.js
@@ -117,7 +117,7 @@ internal class JSNumberFunction : JSFunction(
         )
         defineOwnProperty(
             "MAX_SAFE_INTEGER".js,
-            JsNumberWrapper(Long.MAX_VALUE),
+            Constants.MAX_SAFE_INTEGER.js,
             writable = false,
             configurable = false,
             enumerable = false

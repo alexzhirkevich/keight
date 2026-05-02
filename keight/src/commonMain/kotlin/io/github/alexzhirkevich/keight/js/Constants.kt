@@ -22,4 +22,9 @@ internal object Constants {
      */
     internal const val getterPrefix = "__getter__"
     internal const val setterPrefix = "__setter__"
+
+    /**
+     * JavaScript Number.MAX_SAFE_INTEGER = 2^53 - 1
+     */
+    internal const val MAX_SAFE_INTEGER = 9007199254740991.0
 }
