@@ -148,7 +148,7 @@ internal class JSNumberFunction : JSFunction(
         )
         defineOwnProperty(
             "MIN_SAFE_INTEGER".js,
-            Long.MIN_VALUE.js,
+            (-Constants.MAX_SAFE_INTEGER).js,
             writable = false,
             configurable = false,
             enumerable = false
