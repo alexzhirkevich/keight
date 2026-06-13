@@ -119,4 +119,113 @@ class SwitchTest {
             test(2)
         """.trimIndent().eval().assertEqualsTo("two")
     }
+
+    @Test
+    fun complex_return_in_case() = runTest {
+        """
+            function test(s, flag) {
+                switch(s) {
+                    case 1:
+                        var x = 10;
+                        x += 5;
+                        return x;
+                    case 2:
+                        if (flag) {
+                            return "flagged";
+                        }
+                        return "unflagged";
+                    default:
+                        var res = "default";
+                        return res + "_" + s;
+                }
+            }
+            test(1, false)
+        """.trimIndent().eval().assertEqualsTo(15L)
+
+        """
+            function test(s, flag) {
+                switch(s) {
+                    case 1:
+                        var x = 10;
+                        x += 5;
+                        return x;
+                    case 2:
+                        if (flag) {
+                            return "flagged";
+                        }
+                        return "unflagged";
+                    default:
+                        var res = "default";
+                        return res + "_" + s;
+                }
+            }
+            test(2, true)
+        """.trimIndent().eval().assertEqualsTo("flagged")
+
+        """
+            function test(s, flag) {
+                switch(s) {
+                    case 1: 
+                        var x = 10;
+                        x += 5;
+                        return x;
+                    case 2:
+                        if (flag) {
+                            return "flagged";
+                        }
+                        return "unflagged";
+                    default:
+                        var res = "default";
+                        return res + "_" + s;
+                }
+            }
+            test(2, false)
+        """.trimIndent().eval().assertEqualsTo("unflagged")
+
+        """
+            function test(s, flag) {
+                switch(s) {
+                    case 1:
+                        var x = 10;
+                        x += 5;
+                        return x;
+                    case 2:
+                        if (flag) {
+                            return "flagged";
+                        }
+                        return "unflagged";
+                    default:
+                        var res = "default";
+                        return res + "_" + s;
+                }
+            }
+            test(3, false)
+        """.trimIndent().eval().assertEqualsTo("default_3")
+    }
+
+    @Test
+    fun fallthrough_test() = runTest {
+        """
+            var foo = 1;
+            var output = "Output: ";
+            switch (foo) {
+              case 0:
+                output += "So ";
+              case 1:
+                output += "What ";
+                output += "Is ";
+              case 2:
+                output += "Your ";
+              case 3:
+                output += "Name";
+              case 4:
+                output += "?";
+                break;
+              case 5:
+                output += "!";
+                break;
+            }
+            output
+        """.trimIndent().eval().assertEqualsTo("Output: What Is Your Name?")
+    }
 }
