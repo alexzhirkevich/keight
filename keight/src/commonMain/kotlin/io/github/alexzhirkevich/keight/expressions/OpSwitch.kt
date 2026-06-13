@@ -31,7 +31,8 @@ internal fun OpSwitch(
             }
         }
     } catch (_: BlockBreak) {
-
+    } catch (e: BlockReturn) {
+        throw e
     }
     Undefined
 }

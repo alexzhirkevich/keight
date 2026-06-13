@@ -874,7 +874,7 @@ private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Ke
                 unexpected("case")
             }
             val case = if (keyword == Token.Identifier.Keyword.Case)
-                parseFactor(emptyList())
+                parseFactor(blockContext)
             else OpCase.Default
 
             syntaxCheck(nextSignificant() is Token.Operator.Colon) {
@@ -2164,7 +2164,7 @@ private fun ListIterator<LocatedToken>.parseBlock(
                     }
                     hasSeparator = true
                 }
-                syntaxCheck(hasSeparator || nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
+                syntaxCheck(hasSeparator || expr is OpCase || nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
                     unexpected(next().token::class.simpleName.orEmpty())
                 }
             }
