@@ -60,4 +60,63 @@ class SwitchTest {
             x
         """.trimIndent().eval().assertEqualsTo("")
     }
+
+    @Test
+    fun return_in_case() = runTest {
+        """
+            function test(s) {
+                switch(s) {
+                    case 1: return "one";
+                    case 2: return "two";
+                    default: return "unknown";
+                }
+            }
+            test(1)
+        """.trimIndent().eval().assertEqualsTo("one")
+
+        """
+            function test(s) {
+                switch(s) {
+                    case 1: return "one";
+                    case 2: return "two";
+                    default: return "unknown";
+                }
+            }
+            test(2)
+        """.trimIndent().eval().assertEqualsTo("two")
+
+        """
+            function test(s) {
+                switch(s) {
+                    case 1: return "one";
+                    case 2: return "two";
+                    default: return "unknown";
+                }
+            }
+            test(3)
+        """.trimIndent().eval().assertEqualsTo("unknown")
+    }
+
+    @Test
+    fun simple_return_in_case() = runTest {
+        """
+            function test(s) {
+                switch(s) {
+                    case 1: return 1;
+                    case 2: return "two";
+                }
+            }
+            test(1)
+        """.trimIndent().eval().assertEqualsTo(1L)
+        
+        """
+            function test(s) {
+                switch(s) {
+                    case 1: return 1;
+                    case 2: return "two";
+                }
+            }
+            test(2)
+        """.trimIndent().eval().assertEqualsTo("two")
+    }
 }
