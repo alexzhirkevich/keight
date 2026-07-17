@@ -743,11 +743,30 @@ private fun ListIterator<LocatedToken>.parseFactor(
         is Token.Operator.Delete -> parseDelete()
         is Token.Identifier.Keyword -> {
             // In object/class property key position, keywords (e.g. `default`, `if`, `class`)
-            // can be valid property names. Peek at the following token: if it is `:`, `(`,
-            // `,` or `}`, the keyword is a property name; otherwise fall back to keyword
-            // parsing (e.g. the `async foo() {}` method modifier).
-            val inMemberKeyPosition =
-                blockContext.lastOrNull() in listOf(BlockContext.Object, BlockContext.Class)
+            // can be valid property names. We decide by peeking the token that immediately
+            // follows the keyword.
+            //
+            // The set of "property-name" tokens below is derived from the ECMAScript grammar
+            // for what may follow a `PropertyName` (which, per spec, may be *any* IdentifierName,
+            // including reserved words/keywords) when it appears as the key of an object-literal
+            // member or a class element:
+            //
+            //   PropertyDefinition / MethodDefinition / ClassElement
+            //     PropertyName : AssignmentExpression        -> key followed by `:`
+            //     MethodDefinition: PropertyName ( ... ) {... -> key followed by `(`
+            //     shorthand IdentifierReference { default }   -> key followed by `}` (last member)
+            //     shorthand IdentifierReference { default, ..} -> key followed by `,` (more follow)
+            //
+            // So if the keyword is followed by `:`, `(`, `,` or `}` it is unambiguously being used
+            // as a property name. Any other continuation — notably *another identifier* such as the
+            // `async foo()`, `get foo()`, `set foo()` or `static foo()` modifiers — means the
+            // keyword is acting as a modifier/keyword, so we fall back to `parseKeyword`.
+            //
+            // Boundary note: class-field shorthand forms (e.g. `class X { default; }` /
+            // `default = 1`) are followed by `;`/`=` and are intentionally NOT in this set; the
+            // current parser handles those via the `OpAssign` path rather than as a bare keyword name.
+            val ctx = blockContext.lastOrNull()
+            val inMemberKeyPosition = ctx == BlockContext.Object || ctx == BlockContext.Class
             if (inMemberKeyPosition) {
                 val i = nextIndex()
                 val n = nextSignificant()
@@ -767,7 +786,8 @@ private fun ListIterator<LocatedToken>.parseFactor(
         }
         is Token.Identifier.Reserved -> throw SyntaxError("Unexpected reserved word (${next.identifier})")
         is Token.Identifier.Property -> {
-            val canHaveAccessor = blockContext.lastOrNull() in listOf(BlockContext.Object, BlockContext.Class)
+            val ctx2 = blockContext.lastOrNull()
+            val canHaveAccessor = ctx2 == BlockContext.Object || ctx2 == BlockContext.Class
             var i = nextIndex()
             val n = nextSignificant()
             when {
