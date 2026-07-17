@@ -142,4 +142,49 @@ class ObjectTest {
         "obj['x']++; obj.x".eval(it).assertEqualsTo(3L)
         "obj['x']+=1; obj.x".eval(it).assertEqualsTo(4L)
     }
+
+    @Test
+    fun keyword_property_names() = runtimeTest {
+        // `default` and other keywords must be usable as object property names
+        "var v = { min: 0, max: 100, step: 5, default: 50, unit: '%' }; v.default"
+            .eval(it).assertEqualsTo(50L)
+
+        "({ default: 50 }).default".eval(it).assertEqualsTo(50L)
+        "({ if: 1, for: 2, class: 3 }).for".eval(it).assertEqualsTo(2L)
+        "({ case: 'a', switch: 'b' }).switch".eval(it).assertEqualsTo("b")
+
+        // access via computed and dot notation
+        "var o = { default: 7 }; o['default']".eval(it).assertEqualsTo(7L)
+        "var o = { return: 9 }; o.return".eval(it).assertEqualsTo(9L)
+    }
+
+    @Test
+    fun keyword_property_names_nested() = runtimeTest {
+        """
+            var ui = {
+                slider: function(name, opts) { return opts.default; }
+            };
+            ui.slider("音量", { min: 0, max: 100, step: 5, default: 50, unit: "%" })
+        """.trimIndent().eval(it).assertEqualsTo(50L)
+    }
+
+    @Test
+    fun keyword_method_shorthand() = runtimeTest {
+        // keyword as a method-shorthand name must still work
+        """
+            var o = { default() { return 11 } };
+            o.default()
+        """.trimIndent().eval(it).assertEqualsTo(11L)
+    }
+
+    @Test
+    fun async_method_still_parses() = runtimeTest {
+        // `async` in object context must remain a modifier, not a property name
+        """
+            const obj = {
+                async getValue() { return 42 }
+            }
+            await obj.getValue()
+        """.trimIndent().eval(it).assertEqualsTo(42L)
+    }
 }

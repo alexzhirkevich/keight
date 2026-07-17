@@ -741,7 +741,30 @@ private fun ListIterator<LocatedToken>.parseFactor(
         is Token.Operator.Typeof -> parseTypeof()
         is Token.Operator.Void -> parseVoid()
         is Token.Operator.Delete -> parseDelete()
-        is Token.Identifier.Keyword -> parseKeyword(next, blockContext)
+        is Token.Identifier.Keyword -> {
+            // In object/class property key position, keywords (e.g. `default`, `if`, `class`)
+            // can be valid property names. Peek at the following token: if it is `:`, `(`,
+            // `,` or `}`, the keyword is a property name; otherwise fall back to keyword
+            // parsing (e.g. the `async foo() {}` method modifier).
+            val inMemberKeyPosition =
+                blockContext.lastOrNull() in listOf(BlockContext.Object, BlockContext.Class)
+            if (inMemberKeyPosition) {
+                val i = nextIndex()
+                val n = nextSignificant()
+                returnToIndex(i)
+                val isPropertyName = n is Token.Operator.Colon ||
+                        n is Token.Operator.Bracket.RoundOpen ||
+                        n is Token.Operator.Comma ||
+                        n is Token.Operator.Bracket.CurlyClose
+                if (isPropertyName) {
+                    OpGetProperty(next.identifier, receiver = null).at(loc)
+                } else {
+                    parseKeyword(next, blockContext)
+                }
+            } else {
+                parseKeyword(next, blockContext)
+            }
+        }
         is Token.Identifier.Reserved -> throw SyntaxError("Unexpected reserved word (${next.identifier})")
         is Token.Identifier.Property -> {
             val canHaveAccessor = blockContext.lastOrNull() in listOf(BlockContext.Object, BlockContext.Class)
