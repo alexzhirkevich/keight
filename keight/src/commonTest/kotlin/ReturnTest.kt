@@ -92,6 +92,13 @@ class ReturnTest {
                 })()
             """.trimIndent().eval() is Undefined
         }
+        assertTrue {
+            """
+                (function() {
+                    if (true) return;if (true) return
+                })()
+            """.trimIndent().eval() is Undefined
+        }
 
         // Exact snippet without semicolons (newline-terminated empty returns).
         assertTrue {
