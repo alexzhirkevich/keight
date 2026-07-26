@@ -211,6 +211,21 @@ private fun ListIterator<LocatedToken>.nextSignificant() : Token {
 }
 
 /**
+ * Peek the raw next token (including [Token.NewLine]) WITHOUT consuming it.
+ * Unlike [nextSignificant], this does NOT skip newlines — required for ASI-sensitive
+ * productions such as `return`, where an immediately-following newline terminates the
+ * statement and must remain in the stream for the enclosing block to consume as a
+ * statement separator (see issue #20).
+ */
+private fun ListIterator<LocatedToken>.peekRawToken(): Token? {
+    if (!hasNext()) return null
+    val i = nextIndex()
+    val t = next().token
+    returnToIndex(i)
+    return t
+}
+
+/**
  * Get the next significant LocatedToken (skipping newlines), or null if exhausted.
  */
 private fun ListIterator<LocatedToken>.nextSignificantLocated() : LocatedToken? {
@@ -959,11 +974,16 @@ private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Ke
             syntaxCheck(BlockContext.Function in blockContext) {
                 unexpected("return")
             }
-            val next = next().token
-            if (next == Token.NewLine || next == Token.Operator.SemiColon){
+            // ASI: an empty `return` is terminated by a newline or an explicit `;`.
+            // We must NOT consume that separator here — the enclosing block is responsible
+            // for consuming statement separators (newline / `;` / `,`). Consuming the newline
+            // would leave the following statement without a separator and make the block fail
+            // with "Unexpected token 'Keyword'" when the next statement starts with a keyword
+            // (see issue #20, e.g. `if (true) return\nif (true) return`).
+            val term = peekRawToken()
+            if (term == Token.NewLine || term == Token.Operator.SemiColon) {
                 OpReturn(OpConstant(Undefined))
             } else {
-                previous()
                 OpReturn(parseStatement(blockContext = blockContext, blockType = ExpectedBlockType.Object))
             }
         }
