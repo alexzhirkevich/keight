@@ -202,6 +202,36 @@ private inline fun <reified R : Token> ListIterator<LocatedToken>.nextIsInstance
     return (nextSignificant() is R).also { returnToIndex(i) }
 }
 
+/**
+ * Consume an optional `;` (and surrounding newlines) followed by [kw].
+ *
+ * Returns `true` and consumes up to and including [kw] when the sequence
+ * `;? <kw>` is present; otherwise consumes nothing and restores the stream.
+ *
+ * Used for `;`-terminated inline statements immediately followed by a
+ * continuation keyword: `if (cond) s; else ...`, `do s; while (...)`,
+ * `try { } ; catch ...` / `... ; finally ...`. Crucially, if the next token
+ * after an optional `;` is NOT [kw], the `;` is left in the stream so the
+ * enclosing block can still use it as a statement separator
+ * (e.g. `if (a) b; c` must keep running `c`, `do b; c` keeps running `c`).
+ *
+ * Fixes issue #22 (and its `do/while` + `try/catch/finally` variants): without
+ * this, the explicit `;` left after an inline body makes the continuation
+ * keyword (`else` / `while` / `catch` / `finally`) get orphaned and later
+ * parsed as a standalone statement, raising "Unexpected token" / "Missing ...".
+ */
+private fun ListIterator<LocatedToken>.eatKeywordAfterOptionalSemicolon(kw: Token.Identifier.Keyword): Boolean {
+    val start = nextIndex()
+    val first = nextSignificant()
+    val found = if (first == Token.Operator.SemiColon) {
+        nextSignificant() == kw
+    } else {
+        first == kw
+    }
+    if (!found) returnToIndex(start)
+    return found
+}
+
 private fun ListIterator<LocatedToken>.nextSignificant() : Token {
     var n = next().token
     while (n is Token.NewLine){
@@ -962,13 +992,24 @@ private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Ke
             }
         }
 
-        Token.Identifier.Keyword.If ->  OpIfCondition(
-            condition = parseExpressionGrouping(blockContext),
-            onTrue = parseBlock(blockContext = blockContext),
-            onFalse = if (eat(Token.Identifier.Keyword.Else)) {
+        Token.Identifier.Keyword.If ->  {
+            val condition = parseExpressionGrouping(blockContext)
+            val onTrue = parseBlock(blockContext = blockContext)
+            // Issue #22: tolerate a stray `;` between the if-consequent and `else`
+            // (e.g. `if (true) x=1; else y=2`). In standard JS an explicit `;` terminates
+            // the if-statement, but many hand-written scripts rely on this form.
+            // `eatKeywordAfterOptionalSemicolon` consumes an optional `;` ONLY when `else`
+            // actually follows; otherwise the `;` stays in the stream so the enclosing
+            // block can still use it as a statement separator (e.g. `if (a) b; c`).
+            val onFalse = if (eatKeywordAfterOptionalSemicolon(Token.Identifier.Keyword.Else)) {
                 parseBlock(blockContext = blockContext)
             } else null
-        )
+            OpIfCondition(
+                condition = condition,
+                onTrue = onTrue,
+                onFalse = onFalse,
+            )
+        }
         Token.Identifier.Keyword.Function -> OpFunctionInit(parseFunction(blockContext = blockContext))
         Token.Identifier.Keyword.Return -> {
             syntaxCheck(BlockContext.Function in blockContext) {
@@ -1732,7 +1773,10 @@ private fun ListIterator<LocatedToken>.parseDoWhileLoop(blockContext: List<Block
         scoped = false // while condition should have the same scope with body
     )
 
-    syntaxCheck(eat(Token.Identifier.Keyword.While)) {
+    // Issue #22 (do/while variant): tolerate a stray `;` between the do-body and
+    // `while` (e.g. `do x=1; while (false)`). Only consume the `;` when `while`
+    // actually follows, so `do x=1; y` keeps running `y`.
+    syntaxCheck(eatKeywordAfterOptionalSemicolon(Token.Identifier.Keyword.While)) {
         "Missing while condition in do/while block"
     }
     val condition = parseExpressionGrouping()
@@ -1817,7 +1861,10 @@ private fun ListIterator<LocatedToken>.parseAwait(): Expression {
 
 private fun ListIterator<LocatedToken>.parseTryCatch(blockContext: List<BlockContext>): Expression {
     val tryBlock = parseBlock(type = ExpectedBlockType.Block, blockContext = blockContext)
-    val catchBlock = if (eat(Token.Identifier.Keyword.Catch)) {
+    // Issue #22 (try/catch variant): tolerate a stray `;` between the try-block and
+    // `catch`/`finally` (e.g. `try { } ; catch (e) ...`). Only consume the `;` when
+    // the continuation keyword actually follows, so `try { } ; x` keeps running `x`.
+    val catchBlock = if (eatKeywordAfterOptionalSemicolon(Token.Identifier.Keyword.Catch)) {
         if (eat(Token.Operator.Bracket.RoundOpen)) {
             val next = nextSignificant()
             syntaxCheck(next is Token.Identifier && eat(Token.Operator.Bracket.RoundClose)) {
@@ -1832,7 +1879,7 @@ private fun ListIterator<LocatedToken>.parseTryCatch(blockContext: List<BlockCon
         )
     } else null
 
-    val finallyBlock = if (eat(Token.Identifier.Keyword.Finally)) {
+    val finallyBlock = if (eatKeywordAfterOptionalSemicolon(Token.Identifier.Keyword.Finally)) {
         parseBlock(type = ExpectedBlockType.Block, blockContext = blockContext)
     } else null
 
