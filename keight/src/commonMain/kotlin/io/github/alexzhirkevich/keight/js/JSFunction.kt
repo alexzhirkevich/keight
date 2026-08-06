@@ -259,11 +259,13 @@ public open class JSFunction(
                         )
                     )
                 },
-                thisRef = o
-//                thisRef = Getter {
-//                    assertSuperInitialized()
-//                    o
-//                }
+                thisRef = if (mustHaveSuperInitialized) {
+                    // In a derived constructor `this` is uninitialized until `super()`
+                    // returns. Wrap it so any access before that throws ReferenceError.
+                    SuperInitGuard(o, { superInitialized }, runtime)
+                } else {
+                    o
+                }
             ).also {
                 assertSuperInitialized()
             }
