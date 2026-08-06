@@ -13,10 +13,15 @@ internal fun OpSwitch(
     val v = value(r)
     var defaultIndex = -1;
     var run = false
+    // Issue #23: completion value is the value of the last evaluated statement in the
+    // matched path (matching ECMAScript fall-through semantics).
+    var last: JsAny? = Undefined
+    var broke = false
     try {
         cases.fastForEachIndexed { i, it ->
+            if (broke) return@fastForEachIndexed
             when {
-                run -> it(r)
+                run -> last = it(r)
                 it is OpCase -> {
                     when {
                         it.value === OpCase.Default -> defaultIndex = i
@@ -25,16 +30,24 @@ internal fun OpSwitch(
                 }
             }
         }
-        if (defaultIndex >= 0) {
+        if (!broke && defaultIndex >= 0) {
             for (i in defaultIndex until cases.size) {
-                cases[i].invoke(r)
+                last = cases[i].invoke(r)
             }
         }
-    } catch (_: BlockBreak) {
+    } catch (t: BlockBreak) {
+        // A `break` inside a case carries the case-body completion value (set by OpBlock when
+        // the case body is itself an `OpBlock`), so the switch still reports the last statement's
+        // value. When the break is a plain `break` (value == null) — the common case where the
+        // case body is a flat list of statements — `last` already holds the last evaluated
+        // statement, so we keep it rather than overwriting with `null`. `broke` also prevents the
+        // default block from running after a break.
+        if (t.value != null) last = t.value
+        broke = true
     } catch (e: BlockReturn) {
         throw e
     }
-    Undefined
+    last
 }
 
 internal class OpCase(

@@ -40,6 +40,10 @@ internal fun OpTryCatch(
     else -> throw SyntaxError("Missing catch or finally after try")
 }
 
+// Issue #23: the completion value of a try statement is the value of the try block, or of the
+// catch block when the try block threw. `parseBlock` marks both as non-expressible, so they are
+// evaluated via `asExpressible()`. The finally block never contributes a value unless it
+// completes abruptly - which Kotlin's `finally` already models.
 private fun TryCatchFinally(
     tryBlock : Expression,
     catchVariableName : String?,
@@ -47,7 +51,7 @@ private fun TryCatchFinally(
     finallyBlock : Expression? = null,
 ) = Expression { r ->
     try {
-        tryBlock(r)
+        tryBlock.asExpressible().invoke(r)
     } catch (x: ScopeException) {
         throw x
     } catch (t: Throwable) {
@@ -62,10 +66,10 @@ private fun TryCatchFinally(
             val throwable = if (t is ThrowableValue) t.value else t.js
             r.withScope {
                 it.set(catchVariableName.js, throwable, VariableType.Local)
-                catchBlock.invoke(it)
+                catchBlock.asExpressible().invoke(it)
             }
         } else {
-            catchBlock(r)
+            catchBlock.asExpressible().invoke(r)
         }
     } finally {
         finallyBlock?.invoke(r)
@@ -73,12 +77,13 @@ private fun TryCatchFinally(
 }
 
 
+// Issue #23: see TryCatchFinally - the finally block's value is discarded.
 private fun TryFinally(
     tryBlock : Expression,
     finallyBlock : Expression,
 ) = Expression {
     try {
-        tryBlock(it)
+        tryBlock.asExpressible().invoke(it)
     } finally {
         finallyBlock(it)
     }

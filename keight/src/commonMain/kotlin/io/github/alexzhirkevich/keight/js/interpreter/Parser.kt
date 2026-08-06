@@ -853,11 +853,73 @@ private fun ListIterator<LocatedToken>.parseFactor(
     return expr
 }
 
+/**
+ * Keywords that can only begin a *statement* in ECMAScript and therefore must never appear
+ * in an expression position (an initializer, the right-hand side of an assignment, ...).
+ *
+ * keight's parser is intentionally statement/expression agnostic: [parseFactor] routes every
+ * keyword to [parseKeyword], and [parseAssignmentValue] parses the right-hand side through the
+ * very same [parseStatement] entry point. Without this guard `var a = if (true) '1'` silently
+ * parses as an if-statement and assigns its completion value instead of raising a SyntaxError
+ * the way a spec-compliant engine does.
+ *
+ * `function`, `class` and `import` are deliberately excluded: all three have valid expression
+ * forms (function expression, class expression, dynamic `import()`).
+ */
+private val StatementOnlyKeywords = setOf(
+    Token.Identifier.Keyword.Var,
+    Token.Identifier.Keyword.Let,
+    Token.Identifier.Keyword.Const,
+    Token.Identifier.Keyword.If,
+    Token.Identifier.Keyword.Else,
+    Token.Identifier.Keyword.For,
+    Token.Identifier.Keyword.While,
+    Token.Identifier.Keyword.Do,
+    Token.Identifier.Keyword.Switch,
+    Token.Identifier.Keyword.Case,
+    Token.Identifier.Keyword.Default,
+    Token.Identifier.Keyword.Try,
+    Token.Identifier.Keyword.Catch,
+    Token.Identifier.Keyword.Finally,
+    Token.Identifier.Keyword.Throw,
+    Token.Identifier.Keyword.Return,
+    Token.Identifier.Keyword.Break,
+    Token.Identifier.Keyword.Continue,
+    Token.Identifier.Keyword.With,
+    Token.Identifier.Keyword.Debugger,
+    Token.Identifier.Keyword.Export,
+)
+
+/**
+ * Reject a [StatementOnlyKeywords] token found at the start of an expression.
+ *
+ * Nothing is consumed: the stream is always restored so the caller can parse the expression
+ * itself when the upcoming token is legal.
+ *
+ * Called from every position where the grammar requires an expression rather than a statement:
+ * assignment/initializer right-hand sides, concise arrow-function bodies, parenthesized groups
+ * (call/`new` arguments, `if`/`while`/`switch` heads), array elements, both ternary branches and
+ * the operands of `return` / `throw`.
+ */
+private fun ListIterator<LocatedToken>.checkExpressionStart() {
+    if (!hasNext()) return
+    val i = nextIndex()
+    val next = nextSignificant()
+    returnToIndex(i)
+    if (next is Token.Identifier.Keyword && next in StatementOnlyKeywords) {
+        throw SyntaxError(unexpected(next.identifier))
+    }
+}
+
 private fun ListIterator<LocatedToken>.parseAssignmentValue(
     x: Expression,
     blockContext: List<BlockContext>,
     merge: (suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?)? = null
 ): Expression {
+    // Every branch below parses the right-hand side as an expression, so a statement-only
+    // keyword there is always a syntax error (e.g. `var a = if (true) '1'`).
+    checkExpressionStart()
+
     // When parsing property values in an object literal, use ObjectPropertyValue context
     // to distinguish array literals [1,2] from computed property names [expr]
     val propertyValueContext = blockContext + BlockContext.ObjectPropertyValue
@@ -1008,6 +1070,11 @@ private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Ke
                 condition = condition,
                 onTrue = onTrue,
                 onFalse = onFalse,
+                // Issue #23: propagate the completion value of the taken branch so that
+                // `if (true) '1'` (as a program's last statement) yields `'1'`, matching
+                // the ECMAScript completion-value semantics. `if (false)` without an
+                // `else` still yields `Undefined` (onFalse is null -> res is null).
+                expressible = true
             )
         }
         Token.Identifier.Keyword.Function -> OpFunctionInit(parseFunction(blockContext = blockContext))
@@ -1021,16 +1088,28 @@ private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Ke
             // would leave the following statement without a separator and make the block fail
             // with "Unexpected token 'Keyword'" when the next statement starts with a keyword
             // (see issue #20, e.g. `if (true) return\nif (true) return`).
+            // `}` and the end of the token stream terminate an empty `return` too
+            // (`function f() { return }`), and unlike `\n` / `;` the `}` must stay in the
+            // stream for parseBlock to close the body.
             val term = peekRawToken()
-            if (term == Token.NewLine || term == Token.Operator.SemiColon) {
+            if (term == null ||
+                term == Token.NewLine ||
+                term == Token.Operator.SemiColon ||
+                term == Token.Operator.Bracket.CurlyClose
+            ) {
                 OpReturn(OpConstant(Undefined))
             } else {
+                // The operand of a non-empty `return` is an Expression. ASI was already
+                // resolved above, so peeking past newlines here is safe.
+                checkExpressionStart()
                 OpReturn(parseStatement(blockContext = blockContext, blockType = ExpectedBlockType.Object))
             }
         }
 
         Token.Identifier.Keyword.Class -> parseClass()
         Token.Identifier.Keyword.Throw -> {
+            // The operand of `throw` is an Expression.
+            checkExpressionStart()
             val throwable = parseStatement(blockType = ExpectedBlockType.Object)
             Expression {
                 val t = throwable(it)
@@ -1265,6 +1344,8 @@ private fun ListIterator<LocatedToken>.parseArrayCreation(): Expression {
             if (eat(Token.Operator.Comma)) {
                 add(OpConstant(Uninitialized))
             } else {
+                // Array elements are AssignmentExpressions.
+                checkExpressionStart()
                 add(parseStatement(blockType = ExpectedBlockType.Object))
                 if (!eat(Token.Operator.Comma)) {
                     syntaxCheck(nextSignificant() is Token.Operator.Bracket.SquareClose) {
@@ -1313,6 +1394,9 @@ private fun ListIterator<LocatedToken>.parseExpressionGrouping(blockContext: Lis
             if (nextIsInstance<Token.Operator.Bracket.RoundClose>()) {
                 return@buildList
             }
+            // Every item of a parenthesized group is an expression: call arguments,
+            // `new` arguments, `if`/`while`/`switch` heads, a parenthesized expression.
+            checkExpressionStart()
             add(parseStatement(blockContext, blockType = ExpectedBlockType.Object))
         } while (nextSignificant() is Token.Operator.Comma)
         prevSignificant()
@@ -1501,6 +1585,9 @@ private fun ListIterator<LocatedToken>.parseTernary(
     blockContext: List<BlockContext>
 ) : Expression {
 
+    // Both ternary branches are AssignmentExpressions.
+    checkExpressionStart()
+
     val body = parseStatement(
         blockContext = blockContext + BlockContext.Ternary,
         blockType = ExpectedBlockType.Block
@@ -1515,10 +1602,13 @@ private fun ListIterator<LocatedToken>.parseTernary(
     return OpIfCondition(
         condition = condition,
         onTrue = body,
-        onFalse = parseStatement(
-            blockContext = blockContext,
-            blockType = ExpectedBlockType.Block
-        ),
+        onFalse = run {
+            checkExpressionStart()
+            parseStatement(
+                blockContext = blockContext,
+                blockType = ExpectedBlockType.Block
+            )
+        },
         expressible = true
     )
 }
@@ -1898,6 +1988,11 @@ private fun ListIterator<LocatedToken>.parseArrowFunction(blockContext: List<Blo
     }.map(Expression::toFunctionParam)
 
     validateFunctionParams(fArgs,true)
+
+    // A concise arrow body is an AssignmentExpression, so `() => if (true) '1'` is a
+    // SyntaxError. A block body starts with `{`, which is not a keyword, so guarding
+    // unconditionally leaves `() => { if (...) ... }` untouched.
+    checkExpressionStart()
 
     val lambda = parseBlock(
         type = ExpectedBlockType.Block,

@@ -12,11 +12,10 @@ internal fun OpIfCondition(
 ) = Expression {
     val expr = if (it.isFalse(condition(it))) onFalse else onTrue
 
-    val res = expr?.invoke(it)
+    // Branches are wrapped in an `OpBlock` with `isExpressible = false` by the parser, which
+    // would discard the branch's last statement value. For completion-value semantics (Issue #23)
+    // we must evaluate the taken branch as expressible so its value propagates.
+    val res = expr?.asExpressible()?.invoke(it)
 
-    if (expressible) {
-        res
-    } else {
-        Undefined
-    }
+    if (expressible) res ?: Undefined else Undefined
 }
