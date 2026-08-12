@@ -5,9 +5,11 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Wrapper
 import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.findRoot
+import kotlinx.coroutines.InternalForInheritanceCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlin.jvm.JvmInline
 
+@OptIn(InternalForInheritanceCoroutinesApi::class)
 @JvmInline
 internal value class JsPromiseWrapper(
     override val value: Job

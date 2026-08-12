@@ -171,6 +171,7 @@ internal class JSStringFunction : JSFunction(
     },
     properties = mutableMapOf(
         "fromCharCode".js to "fromCharCode".func(FunctionParam("codes", isVararg = true)) {
+            @Suppress("UNCHECKED_CAST")
             (it[0] as Iterable<JsAny?>).map {
                 val c = toNumber(it).toInt()
                 if (c in LSEP) "\n" else Char(c).toString()

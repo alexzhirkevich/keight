@@ -576,7 +576,6 @@ private class RuntimeObject(val thisRef: () -> ScriptRuntime) : JsObject {
 
 
     override suspend fun delete(property: JsAny?, runtime: ScriptRuntime): Boolean {
-
         thisRef().delete(property, true)
         return true
     }
@@ -608,11 +607,13 @@ private fun jsmul(a : Any?, b : Any?) : JsAny {
         a is Double && b is Double -> (a*b).js
         a is Number && b is Number -> (a.toDouble() * b.toDouble()).js
         a is List<*> && b is Number -> {
+            @Suppress("UNCHECKED_CAST")
             a as List<Number>
             val bf = b.toDouble()
             a.fastMap { (it.toDouble() * bf).js }.js
         }
         a is Number && b is List<*> -> {
+            @Suppress("UNCHECKED_CAST")
             b as List<Number>
             val af = a.toDouble()
             b.fastMap { (it.toDouble() * af).js }.js
@@ -640,6 +641,7 @@ private fun jsdiv(a : Any?, b : Any?) : JsAny {
         b == null -> Double.POSITIVE_INFINITY.js
 
         a is List<*> && b is Number -> {
+            @Suppress("UNCHECKED_CAST")
             a as List<Number>
             val bf = b.toDouble()
             a.fastMap { (it.toDouble() / bf).js }.js
@@ -690,6 +692,7 @@ private fun jsneg(v : Any?) : JsAny {
         is Long -> (-v).js
         is Number -> (-v.toDouble()).js
         is List<*> -> {
+            @Suppress("UNCHECKED_CAST")
             v as List<Number>
             v.fastMap { (-it.toDouble()).js }.js
         }

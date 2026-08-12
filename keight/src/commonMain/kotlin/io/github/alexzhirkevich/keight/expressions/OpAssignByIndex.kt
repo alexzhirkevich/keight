@@ -36,6 +36,7 @@ internal class OpAssignByIndex(
 
             return when (rec) {
                 is MutableList<*> -> {
+                    @Suppress("UNCHECKED_CAST")
                     rec as MutableList<JsAny?>
                     val i = runtime.toNumber(idx)
 

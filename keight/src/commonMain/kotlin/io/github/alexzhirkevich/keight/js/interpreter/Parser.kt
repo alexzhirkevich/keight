@@ -1241,7 +1241,7 @@ private fun ListIterator<LocatedToken>.parseNew(loc: SourceLocation?) : Expressi
             it.pushCallFrame(frame)
             try {
                 constructor.construct(args.fastMap { arg -> arg(it) }, it).also { result ->
-                    if (adjustedLine != null && loc != null && result is Expression.LocationAttachable) {
+                    if (adjustedLine != null && result is Expression.LocationAttachable) {
                         result.attachLocation(adjustedLine, loc.column, loc.fileName)
                     }
                     if (result is JSError) {

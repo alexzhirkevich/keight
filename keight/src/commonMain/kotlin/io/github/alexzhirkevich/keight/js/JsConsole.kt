@@ -16,6 +16,7 @@ private fun ScriptRuntime.out(message : List<Any?>, out : (Any?) -> Unit) : JsAn
     if (message.isEmpty() || (message[0] as List<*>).isEmpty()) {
         return Undefined
     }
+    @Suppress("UNCHECKED_CAST")
     val args = message[0] as List<JsAny?>
     if (args.size == 1) {
         out(args[0]?.toKotlin(this))

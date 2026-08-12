@@ -99,6 +99,7 @@ internal class JSPromiseFunction : JSFunction(
         },
         "all".func("values".vararg()) { args ->
             async {
+                @Suppress("UNCHECKED_CAST")
                 (args[0] as Iterable<JsAny?>).map {
                     val job = it?.toKotlin(this@func)
                     typeCheck(job is Job){ "$job is not a Promise".js }

@@ -167,8 +167,7 @@ private suspend fun execKotlinFunction(
 
     return when (function) {
 
-        is Function0<*> -> (function as Function0<Any?>)
-            .invoke() as? JsAny?
+        is Function0<*> -> function.invoke() as? JsAny?
 
         is Function1<*, *> -> withInvalidArgsCheck {
             function as Function1<Any?, Any?>

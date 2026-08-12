@@ -9,6 +9,7 @@ internal class JSFunctionFunction : JSFunction(
             FunctionParam("thisArg"),
             "argArray".vararg()
         ) {
+            @Suppress("UNCHECKED_CAST")
             thisRef
                 .callableOrThrow(this)
                 .call(
@@ -22,6 +23,7 @@ internal class JSFunctionFunction : JSFunction(
             FunctionParam("thisArg"),
             "argArray".vararg()
         ) {
+            @Suppress("UNCHECKED_CAST")
             thisRef
                 .callableOrThrow(this)
                 .bind(
@@ -35,6 +37,7 @@ internal class JSFunctionFunction : JSFunction(
             FunctionParam("thisArg"),
             "argArray" defaults OpArgOmitted
         ) {
+            @Suppress("UNCHECKED_CAST")
             thisRef
                 .callableOrThrow(this)
                 .call(
