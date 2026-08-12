@@ -2307,24 +2307,20 @@ private fun ListIterator<LocatedToken>.parseBlock(
 
     var isSurroundedWithBraces = false
     val list = buildList {
-        // For a real statement list (top-level unwrapped scripts) a leading `{`
-        // is NOT the script's surrounding brace — it starts a block *statement*.
-        // Eating it here (with `scoped` inherited from the caller, which is
-        // `false` at the top level) would make the block's `let`/`const`
-        // declarations leak into the surrounding scope, and any statements
-        // after the closing `}` would be silently dropped (e.g.
-        // `{ const t = 1; }\nt()` must throw ReferenceError, and
-        // `{ f(); } g()` must still run `g()`). The brace-less statement-list
-        // branch below parses a leading `{` via parseStatement -> parseBlock
-        // with its own (scoped) scope.
-        if (!isStatementList && eat(Token.Operator.Bracket.CurlyOpen)) {
-            isSurroundedWithBraces = true
-            val context = if (type == ExpectedBlockType.Object)
-                blockContext + BlockContext.Object
-            else blockContext
-            while (!nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
+        /**
+         * Parse a flat statement list (either surrounded by `{`...`}` or the bare
+         * top level).  The body — hoisting, separator consumption, and ASI — is
+         * identical; only the loop condition, the fallback syntax-check terminator,
+         * and the context passed to `parseStatement` differ.
+         */
+        fun parseStatementList(
+            stmtContext: List<BlockContext>,
+            shouldContinue: () -> Boolean,
+            isNaturalTerminator: () -> Boolean,
+        ) {
+            while (shouldContinue()) {
                 val expr = parseStatement(
-                    blockContext = context,
+                    blockContext = stmtContext,
                     blockType = ExpectedBlockType.None,
                     isBlockAnchor = true
                 )
@@ -2340,7 +2336,6 @@ private fun ListIterator<LocatedToken>.parseBlock(
                         val assign = OpAssign(
                             type = VariableType.Local,
                             variableName = expr.name,
-                            receiver = null,
                             assignableValue = expr,
                             merge = null
                         )
@@ -2364,7 +2359,6 @@ private fun ListIterator<LocatedToken>.parseBlock(
                             val assign = OpAssign(
                                 type = VariableType.Local,
                                 variableName = name,
-                                receiver = null,
                                 assignableValue = expr,
                                 merge = null
                             )
@@ -2379,7 +2373,6 @@ private fun ListIterator<LocatedToken>.parseBlock(
                         val assign = OpAssign(
                             type = VariableType.Local,
                             variableName = expr.property.name,
-                            receiver = null,
                             assignableValue = expr.property,
                             merge = null
                         )
@@ -2404,7 +2397,6 @@ private fun ListIterator<LocatedToken>.parseBlock(
                         val assign = OpAssign(
                             type = VariableType.Local,
                             variableName = name,
-                            receiver = null,
                             assignableValue = expr.property,
                             merge = null
                         )
@@ -2442,8 +2434,8 @@ private fun ListIterator<LocatedToken>.parseBlock(
                 // NOT start a fresh statement (e.g. `{ a(){} b(){} }` stays a syntax
                 // error, as in V8).
                 val asiAfterBlock = !hasSeparator && hasNext() &&
-                    BlockContext.Object !in context &&
-                    BlockContext.Class !in context &&
+                    BlockContext.Object !in stmtContext &&
+                    BlockContext.Class !in stmtContext &&
                     run {
                         var ok = false
                         if (afterStmtIndex > 0) {
@@ -2473,12 +2465,34 @@ private fun ListIterator<LocatedToken>.parseBlock(
                         ok
                     }
                 syntaxCheck(
-                    hasSeparator || asiAfterBlock || expr is OpCase ||
-                        nextIsInstance<Token.Operator.Bracket.CurlyClose>()
+                    hasSeparator || asiAfterBlock || expr is OpCase || isNaturalTerminator()
                 ) {
                     unexpected(next().token::class.simpleName.orEmpty())
                 }
             }
+        }
+
+        // For a real statement list (top-level unwrapped scripts) a leading `{`
+        // is NOT the script's surrounding brace — it starts a block *statement*.
+        // Eating it here (with `scoped` inherited from the caller, which is
+        // `false` at the top level) would make the block's `let`/`const`
+        // declarations leak into the surrounding scope, and any statements
+        // after the closing `}` would be silently dropped (e.g.
+        // `{ const t = 1; }\nt()` must throw ReferenceError, and
+        // `{ f(); } g()` must still run `g()`). The brace-less statement-list
+        // branch below parses a leading `{` via parseStatement -> parseBlock
+        // with its own (scoped) scope.
+        if (!isStatementList && eat(Token.Operator.Bracket.CurlyOpen)) {
+            isSurroundedWithBraces = true
+            val context = if (type == ExpectedBlockType.Object)
+                blockContext + BlockContext.Object
+            else blockContext
+
+            parseStatementList(
+                stmtContext = context,
+                shouldContinue = { !nextIsInstance<Token.Operator.Bracket.CurlyClose>() },
+                isNaturalTerminator = { nextIsInstance<Token.Operator.Bracket.CurlyClose>() },
+            )
 
             check(nextSignificant() is Token.Operator.Bracket.CurlyClose) {
                 "} was expected"
@@ -2496,117 +2510,11 @@ private fun ListIterator<LocatedToken>.parseBlock(
                 }
             }
             if (isStatementList) {
-                // Top-level (unwrapped) scripts reach here. Mirror the brace branch's
-                // statement handling: hoist function/class/export declarations, consume
-                // `;`/newline/comma separators, and apply ASI so that constructs such as
-                // `try { } catch { } nextStmt` parse without an explicit `;`. Unlike the
-                // brace branch (terminated by `}`), this list is terminated by EOF.
-                while (hasNext()) {
-                    val expr = parseStatement(
-                        blockContext = blockContext,
-                        // Use None (same as the brace branch) so that parseFactor
-                        // correctly routes `{a:1}` to OPMakeObject rather than
-                        // treating it as a block statement (BlockType.Block causes
-                        // parseBlock to return an unscoped OpBlock of `:`-expressions).
-                        blockType = ExpectedBlockType.None,
-                        isBlockAnchor = true
-                    )
-                    val afterStmtIndex = nextIndex()
-
-                    when (expr) {
-                        is OpClassInit -> {
-                            val assign = OpAssign(
-                                type = VariableType.Local,
-                                variableName = expr.name,
-                                assignableValue = expr,
-                                merge = null
-                            )
-                            add(index = hoistedIndex++, element = Expression { assign(it); Undefined })
-                        }
-
-                        is OpFunctionInit if !expr.function.isArrow -> {
-                            if (type == ExpectedBlockType.Object) {
-                                add(expr)
-                            } else {
-                                val name = expr.function.name
-                                syntaxCheck(name.isNotBlank()) {
-                                    "Function statements require a function name"
-                                }
-                                val assign = OpAssign(
-                                    type = VariableType.Local,
-                                    variableName = name,
-                                    assignableValue = expr,
-                                    merge = null
-                                )
-                                add(index = hoistedIndex++, element = Expression { assign(it); Undefined })
-                            }
-                        }
-
-                        is OpExport if expr.property is OpClassInit -> {
-                            val assign = OpAssign(
-                                type = VariableType.Local,
-                                variableName = expr.property.name,
-                                assignableValue = expr.property,
-                                merge = null
-                            )
-                            add(index = hoistedIndex++, element = Expression { expr(it); assign(it); Undefined })
-                        }
-
-                        is OpExport if expr.property is OpFunctionInit && !expr.property.function.isArrow -> {
-                            val name = expr.property.function.name
-                            syntaxCheck(name.isNotBlank()) {
-                                "Function statements require a function name"
-                            }
-                            val assign = OpAssign(
-                                type = VariableType.Local,
-                                variableName = name,
-                                assignableValue = expr.property,
-                                merge = null
-                            )
-                            add(index = hoistedIndex++, element = Expression { expr(it); assign(it); Undefined })
-                        }
-
-                        is OpImport -> add(hoistedIndex++, expr)
-                        else -> add(expr)
-                    }
-
-                    var hasSeparator = false
-                    while (hasNext()) {
-                        val next = next().token
-                        if (next !is Token.NewLine && next !is Token.Operator.SemiColon && next !is Token.Operator.Comma) {
-                            previous()
-                            break
-                        }
-                        hasSeparator = true
-                    }
-                    val asiAfterBlock = !hasSeparator && hasNext() &&
-                        BlockContext.Object !in blockContext &&
-                        BlockContext.Class !in blockContext &&
-                        run {
-                            var ok = false
-                            if (afterStmtIndex > 0) {
-                                while (nextIndex() > afterStmtIndex) previous()
-                                if (hasPrevious()) {
-                                    var lt = previous()
-                                    while (lt.token is Token.NewLine && hasPrevious()) {
-                                        lt = previous()
-                                    }
-                                    ok = when (lt.token) {
-                                        is Token.Operator.Bracket.CurlyClose -> true
-                                        is Token.Operator.Bracket.RoundClose -> expr is OpDoWhileLoop
-                                        else -> false
-                                    }
-                                }
-                                while (nextIndex() < afterStmtIndex) next()
-                            }
-                            ok
-                        }
-                    syntaxCheck(
-                        hasSeparator || asiAfterBlock || expr is OpCase || !hasNext()
-                    ) {
-                        unexpected(next().token::class.simpleName.orEmpty())
-                    }
-                }
+                parseStatementList(
+                    stmtContext = blockContext,
+                    shouldContinue = { hasNext() },
+                    isNaturalTerminator = { !hasNext() },
+                )
             } else {
                 do {
                     add(parseStatement(blockContext, blockType = type))
