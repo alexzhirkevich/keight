@@ -783,7 +783,6 @@ private fun ListIterator<LocatedToken>.parseFactor(
                 parseArrayCreation()
             }
         }
-        is Token.Operator.New -> parseNew(loc)
         is Token.Operator.Typeof -> parseTypeof()
         is Token.Operator.Void -> parseVoid()
         is Token.Operator.Delete -> parseDelete()
