@@ -25,6 +25,12 @@ internal class OpForLoop(
         { !it.isFalse(comparison.invoke(it)) }
     }
 
+    // Issue #23: a loop's completion value is the value of the last normally-completed
+    // body iteration (matching ECMAScript). `break`/`continue` leave `last` untouched,
+    // which is exactly the spec behaviour. `asExpressible` is applied here, at construction
+    // time, rather than on every execution.
+    private val bodyExpr = body.asExpressible()
+
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         return runtime.withScope {
             assignment?.invoke(it)
@@ -32,11 +38,7 @@ internal class OpForLoop(
         }
     }
 
-    // Issue #23: a loop's completion value is the value of the last normally-completed
-    // body iteration (matching ECMAScript). `break`/`continue` leave `last` untouched,
-    // which is exactly the spec behaviour.
     private suspend fun block(ctx: ScriptRuntime): JsAny? {
-        val bodyExpr = body.asExpressible()
         var last: JsAny? = Undefined
         while (condition(ctx)) {
             try {
@@ -69,6 +71,9 @@ internal class OpForInLoop(
     override var label: String? = null
 ) : Expression(), Labeled {
 
+    // Issue #23: completion value is the last body value (see OpForLoop.block).
+    private val bodyExpr = body.asExpressible()
+
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         return runtime.withScope {
             val o = inObject(it)
@@ -83,8 +88,6 @@ internal class OpForInLoop(
                 prepare(it)
             }
 
-            // Issue #23: completion value is the last body value (see OpForLoop.block).
-            val bodyExpr = body.asExpressible()
             var last: JsAny? = Undefined
             for (k in keys) {
                 try {
@@ -119,6 +122,9 @@ internal class OpForOfLoop(
     override var label: String? = null
 ) : Expression(), Labeled {
 
+    // Issue #23: completion value is the last body value (see OpForLoop.block).
+    private val bodyExpr = body.asExpressible()
+
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         return runtime.withScope {
             val iterableObj = iterable(it)
@@ -137,8 +143,6 @@ internal class OpForOfLoop(
             val iterator = callable.call(iterableObj, emptyList(), it)
                 ?: return@withScope Undefined
 
-            // Issue #23: completion value is the last body value (see OpForLoop.block).
-            val bodyExpr = body.asExpressible()
             var last: JsAny? = Undefined
             while (true) {
                 val result = iterator
@@ -182,9 +186,9 @@ internal class OpDoWhileLoop(
     override var label: String? = null
 ) : Expression(), Labeled {
     // Issue #23: completion value is the last body value (see OpForLoop.block).
+    private val bodyExpr = body.copy(isExpressible = true)
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         var last: JsAny? = Undefined
-        val bodyExpr = body.copy(isExpressible = true)
         do {
             val cond = runtime.withScope {
                 try {
@@ -217,9 +221,9 @@ internal class OpWhileLoop(
     override var label: String? = null
 ) : Expression(), Labeled {
     // Issue #23: completion value is the last body value (see OpForLoop.block).
+    private val bodyExpr = body.asExpressible()
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
         var last: JsAny? = Undefined
-        val bodyExpr = body.asExpressible()
         while (!runtime.isFalse(condition.invoke(runtime))) {
             try {
                 last = bodyExpr.invoke(runtime)

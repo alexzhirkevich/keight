@@ -78,8 +78,10 @@ internal data class OpBlock(
  * ECMAScript completion-value semantics (Issue #23) we must mark those blocks expressible so
  * the enclosing `if`/`for`/`while`/`try`/... can propagate the body's last statement value.
  */
-internal fun Expression.asExpressible(): Expression =
-    (this as? OpBlock)?.copy(isExpressible = true) ?: this
+internal fun Expression.asExpressible(): Expression {
+    val block = this as? OpBlock ?: return this
+    return if (block.isExpressible) this else block.copy(isExpressible = true)
+}
 
 
 internal sealed class ScopeException : Throwable()
