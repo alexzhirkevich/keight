@@ -186,10 +186,11 @@ class AsyncStackTraceScenariosTest {
         """.trimIndent().eval()
         val s = result.toString()
         assertTrue("stack should contain the message 'rp'") { s.contains("rp") }
-        // Arrow callbacks are anonymous -> the throwing frame shows <anonymous>.
-        assertTrue("stack should contain the anonymous arrow frame") { s.contains("<anonymous>") }
+        // Arrow callbacks are anonymous but have a source location, so V8-style rendering
+        // shows the location directly (no <anonymous> token).
+        assertTrue("anonymous arrow frame should NOT carry <anonymous>") { !s.contains("<anonymous>") }
         assertTrue("stack should trace back across the async boundary ('async')") { s.contains("async") }
-        assertTrue("anonymous throwing frame should be at (:1:67)") { s.contains("at <anonymous> (:1:67)") }
+        assertTrue("anonymous throwing frame should be at (:1:67)") { s.contains("at :1:67") }
         assertTrue("scheduling frame should be 'at async a' at (:1:41)") { s.contains("at async a (:1:41)") }
     }
 
@@ -203,9 +204,9 @@ class AsyncStackTraceScenariosTest {
         """.trimIndent().eval()
         val s = result.toString()
         assertTrue("stack should contain the message 'arrow'") { s.contains("arrow") }
-        assertTrue("stack should contain the anonymous arrow frame") { s.contains("<anonymous>") }
+        assertTrue("anonymous arrow frame should NOT carry <anonymous>") { !s.contains("<anonymous>") }
         assertTrue("stack should trace back across the async boundary ('async')") { s.contains("async") }
-        assertTrue("anonymous throwing frame should be at (:1:60)") { s.contains("at <anonymous> (:1:60)") }
+        assertTrue("anonymous throwing frame should be at (:1:60)") { s.contains("at :1:60") }
         assertTrue("scheduling frame should be 'at async a' at (:1:41)") { s.contains("at async a (:1:41)") }
     }
 

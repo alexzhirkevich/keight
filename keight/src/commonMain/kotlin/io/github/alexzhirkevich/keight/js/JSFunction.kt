@@ -104,6 +104,15 @@ public open class JSFunction(
      * carry a `(file:line:col)` like V8, instead of an anonymous location-less
      * frame.
      */
+    /**
+     * V8-style inferred frame name for stack traces. Unlike [name] (which V8 only
+     * sets for lexical variable bindings and named function expressions), this is
+     * populated for *property* assignments (`obj.foo = fn`) where V8 keeps the
+     * `name` property empty but still shows `at obj.foo` in the stack. Set on the
+     * first assignment only (later re-assignments to other properties do not
+     * overwrite it), mirroring V8's first-wins behaviour.
+     */
+    inferredName : String? = null,
     public val sourceLocation : SourceLocation? = null,
     properties : MutableMap<JsAny?, JsAny?> = mutableMapOf(),
 ) : JsObjectImpl(name, properties), Callable, JsObject, Constructor {
@@ -114,6 +123,13 @@ public open class JSFunction(
     private var isMutableThisRef = !isArrow
     private var bindedArgs = emptyList<JsAny?>()
     internal var closure : ScriptRuntime? = null
+
+    /**
+     * V8-style inferred frame name for stack traces (see constructor param).
+     * `null` until a property assignment infers one; set once via [setInferredName].
+     */
+    internal var inferredName: String? = inferredName
+        private set
 
     init {
         properties.forEach {
@@ -176,6 +192,16 @@ public open class JSFunction(
         )
     }
 
+    /**
+     * Records a V8-style inferred frame name (see [inferredName]). First assignment
+     * wins: subsequent calls on an already-named function are ignored, matching V8
+     * where a function object assigned to two different properties keeps the name
+     * from the first binding.
+     */
+    internal fun setInferredName(name: String) {
+        if (inferredName == null) inferredName = name
+    }
+
     override suspend fun fallbackProto(runtime: ScriptRuntime): JsAny? {
        return runtime.findJsRoot().Function.get(PROTOTYPE, runtime)
     }
@@ -195,6 +221,7 @@ public open class JSFunction(
         superConstructor = superConstructor,
         prototype = prototype,
         sourceLocation = sourceLocation,
+        inferredName = inferredName,
     ).apply {
         closure = this@JSFunction.closure
     }

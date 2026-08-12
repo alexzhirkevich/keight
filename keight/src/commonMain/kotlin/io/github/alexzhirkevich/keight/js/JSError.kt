@@ -171,12 +171,12 @@ public open class JSError(
                 i += 1
             }
         } else if (lineNumber != null || columnNumber != null || fileName != null) {
-            // Fallback: single-frame stack trace from location fields
+            // Fallback: single-frame stack trace from location fields.
+            // V8 drops the <anonymous> token whenever a source location is present.
             if (fileName != null) {
-                sb.append("\n    at <anonymous> ($fileName")
+                sb.append("\n    at $fileName")
                 if (lineNumber != null) sb.append(":$lineNumber")
                 if (columnNumber != null) sb.append(":$columnNumber")
-                sb.append(")")
             } else {
                 sb.append("\n    at <anonymous>")
                 if (lineNumber != null) sb.append(":$lineNumber")

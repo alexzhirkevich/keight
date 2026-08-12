@@ -104,22 +104,29 @@ public data class CallFrame(
             return "    at $name (<native>)"
         }
         val prefix = if (isAsync) "async " else ""
-        val name = when {
-            functionName.isNullOrEmpty() -> "<anonymous>"
-            isConstructor -> "new $functionName"
-            else -> functionName
+        val hasLocation = fileName != null || lineNumber != null || columnNumber != null
+        // Resolve the displayed name.
+        // - named function      -> its name
+        // - anonymous ctor       -> "new <anonymous>" (V8 keeps the token for ctors)
+        // - anonymous w/ location -> V8 drops the name entirely (renders just the location)
+        // - anonymous w/o location -> "<anonymous>"
+        val rawName = when {
+            !functionName.isNullOrEmpty() -> functionName
+            isConstructor -> "<anonymous>"
+            hasLocation -> null
+            else -> "<anonymous>"
         }
-        return if (fileName != null || lineNumber != null) {
+        val name = if (isConstructor && rawName != null) "new $rawName" else (rawName ?: "")
+        return if (hasLocation) {
             val location = buildString {
-                append(" (")
                 if (fileName != null) append(fileName)
                 if (lineNumber != null) append(":$lineNumber")
                 if (columnNumber != null) append(":$columnNumber")
-                append(")")
             }
-            "    at $prefix$name$location"
+            if (name.isNotEmpty()) "    at $prefix$name ($location)"
+            else "    at $prefix$location"
         } else {
-            "    at $prefix$name"
+            "    at $prefix${name.ifEmpty { "<anonymous>" }}"
         }
     }
 }
