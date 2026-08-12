@@ -36,10 +36,11 @@ public abstract class Expression {
     /**
      * Attach source location and call stack to an error if it supports it.
      */
-    private fun attachErrorInfo(error: Throwable, runtime: ScriptRuntime) {
+    private suspend fun attachErrorInfo(error: Throwable, runtime: ScriptRuntime) {
         val loc = sourceLocation
         val hasLocation = loc != null
-        val hasCallStack = runtime.callStack.isNotEmpty()
+        val longStack = runtime.captureLongStack()
+        val hasCallStack = longStack.isNotEmpty()
         if (!hasLocation && !hasCallStack) return
         try {
             val attachable = error as? LocationAttachable ?: return
@@ -47,7 +48,7 @@ public abstract class Expression {
                 attachable.attachLocation(loc.line, loc.column, loc.fileName)
             }
             if (hasCallStack) {
-                attachable.attachCallStack(runtime.captureCallStack())
+                attachable.attachCallStack(longStack)
             }
         } catch (_: ClassCastException) {
             // Not a JS error, ignore
@@ -90,12 +91,19 @@ public data class CallFrame(
     public val columnNumber: Int?,
     public val isConstructor: Boolean = false,
     public val isNative: Boolean = false,
+    /**
+     * True for frames that belong to a parent asynchronous task (i.e. they were
+     * captured across an `await`/promise boundary). Mirrors V8's `async` stack
+     * frames, rendered as `at async <name> (...)`.
+     */
+    public val isAsync: Boolean = false,
 ) {
     public fun toStackString(): String {
         if (isNative) {
             val name = functionName ?: "unknown"
             return "    at $name (<native>)"
         }
+        val prefix = if (isAsync) "async " else ""
         val name = when {
             functionName.isNullOrEmpty() -> "<anonymous>"
             isConstructor -> "new $functionName"
@@ -109,9 +117,9 @@ public data class CallFrame(
                 if (columnNumber != null) append(":$columnNumber")
                 append(")")
             }
-            "    at $name$location"
+            "    at $prefix$name$location"
         } else {
-            "    at $name"
+            "    at $prefix$name"
         }
     }
 }

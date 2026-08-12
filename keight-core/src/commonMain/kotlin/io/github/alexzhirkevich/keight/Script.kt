@@ -3,9 +3,6 @@ package io.github.alexzhirkevich.keight
 import io.github.alexzhirkevich.keight.js.JsAny
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import kotlin.coroutines.cancellation.CancellationException
 
 public interface Script {
 

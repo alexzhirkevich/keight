@@ -4,6 +4,7 @@ import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.CallFrame
+import io.github.alexzhirkevich.keight.asyncFormStack
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.fastMap
@@ -13,7 +14,6 @@ import io.github.alexzhirkevich.keight.js.SyntaxError
 import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
 import io.github.alexzhirkevich.keight.js.js
-import kotlinx.coroutines.async
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.jvm.JvmInline
@@ -173,7 +173,7 @@ private suspend fun execKotlinFunction(
             function as Function1<Any?, Any?>
             when (args.size){
                 1 -> function.invoke(args[0]).jsAnyOrUndefined()
-                0 -> runtime.async {
+                0 -> runtime.asyncFormStack {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont).also {
                             if (it != SUSPENDED){
@@ -190,7 +190,7 @@ private suspend fun execKotlinFunction(
             function as Function2<Any?, Any?, Any?>
             when (args.size){
                 2 -> function.invoke(args[0], args[1]).jsAnyOrUndefined()
-                1 -> runtime.async {
+                1 -> runtime.asyncFormStack {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0]).also {
                             if (it != SUSPENDED){
@@ -207,7 +207,7 @@ private suspend fun execKotlinFunction(
             function as Function3<Any?, Any?, Any?, Any?>
             when (args.size){
                 3 -> function .invoke(args[0], args[1], args[2]).jsAnyOrUndefined()
-                2 -> runtime.async {
+                2 -> runtime.asyncFormStack {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1]).also {
                             if (it != SUSPENDED){
@@ -224,7 +224,7 @@ private suspend fun execKotlinFunction(
             function as Function4<Any?, Any?, Any?, Any?, Any?>
             when (args.size) {
                 4 -> function.invoke(args[0], args[1], args[2], args[3]).jsAnyOrUndefined()
-                3 -> runtime.async {
+                3 -> runtime.asyncFormStack {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1], args[2]).also {
                             if (it != SUSPENDED){
@@ -243,7 +243,7 @@ private suspend fun execKotlinFunction(
             when (args.size) {
                 5 -> function.invoke(args[0], args[1], args[2], args[3], args[4])
                     .jsAnyOrUndefined()
-                4 -> runtime.async {
+                4 -> runtime.asyncFormStack {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1], args[2], args[3]).also {
                             if (it != SUSPENDED){
@@ -262,7 +262,7 @@ private suspend fun execKotlinFunction(
             when (args.size) {
                 6 -> function.invoke(args[0], args[1], args[2], args[3], args[4], args[6])
                     .jsAnyOrUndefined()
-                5 -> runtime.async<Any?> {
+                5 -> runtime.asyncFormStack {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1], args[2], args[3], args[4]).also {
                             if (it != SUSPENDED){
@@ -280,7 +280,7 @@ private suspend fun execKotlinFunction(
             when (args.size) {
                 7 -> function.invoke(args[0], args[1], args[2], args[3], args[4], args[5], args[6])
                     .jsAnyOrUndefined()
-                6 -> runtime.async {
+                6 -> runtime.asyncFormStack {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1], args[2], args[3], args[4], args[5]).also {
                             if (it != SUSPENDED){
@@ -299,7 +299,7 @@ private suspend fun execKotlinFunction(
             when (args.size) {
                 8 -> function.invoke(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7])
                     .jsAnyOrUndefined()
-                7 -> runtime.async {
+                7 -> runtime.asyncFormStack {
                     suspendCancellableCoroutine { cont ->
                         function.invoke(cont, args[0], args[1], args[2], args[3], args[4], args[5], args[6]).also {
                             if (it != SUSPENDED){

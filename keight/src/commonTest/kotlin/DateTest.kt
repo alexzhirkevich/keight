@@ -217,7 +217,7 @@ class DateTest {
         val toISOString = "d.toISOString()".eval(it)
         assertTrue(toISOString is String, "toISOString should return string")
         assertTrue(
-            (toISOString as String).contains("2024"),
+            toISOString.contains("2024"),
             "toISOString should contain year: $toISOString"
         )
     }
@@ -228,7 +228,7 @@ class DateTest {
         val result = "d.toDateString()".eval(it)
         assertTrue(result is String, "toDateString should return string")
         assertTrue(
-            (result as String).isNotBlank(),
+            result.isNotBlank(),
             "toDateString should not be blank"
         )
     }
@@ -260,7 +260,7 @@ class DateTest {
         val result = "d.toLocaleString()".eval(it)
         assertTrue(result is String, "toLocaleString should return string")
         assertTrue(
-            (result as String).contains("2024"),
+            result.contains("2024"),
             "toLocaleString should contain year: $result"
         )
     }

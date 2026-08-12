@@ -7,7 +7,6 @@ import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.alexzhirkevich.keight.set
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.coroutines.EmptyCoroutineContext

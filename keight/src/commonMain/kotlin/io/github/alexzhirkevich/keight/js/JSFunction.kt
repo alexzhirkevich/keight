@@ -5,8 +5,10 @@ import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.LazyGetter
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.SourceLocation
 import io.github.alexzhirkevich.keight.Uninitialized
 import io.github.alexzhirkevich.keight.VariableType
+import io.github.alexzhirkevich.keight.asyncFormStack
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.Destruction
 import io.github.alexzhirkevich.keight.expressions.OpAssign
@@ -25,7 +27,6 @@ import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
 import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
-import kotlinx.coroutines.async
 import kotlin.collections.List
 import kotlin.collections.Map
 import kotlin.collections.MutableMap
@@ -96,6 +97,14 @@ public open class JSFunction(
     internal val prototype : JsObject? = JsObjectImpl(),
     // Store the parent prototype for super binding
     internal val superProto : JsAny? = null,
+    /**
+     * Source location of the function's declaration/definition (the `function`
+     * keyword, the arrow, or the method name). Used to render stack frames for
+     * programmatically-invoked callbacks (e.g. Promise `.then` handlers) so they
+     * carry a `(file:line:col)` like V8, instead of an anonymous location-less
+     * frame.
+     */
+    public val sourceLocation : SourceLocation? = null,
     properties : MutableMap<JsAny?, JsAny?> = mutableMapOf(),
 ) : JsObjectImpl(name, properties), Callable, JsObject, Constructor {
 
@@ -185,6 +194,7 @@ public open class JSFunction(
         isAsync = isAsync,
         superConstructor = superConstructor,
         prototype = prototype,
+        sourceLocation = sourceLocation,
     ).apply {
         closure = this@JSFunction.closure
     }
@@ -298,7 +308,7 @@ public open class JSFunction(
         }
 
         return if (isAsync){
-            invokeRuntime.async { doInvoke() }.js
+            invokeRuntime.asyncFormStack { doInvoke() }.js
         } else {
             doInvoke()
         }

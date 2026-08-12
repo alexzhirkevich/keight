@@ -823,10 +823,10 @@ private fun ListIterator<LocatedToken>.parseFactor(
                 if (isPropertyName) {
                     OpGetProperty(next.identifier, receiver = null).at(loc)
                 } else {
-                    parseKeyword(next, blockContext)
+                    parseKeyword(next, blockContext, loc)
                 }
             } else {
-                parseKeyword(next, blockContext)
+                parseKeyword(next, blockContext, loc)
             }
         }
         is Token.Identifier.Reserved -> throw SyntaxError("Unexpected reserved word (${next.identifier})")
@@ -1002,7 +1002,11 @@ private fun getMergeForAssignment(operator: Token.Operator.Assign): (suspend Scr
     }
 }
 
-private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Keyword, blockContext: List<BlockContext>): Expression {
+private fun ListIterator<LocatedToken>.parseKeyword(
+    keyword: Token.Identifier.Keyword,
+    blockContext: List<BlockContext>,
+    fnLoc: SourceLocation? = null,
+): Expression {
     return when(keyword){
         Token.Identifier.Keyword.Var,
         Token.Identifier.Keyword.Let,
@@ -1077,7 +1081,12 @@ private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Ke
                 expressible = true
             )
         }
-        Token.Identifier.Keyword.Function -> OpFunctionInit(parseFunction(blockContext = blockContext))
+        Token.Identifier.Keyword.Function -> OpFunctionInit(
+            parseFunction(
+                blockContext = blockContext,
+                fnLoc = fnLoc
+            )
+        )
         Token.Identifier.Keyword.Return -> {
             syntaxCheck(BlockContext.Function in blockContext) {
                 unexpected("return")
@@ -1245,7 +1254,14 @@ private fun ListIterator<LocatedToken>.parseNew(loc: SourceLocation?) : Expressi
                         result.attachLocation(adjustedLine, loc.column, loc.fileName)
                     }
                     if (result is JSError) {
-                        result.callStackFrames = it.captureCallStack()
+                        val frames = it.captureLongStack()
+                        // Drop the constructor's own call frame so the top stack
+                        // frame is the *enclosing* function at the construction
+                        // site, matching V8 (where `new Error` does not add a
+                        // separate frame — the deepest frame is e.g. `at l3`).
+                        result.callStackFrames =
+                            if (frames.lastOrNull()?.isConstructor == true) frames.dropLast(1)
+                            else frames
                     }
                 }
             } finally {
@@ -1280,7 +1296,14 @@ private fun ListIterator<LocatedToken>.parseNew(loc: SourceLocation?) : Expressi
                         result.attachLocation(adjustedLine, loc.column, loc.fileName)
                     }
                     if (result is JSError) {
-                        result.callStackFrames = it.captureCallStack()
+                        val frames = it.captureLongStack()
+                        // Drop the constructor's own call frame so the top stack
+                        // frame is the *enclosing* function at the construction
+                        // site, matching V8 (where `new Error` does not add a
+                        // separate frame — the deepest frame is e.g. `at l3`).
+                        result.callStackFrames =
+                            if (frames.lastOrNull()?.isConstructor == true) frames.dropLast(1)
+                            else frames
                     }
                 }
             } finally {
@@ -1535,19 +1558,22 @@ private fun ListIterator<LocatedToken>.parseMethodBody(
     blockContext: List<BlockContext>
 ) : JSFunction {
     // At this point, we just need to parse the { body }
+    // Capture the method's declaration location (its name) for stack frames.
+    val fnLoc = nextSignificantLocation()
     val body = parseBlock(
         scoped = false,
         blockContext = blockContext + BlockContext.Function,
         type = ExpectedBlockType.Block
     ) as OpBlock
-    
+
     // Convert arguments expressions to function parameters
     val params = arguments.map { it.toFunctionParam() }
-    
+
     return JSFunction(
         name = name,
         parameters = params,
-        body = body
+        body = body,
+        sourceLocation = fnLoc
     )
 }
 
@@ -1883,6 +1909,8 @@ private fun ListIterator<LocatedToken>.parseAsync(blockContext: List<BlockContex
     
     if (isInObjectContext && nextIsInstance<Token.Identifier.Property>()) {
         // This is async method shorthand: { async method() {} }
+        // Capture the method's declaration location (its name) for stack frames.
+        val fnLoc = nextSignificantLocation()
         val methodName = (nextSignificant() as Token.Identifier.Property).identifier
         // Parse the function parameters and body
         val touple = parseStatement(blockType = ExpectedBlockType.None)
@@ -1901,7 +1929,8 @@ private fun ListIterator<LocatedToken>.parseAsync(blockContext: List<BlockContex
             name = methodName,
             parameters = args,
             body = block,
-            isAsync = true
+            isAsync = true,
+            sourceLocation = fnLoc
         )
         
         return OpColonAssignment(
@@ -1994,6 +2023,9 @@ private fun ListIterator<LocatedToken>.parseArrowFunction(blockContext: List<Blo
     // unconditionally leaves `() => { if (...) ... }` untouched.
     checkExpressionStart()
 
+    // Capture the arrow function's location (its body start) for stack frames.
+    val fnLoc = nextSignificantLocation()
+
     val lambda = parseBlock(
         type = ExpectedBlockType.Block,
         blockContext = blockContext + BlockContext.Function,
@@ -2008,14 +2040,23 @@ private fun ListIterator<LocatedToken>.parseArrowFunction(blockContext: List<Blo
         name = "",
         parameters = fArgs,
         body = lambda.copy(isExpressible = !lambda.isSurroundedWithBraces),
-        isArrow = true
+        isArrow = true,
+        sourceLocation = fnLoc
     )
 }
 
 private fun ListIterator<LocatedToken>.parseFunction(
     name: String? = null,
-    blockContext: List<BlockContext>
+    blockContext: List<BlockContext>,
+    fnLoc: SourceLocation? = null,
 ) : JSFunction {
+
+    // Use the explicitly provided declaration location (captured at the
+    // `function` keyword by the caller) when available; otherwise peek the next
+    // significant token (used for arrow / method / async expressions where the
+    // keyword isn't in hand). This location drives the (file:line:col) shown on
+    // programmatically-invoked callback stack frames.
+    val effectiveLoc = fnLoc ?: nextSignificantLocation()
 
     val actualName = name ?: run {
         if (nextIsInstance<Token.Identifier.Property>()) {
@@ -2044,7 +2085,8 @@ private fun ListIterator<LocatedToken>.parseFunction(
     return JSFunction(
         name = actualName,
         parameters = args,
-        body = block
+        body = block,
+        sourceLocation = effectiveLoc
     )
 }
 

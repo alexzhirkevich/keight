@@ -5,6 +5,13 @@ import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.ScriptRuntime
 
+/**
+ * Names of the `Promise.prototype` methods that schedule a continuation
+ * callback. Their call frame (captured at the `.<method>(...)` call site) is
+ * merged with the handler callback frame during stack rendering.
+ */
+private val PROMISE_METHODS = setOf("then", "catch", "finally")
+
 public open class JSError(
     private val msg : Any?,
     private val name : String = "Error",
@@ -132,9 +139,36 @@ public open class JSError(
 
             sb.append("\n")
             sb.append(firstLine.toStackString())
-            for (i in 1 until reversed.size) {
+
+            // A Promise `.then`/`.catch`/`.finally` continuation is modelled as
+            // two captured frames: the method call frame (at the `.then(...)` call
+            // site) followed by the handler callback frame (at the handler's
+            // *definition*). V8 collapses these into a single
+            // `at async <handler> (call-site)` frame, so we merge them: keep the
+            // handler's name but use the method call's (suspension) location.
+            var i = 1
+            while (i < reversed.size) {
+                val f = reversed[i]
+                if (f.functionName in PROMISE_METHODS && f.isAsync && i + 1 < reversed.size) {
+                    val cb = reversed[i + 1]
+                    if (cb.functionName != null && cb.functionName !in PROMISE_METHODS) {
+                        sb.append("\n")
+                        sb.append(
+                            CallFrame(
+                                functionName = cb.functionName,
+                                fileName = f.fileName,
+                                lineNumber = f.lineNumber,
+                                columnNumber = f.columnNumber,
+                                isAsync = true
+                            ).toStackString()
+                        )
+                        i += 2
+                        continue
+                    }
+                }
                 sb.append("\n")
-                sb.append(reversed[i].toStackString())
+                sb.append(f.toStackString())
+                i += 1
             }
         } else if (lineNumber != null || columnNumber != null || fileName != null) {
             // Fallback: single-frame stack trace from location fields

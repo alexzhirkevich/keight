@@ -340,7 +340,11 @@ class SourceLocationTest {
         val s = result.toString()
         assertTrue("stack should contain 'a'" ) { s.contains("a") }
         assertTrue("stack should contain 'b'" ) { s.contains("b") }
-        assertTrue("stack should contain 'new Error'" ) { s.contains("new Error") }
+        // V8 does not render the `new Error` constructor as a separate frame; the
+        // deepest frame is the enclosing function (`b`) at the construction site.
+        assertTrue("deepest frame should be the enclosing function 'b'") {
+            s.contains("at b")
+        }
     }
 
     @Test
