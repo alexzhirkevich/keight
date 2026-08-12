@@ -1,5 +1,7 @@
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 /**
  * Tests for inline `;`-terminated statements immediately followed by a continuation
@@ -100,5 +102,69 @@ class TryDoInlineTest {
     fun try_catch_semicolon_does_not_swallow_following() = runTest {
         "var r=0; try { r=1; } catch(e) {}; r=2; r".eval().assertEqualsTo(2L)
         "var r=0; try { r=1; } finally {}; r=2; r".eval().assertEqualsTo(2L)
+    }
+
+    // --- ASI after block statements (V8 alignment) -------------------------
+    //
+    // A statement that ends with a block-closing '}' may be immediately followed by
+    // another statement on the same line without an explicit separator: ECMAScript
+    // inserts an implicit ';' (ASI rule #2). keight previously required a literal
+    // ';' or newline between them and rejected `} stmt`. These cases must parse and
+    // run like V8.
+
+    // try/catch block followed (same line, no ';') by another statement.
+    @Test
+    fun try_catch_block_followed_by_statement_asi() = runTest {
+        "var e; try { throw 1; } catch(err){ e = err; } e".eval().assertEqualsTo(1L)
+    }
+
+    // try/catch whose body throws, then `e.stack` is read (the original report).
+    @Test
+    fun try_catch_block_followed_by_stack_read_asi() = runTest {
+        val stack = "let e; try { throw new Error('x'); } catch(err){ e = err; } e.stack"
+            .eval().toString()
+        assertTrue(stack.contains("Error: x"), "expected stack to mention the error, got: $stack")
+    }
+
+    // if-block followed by a statement without separator.
+    @Test
+    fun if_block_followed_by_statement_asi() = runTest {
+        "if (1) { 2; } 3".eval().assertEqualsTo(3L)
+    }
+
+    // while/for/do blocks followed by a statement without separator.
+    @Test
+    fun loop_block_followed_by_statement_asi() = runTest {
+        "while (0) { 1; } 5".eval().assertEqualsTo(5L)
+        "for (;;) { break; } 7".eval().assertEqualsTo(7L)
+        "do { 1; } while (false) 9".eval().assertEqualsTo(9L)
+    }
+
+    // Nested blocks: the ASI boundary applies at every level.
+    @Test
+    fun nested_block_followed_by_statement_asi() = runTest {
+        "try { if (1) { 2; } 3; } catch(e) { 4; } 6".eval().assertEqualsTo(6L)
+    }
+
+    // ASI must NOT apply inside object literals: members are comma-separated, so
+    // `{ a(){} b(){} }` stays a SyntaxError (matching V8).
+    @Test
+    fun object_literal_members_still_require_comma() = runTest {
+        assertFailsWith<Throwable> {
+            "const o = { a(){} b(){} };".eval()
+        }
+    }
+
+    // ASI must NOT turn two adjacent *expression statements* into separate
+    // statements: only block/control statements ending in '}' or a control ')'
+    // (e.g. do/while) permit a following statement without a separator. These all
+    // stay SyntaxErrors, matching V8.
+    @Test
+    fun expression_statement_adjacency_still_errors() = runTest {
+        for (src in listOf("a b", "1 2", "a() b()", "(1) 2", "x = 1 y = 2")) {
+            assertFailsWith<Throwable>("expected '$src' to be a SyntaxError") {
+                src.eval()
+            }
+        }
     }
 }

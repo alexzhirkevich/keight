@@ -2314,6 +2314,11 @@ private fun ListIterator<LocatedToken>.parseBlock(
                     blockType = ExpectedBlockType.None,
                     isBlockAnchor = true
                 )
+                // Index of the first token *after* this statement. Used below to
+                // detect ASI: if the previous statement ended with a block-closing
+                // '}' and the next token is not an explicit separator, ECMAScript
+                // inserts an implicit ';' (ASI rule #2).
+                val afterStmtIndex = nextIndex()
 
                 // hoisted
                 when (expr) {
@@ -2411,7 +2416,52 @@ private fun ListIterator<LocatedToken>.parseBlock(
                     }
                     hasSeparator = true
                 }
-                syntaxCheck(hasSeparator || expr is OpCase || nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
+                // ASI (automatic semicolon insertion), rule #2: when a statement is
+                // not followed by an explicit separator (';', newline or ',') but the
+                // previous significant token was a block-closing '}', ECMAScript
+                // inserts an implicit ';'. This lets constructs such as
+                // `try { } catch { } nextStmt` (written on one line, without ';')
+                // parse, matching V8.
+                //
+                // Restricted to statement-level contexts: object literals and class
+                // bodies separate members with commas, not ASI, so a '}' there must
+                // NOT start a fresh statement (e.g. `{ a(){} b(){} }` stays a syntax
+                // error, as in V8).
+                val asiAfterBlock = !hasSeparator && hasNext() &&
+                    BlockContext.Object !in context &&
+                    BlockContext.Class !in context &&
+                    run {
+                        var ok = false
+                        if (afterStmtIndex > 0) {
+                            // Rewind to just before the next statement, step back over
+                            // any newlines to the last token of the previous statement,
+                            // then restore the iterator to afterStmtIndex.
+                            while (nextIndex() > afterStmtIndex) previous()
+                            if (hasPrevious()) {
+                                var lt = previous()
+                                while (lt.token is Token.NewLine && hasPrevious()) {
+                                    lt = previous()
+                                }
+                                // ASI rule #2: insert an implicit ';' before the next
+                                // token when it is preceded by a block-closing '}' (any
+                                // statement) or a ')' belonging to a control statement
+                                // such as `do/while` (whose body is not a block).
+                                // Expression statements (`a b`, `1 2`, `a() b()`,
+                                // `(1) 2`, `x = 1 y = 2`) stay SyntaxErrors, matching V8.
+                                ok = when (lt.token) {
+                                    is Token.Operator.Bracket.CurlyClose -> true
+                                    is Token.Operator.Bracket.RoundClose -> expr is OpDoWhileLoop
+                                    else -> false
+                                }
+                            }
+                            while (nextIndex() < afterStmtIndex) next()
+                        }
+                        ok
+                    }
+                syntaxCheck(
+                    hasSeparator || asiAfterBlock || expr is OpCase ||
+                        nextIsInstance<Token.Operator.Bracket.CurlyClose>()
+                ) {
                     unexpected(next().token::class.simpleName.orEmpty())
                 }
             }
