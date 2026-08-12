@@ -32,8 +32,8 @@ class AsyncStackTraceScenariosTest {
         // The error is created before `.catch` attaches, so rethrowing it keeps
         // the original stack (V8 behaviour) -> deepest frame is the creation site.
         assertTrue("stack should trace back to the scheduling function 'a'") { s.contains("at a") }
-        assertTrue("deepest frame should be at the Error creation site (:1:15)") {
-            s.contains("at a (:1:15)")
+        assertTrue("deepest frame should be at the Error creation site (:1:38)") {
+            s.contains("at a (:1:38)")
         }
     }
 
@@ -47,8 +47,8 @@ class AsyncStackTraceScenariosTest {
         """.trimIndent().eval()
         val s = result.toString()
         assertTrue("stack should contain the message 'x'") { s.contains("x") }
-        assertTrue("deepest frame should be at the Error creation site (:1:15)") {
-            s.contains("at a (:1:15)")
+        assertTrue("deepest frame should be at the Error creation site (:1:38)") {
+            s.contains("at a (:1:38)")
         }
     }
 
@@ -62,8 +62,8 @@ class AsyncStackTraceScenariosTest {
         """.trimIndent().eval()
         val s = result.toString()
         assertTrue("stack should contain the message 'rej'") { s.contains("rej") }
-        assertTrue("deepest frame should be at the Error creation site (:1:14)") {
-            s.contains("at a (:1:14)")
+        assertTrue("deepest frame should be at the Error creation site (:1:37)") {
+            s.contains("at a (:1:37)")
         }
     }
 
@@ -82,8 +82,8 @@ class AsyncStackTraceScenariosTest {
         assertTrue("stack should contain the message 'fin'") { s.contains("fin") }
         assertTrue("stack should contain the throwing finally handler 'b'") { s.contains("at b") }
         assertTrue("stack should trace back across the async boundary ('async')") { s.contains("async") }
-        assertTrue("throwing finally handler frame should be at (:2:11)") { s.contains("at b (:2:11)") }
-        assertTrue("scheduling frame should be 'at async a' at (:1:18)") { s.contains("at async a (:1:18)") }
+        assertTrue("throwing finally handler frame should be at (:2:22)") { s.contains("at b (:2:22)") }
+        assertTrue("scheduling frame should be 'at async a' at (:1:42)") { s.contains("at async a (:1:42)") }
     }
 
     // ========== Real async/await chains ==========
@@ -103,9 +103,9 @@ class AsyncStackTraceScenariosTest {
         assertTrue("stack should contain 'c'") { s.contains("at c") }
         assertTrue("stack should contain 'b'") { s.contains("at async b") }
         assertTrue("stack should contain 'a'") { s.contains("at async a") }
-        assertTrue("throw site frame should be at (:3:13)") { s.contains("at c (:3:13)") }
-        assertTrue("await b() frame should be at (:1:13)") { s.contains("at async b (:1:13)") }
-        assertTrue("await a() frame should be at (:5:7)") { s.contains("at async a (:5:7)") }
+        assertTrue("throw site frame should be at (:3:28)") { s.contains("at c (:3:28)") }
+        assertTrue("await b() frame should be at (:1:28)") { s.contains("at async b (:1:28)") }
+        assertTrue("await a() frame should be at (:5:13)") { s.contains("at async a (:5:13)") }
     }
 
     @Test
@@ -119,8 +119,8 @@ class AsyncStackTraceScenariosTest {
         val s = result.toString()
         assertTrue("stack should contain the message 'r'") { s.contains("r") }
         assertTrue("stack should trace back to 'a'") { s.contains("at a") }
-        assertTrue("deepest frame should be at the Error creation site (:1:17)") {
-            s.contains("at a (:1:17)")
+        assertTrue("deepest frame should be at the Error creation site (:1:43)") {
+            s.contains("at a (:1:43)")
         }
     }
 
@@ -135,7 +135,7 @@ class AsyncStackTraceScenariosTest {
         val s = result.toString()
         assertTrue("stack should contain the message 'asy'") { s.contains("asy") }
         assertTrue("stack should contain 'a'") { s.contains("at a") }
-        assertTrue("throw site frame should be at (:1:13)") { s.contains("at a (:1:13)") }
+        assertTrue("throw site frame should be at (:1:28)") { s.contains("at a (:1:28)") }
     }
 
     @Test
@@ -149,7 +149,7 @@ class AsyncStackTraceScenariosTest {
         val s = result.toString()
         assertTrue("stack should contain the message 'tl'") { s.contains("tl") }
         assertTrue("stack should contain 'main'") { s.contains("at main") }
-        assertTrue("throw site frame should be at (:1:12)") { s.contains("at main (:1:12)") }
+        assertTrue("throw site frame should be at (:1:30)") { s.contains("at main (:1:30)") }
     }
 
     @Test
@@ -170,8 +170,8 @@ class AsyncStackTraceScenariosTest {
             s.contains("at e") && s.contains("at async d") && s.contains("at async c") &&
                 s.contains("at async b") && s.contains("at async a")
         }
-        assertTrue("throw site frame should be 'at e' at (:5:12)") { s.contains("at e (:5:12)") }
-        assertTrue("await a() frame should be at (:7:7)") { s.contains("at async a (:7:7)") }
+        assertTrue("throw site frame should be 'at e' at (:5:27)") { s.contains("at e (:5:27)") }
+        assertTrue("await a() frame should be at (:7:13)") { s.contains("at async a (:7:13)") }
     }
 
     // ========== .then callbacks ==========
@@ -189,8 +189,8 @@ class AsyncStackTraceScenariosTest {
         // Arrow callbacks are anonymous -> the throwing frame shows <anonymous>.
         assertTrue("stack should contain the anonymous arrow frame") { s.contains("<anonymous>") }
         assertTrue("stack should trace back across the async boundary ('async')") { s.contains("async") }
-        assertTrue("anonymous throwing frame should be at (:1:28)") { s.contains("at <anonymous> (:1:28)") }
-        assertTrue("scheduling frame should be 'at async a' at (:1:17)") { s.contains("at async a (:1:17)") }
+        assertTrue("anonymous throwing frame should be at (:1:67)") { s.contains("at <anonymous> (:1:67)") }
+        assertTrue("scheduling frame should be 'at async a' at (:1:41)") { s.contains("at async a (:1:41)") }
     }
 
     @Test
@@ -205,8 +205,8 @@ class AsyncStackTraceScenariosTest {
         assertTrue("stack should contain the message 'arrow'") { s.contains("arrow") }
         assertTrue("stack should contain the anonymous arrow frame") { s.contains("<anonymous>") }
         assertTrue("stack should trace back across the async boundary ('async')") { s.contains("async") }
-        assertTrue("anonymous throwing frame should be at (:1:28)") { s.contains("at <anonymous> (:1:28)") }
-        assertTrue("scheduling frame should be 'at async a' at (:1:17)") { s.contains("at async a (:1:17)") }
+        assertTrue("anonymous throwing frame should be at (:1:60)") { s.contains("at <anonymous> (:1:60)") }
+        assertTrue("scheduling frame should be 'at async a' at (:1:41)") { s.contains("at async a (:1:41)") }
     }
 
     @Test
@@ -224,8 +224,8 @@ class AsyncStackTraceScenariosTest {
         assertTrue("stack should contain the message 'mid'") { s.contains("mid") }
         assertTrue("stack should contain the throwing handler 'c'") { s.contains("at c") }
         assertTrue("stack should contain the scheduling function 'a'") { s.contains("at async a") }
-        assertTrue("throw site frame should be at (:3:10)") { s.contains("at c (:3:10)") }
-        assertTrue("scheduling frame should be 'at async a' at (:1:21)") { s.contains("at async a (:1:21)") }
+        assertTrue("throw site frame should be at (:3:21)") { s.contains("at c (:3:21)") }
+        assertTrue("scheduling frame should be 'at async a' at (:1:48)") { s.contains("at async a (:1:48)") }
     }
 
     // ========== Mixed sync + async ==========
@@ -245,8 +245,8 @@ class AsyncStackTraceScenariosTest {
         assertTrue("stack should contain 'c'") { s.contains("at c") }
         assertTrue("stack should contain 'b'") { s.contains("at async b") }
         assertTrue("stack should contain 'a'") { s.contains("at async a") }
-        assertTrue("throw site frame should be at (:3:11)") { s.contains("at c (:3:11)") }
-        assertTrue("scheduling frame should be 'at async a' at (:5:7)") { s.contains("at async a (:5:7)") }
+        assertTrue("throw site frame should be at (:3:22)") { s.contains("at c (:3:22)") }
+        assertTrue("scheduling frame should be 'at async a' at (:5:13)") { s.contains("at async a (:5:13)") }
     }
 
     // ========== new Promise executor ==========
@@ -263,8 +263,8 @@ class AsyncStackTraceScenariosTest {
         assertTrue("stack should contain the message 'exec'") { s.contains("exec") }
         assertTrue("stack should contain the 'new Promise' executor frame") { s.contains("new Promise") }
         assertTrue("stack should trace back across the async boundary ('async')") { s.contains("async") }
-        assertTrue("executor frame should be at (:1:28)") { s.contains("at new Promise (:1:28)") }
-        assertTrue("await a() frame should be at (:3:7)") { s.contains("at async a (:3:7)") }
+        assertTrue("executor frame should be at (:1:57)") { s.contains("at new Promise (:1:57)") }
+        assertTrue("await a() frame should be at (:3:13)") { s.contains("at async a (:3:13)") }
     }
 
     // ========== Promise.all ==========
@@ -312,8 +312,8 @@ class AsyncStackTraceScenariosTest {
         assertTrue("stack should trace back to the scheduling function 'a'") { s.contains("at a") }
         // The rejection reason is created synchronously inside `a`, so the deepest
         // frame is the Error creation site at the `new Error` call.
-        assertTrue("deepest frame should be the Error creation site 'at a (:1:29)'") {
-            s.contains("at a (:1:29)")
+        assertTrue("deepest frame should be the Error creation site 'at a (:1:75)'") {
+            s.contains("at a (:1:75)")
         }
     }
 }

@@ -674,6 +674,7 @@ private fun ListIterator<LocatedToken>.parseFactor(
 ): Expression {
     val loc = nextSignificantLocation()
     val expr =  when (val next = nextSignificant()) {
+        is Token.Operator.New -> parseNew(loc)
         is Token.Str -> OpConstant(next.value.js).at(loc)
         is Token.Regex -> OpConstant(next.value.toJsRegex()).at(loc)
         is Token.TemplateString -> {

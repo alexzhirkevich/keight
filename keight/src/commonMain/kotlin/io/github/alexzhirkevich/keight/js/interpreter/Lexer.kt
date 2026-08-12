@@ -4,10 +4,55 @@ import io.github.alexzhirkevich.keight.SourceLocation
 import io.github.alexzhirkevich.keight.js.SyntaxError
 
 
+/**
+ * A [ListIterator] decorator that tracks the current 1-based source line and
+ * column as characters are consumed. Every [next] advances the position and
+ * every [previous] rewinds it, so multi-character tokens (identifiers, numbers,
+ * strings, comments, template literals, regexes) that consume several
+ * characters advance the column for *each* character — not just the first.
+ *
+ * This keeps [SourceLocation] column numbers consistent with engines like V8,
+ * which count every source character (e.g. `return new Error` reports the
+ * `new` keyword column, not the `return` keyword column).
+ */
+private class CharStream(
+    private val delegate: ListIterator<Char>
+) : ListIterator<Char> by delegate {
+    var line = 1
+        private set
+    var column = 1
+        private set
+
+    override fun next(): Char {
+        val c = delegate.next()
+        if (c.code in LSEP) {
+            line++
+            column = 1
+        } else {
+            column++
+        }
+        return c
+    }
+
+    override fun previous(): Char {
+        val c = delegate.previous()
+        // Put-backs in the sub-lexers always re-read a single non-newline char,
+        // so a simple rewind is sufficient here.
+        if (c.code in LSEP) {
+            if (line > 1) line--
+            column = 1
+        } else {
+            column = maxOf(1, column - 1)
+        }
+        return c
+    }
+}
+
 internal fun String.tokenize(
     ignoreWhitespaces: Boolean =  true
 ) : List<LocatedToken> = toList()
     .listIterator()
+    .let { CharStream(it) }
     .tokenizeImpl(
         untilEndOfBlock = false,
         ignoreWhitespaces = ignoreWhitespaces
@@ -22,27 +67,17 @@ internal fun String.tokenizeRaw(
     ignoreWhitespaces: Boolean = true
 ) : List<Token> = toList()
     .listIterator()
+    .let { CharStream(it) }
     .tokenizeRawImpl(
         untilEndOfBlock = false,
         ignoreWhitespaces = ignoreWhitespaces
     )
 
-private fun ListIterator<Char>.tokenizeImpl(
+private fun CharStream.tokenizeImpl(
     untilEndOfBlock : Boolean,
     ignoreWhitespaces : Boolean = false
 ) : List<LocatedToken> {
     val result = mutableListOf<LocatedToken>()
-    var line = 1
-    var column = 1
-
-    fun advancePosition(c: Char) {
-        if (c.code in LSEP) {
-            line++
-            column = 1
-        } else {
-            column++
-        }
-    }
 
     try {
         var blockStack = 0
@@ -51,7 +86,6 @@ private fun ListIterator<Char>.tokenizeImpl(
             val startLine = line
             val startColumn = column
             val c = next()
-            advancePosition(c)
 
             val token = when (c) {
                 '=' -> assign()
