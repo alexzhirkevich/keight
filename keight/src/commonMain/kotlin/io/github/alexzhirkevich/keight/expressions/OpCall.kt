@@ -56,7 +56,7 @@ internal class OpCall(
         // (which already carry their reference name in `inferredName`) are left
         // untouched, so a bare `const f = () => {}; f()` stays `at f`.
         val explicitName = fn?.let { it.name.takeIf { n -> n.isNotEmpty() } ?: it.inferredName }
-        val funcName = if (explicitName != null && fn?.inferredName == null && receiver != null) {
+        val funcName = if (explicitName != null && fn.inferredName == null && receiver != null) {
             methodPrefix(thisRef, runtime)?.let { "$it.$explicitName" } ?: explicitName
         } else explicitName
         val frame = CallFrame(
