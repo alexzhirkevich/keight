@@ -48,6 +48,14 @@ internal sealed interface Token {
 
     object NewLine : Token
 
+    /**
+     * Sentinel returned by [nextSignificant] (and friends) when the token stream is
+     * exhausted. Previously the parser relied on the engine always wrapping scripts in
+     * a trailing `}`, so EOF was never reached during statement parsing; now that the
+     * wrap is gone, EOF must be a first-class token instead of an exception.
+     */
+    object EndOfFile : Token
+
     sealed interface Operator : Token {
 
         object Comma : Operator

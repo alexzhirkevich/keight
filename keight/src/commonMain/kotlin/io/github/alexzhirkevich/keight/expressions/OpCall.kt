@@ -62,7 +62,7 @@ internal class OpCall(
         val frame = CallFrame(
             functionName = funcName,
             fileName = loc?.fileName,
-            lineNumber = loc?.line?.let { maxOf(1, it - 1) },
+            lineNumber = loc?.line,
             columnNumber = loc?.column
         )
         runtime.pushCallFrame(frame)
@@ -138,7 +138,7 @@ internal fun OpCall(
                     val frame = CallFrame(
                         functionName = funcName,
                         fileName = loc?.fileName,
-                        lineNumber = loc?.line?.let { maxOf(1, it - 1) },
+                        lineNumber = loc?.line,
                         columnNumber = loc?.column
                     )
                     runtime.pushCallFrame(frame)

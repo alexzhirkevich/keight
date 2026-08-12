@@ -20,8 +20,7 @@ public open class JSEngine<out R : JSRuntime>(
 ) : ScriptEngine<R> {
 
     override fun compile(script: String, name: String?): Script {
-        val tokens = "{\n$script\n}".tokenize()
-        val expression = tokens.parse(name)
+        val expression = script.tokenize().parse(name)
 
         return if (name == null) {
             JSScript(runtime, expression, name)

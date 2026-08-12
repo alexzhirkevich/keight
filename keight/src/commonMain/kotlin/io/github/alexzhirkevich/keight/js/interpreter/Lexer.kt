@@ -721,10 +721,19 @@ internal fun ListIterator<Char>.number(start : Char) : Token.Num {
         ((ch == '-'  || ch == '+') && value.lastOrNull() == 'e')
     )
 
-    previous()
+    // Only unconsume the peeked char when we actually advanced past it via next().
+    // When ch == null the loop hit EOF without calling next() (the last digit was
+    // already consumed by the caller's next()), so calling previous() here would
+    // rewind that digit and make the main tokenize loop re-read it forever (OOM).
+    // This was previously masked because JSEngine.compile wrapped scripts in
+    // "{\n$script\n}", so a number was never the very last character.
+    if (ch != null) previous()
 
     return try {
         if (value.endsWith('.')) {
+            // The trailing '.' was consumed via next() (either as ch above when the
+            // peek found more input, or — at EOF — as the last appended char). Hand it
+            // back so the main loop treats it as a member-access operator.
             previous()
             isFloat = false
         }
