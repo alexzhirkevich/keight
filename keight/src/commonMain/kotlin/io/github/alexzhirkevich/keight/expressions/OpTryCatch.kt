@@ -40,46 +40,58 @@ internal fun OpTryCatch(
     else -> throw SyntaxError("Missing catch or finally after try")
 }
 
+// Issue #23: the completion value of a try statement is the value of the try block, or of the
+// catch block when the try block threw. `parseBlock` marks both as non-expressible, so they are
+// made expressible at construction time below. The finally block never contributes a value
+// unless it completes abruptly - which Kotlin's `finally` already models.
 private fun TryCatchFinally(
     tryBlock : Expression,
     catchVariableName : String?,
     catchBlock : Expression,
     finallyBlock : Expression? = null,
-) = Expression { r ->
-    try {
-        tryBlock(r)
-    } catch (x: ScopeException) {
-        throw x
-    } catch (t: Throwable) {
-        val t = when  {
-            t is ReferenceError && t.get(CONSTRUCTOR, r) !== (r.findJsRoot()).ReferenceError ->
-                r.makeReferenceError { t.message.orEmpty().js  }
-            t is TypeError && t.get(CONSTRUCTOR, r) !== (r.findJsRoot()).TypeError ->
-                r.makeTypeError { t.message.orEmpty().js  }
-            else -> t
-        }
-        if (catchVariableName != null) {
-            val throwable = if (t is ThrowableValue) t.value else t.js
-            r.withScope {
-                it.set(catchVariableName.js, throwable, VariableType.Local)
-                catchBlock.invoke(it)
+) : Expression {
+    val tryBlockE = tryBlock.asExpressible()
+    val catchBlockE = catchBlock.asExpressible()
+    return Expression { r ->
+        try {
+            tryBlockE.invoke(r)
+        } catch (x: ScopeException) {
+            throw x
+        } catch (t: Throwable) {
+            val t = when  {
+                t is ReferenceError && t.get(CONSTRUCTOR, r) !== (r.findJsRoot()).ReferenceError ->
+                    r.makeReferenceError { t.message.orEmpty().js  }
+                t is TypeError && t.get(CONSTRUCTOR, r) !== (r.findJsRoot()).TypeError ->
+                    r.makeTypeError { t.message.orEmpty().js  }
+                else -> t
             }
-        } else {
-            catchBlock(r)
+            if (catchVariableName != null) {
+                val throwable = if (t is ThrowableValue) t.value else t.js
+                r.withScope {
+                    it.set(catchVariableName.js, throwable, VariableType.Local)
+                    catchBlockE.invoke(it)
+                }
+            } else {
+                catchBlockE.invoke(r)
+            }
+        } finally {
+            finallyBlock?.invoke(r)
         }
-    } finally {
-        finallyBlock?.invoke(r)
     }
 }
 
 
+// Issue #23: see TryCatchFinally - the finally block's value is discarded.
 private fun TryFinally(
     tryBlock : Expression,
     finallyBlock : Expression,
-) = Expression {
-    try {
-        tryBlock(it)
-    } finally {
-        finallyBlock(it)
+) : Expression {
+    val tryBlockE = tryBlock.asExpressible()
+    return Expression {
+        try {
+            tryBlockE.invoke(it)
+        } finally {
+            finallyBlock(it)
+        }
     }
 }

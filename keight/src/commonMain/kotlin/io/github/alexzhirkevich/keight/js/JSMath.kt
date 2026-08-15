@@ -109,6 +109,7 @@ private suspend fun ScriptRuntime.opVararg(
     if (args.isEmpty() || (args[0] as List<*>).isEmpty()){
         return onEmpty().js
     }
+    @Suppress("UNCHECKED_CAST")
     val a = (args[0] as List<JsAny?>).fastMap {
         toNumber(it).toDouble()
     }

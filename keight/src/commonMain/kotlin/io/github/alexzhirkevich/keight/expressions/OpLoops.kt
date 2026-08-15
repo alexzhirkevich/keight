@@ -11,7 +11,6 @@ import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
 import io.github.alexzhirkevich.keight.js.js
 
-
 internal class OpForLoop(
     private val assignment : Expression?,
     private val increment: Expression?,
@@ -26,19 +25,24 @@ internal class OpForLoop(
         { !it.isFalse(comparison.invoke(it)) }
     }
 
+    // Issue #23: a loop's completion value is the value of the last normally-completed
+    // body iteration (matching ECMAScript). `break`/`continue` leave `last` untouched,
+    // which is exactly the spec behaviour. `asExpressible` is applied here, at construction
+    // time, rather than on every execution.
+    private val bodyExpr = body.asExpressible()
+
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
-        runtime.withScope {
+        return runtime.withScope {
             assignment?.invoke(it)
             block(it)
-            Undefined
         }
-        return Undefined
     }
 
-    private suspend fun block(ctx: ScriptRuntime) {
+    private suspend fun block(ctx: ScriptRuntime): JsAny? {
+        var last: JsAny? = Undefined
         while (condition(ctx)) {
             try {
-                body(ctx)
+                last = bodyExpr(ctx)
             } catch (t: BlockContinue) {
                 if (t.label == label) {
                     continue
@@ -55,6 +59,7 @@ internal class OpForLoop(
                 increment?.invoke(ctx)
             }
         }
+        return last
     }
 }
 
@@ -66,8 +71,11 @@ internal class OpForInLoop(
     override var label: String? = null
 ) : Expression(), Labeled {
 
+    // Issue #23: completion value is the last body value (see OpForLoop.block).
+    private val bodyExpr = body.asExpressible()
+
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
-        runtime.withScope {
+        return runtime.withScope {
             val o = inObject(it)
 
             syntaxCheck(o is JsAny){
@@ -80,10 +88,11 @@ internal class OpForInLoop(
                 prepare(it)
             }
 
+            var last: JsAny? = Undefined
             for (k in keys) {
                 try {
                     assign(it, k.js)
-                    body(it)
+                    last = bodyExpr(it)
                 } catch (t: BlockContinue) {
                     if (t.label == label) {
                         continue
@@ -98,9 +107,8 @@ internal class OpForInLoop(
                     }
                 }
             }
-            Undefined
+            last
         }
-        return Undefined
     }
 }
 
@@ -114,8 +122,11 @@ internal class OpForOfLoop(
     override var label: String? = null
 ) : Expression(), Labeled {
 
+    // Issue #23: completion value is the last body value (see OpForLoop.block).
+    private val bodyExpr = body.asExpressible()
+
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
-        runtime.withScope {
+        return runtime.withScope {
             val iterableObj = iterable(it)
 
             syntaxCheck(iterableObj is JsAny) {
@@ -124,14 +135,15 @@ internal class OpForOfLoop(
 
             // Get iterator by calling Symbol.iterator on the iterable object
             val iteratorFn = iterableObj.get(JsSymbol.iterator, it)
-                ?: return@withScope
+                ?: return@withScope Undefined
 
             val callable = iteratorFn.callableOrNull()
-                ?: return@withScope
+                ?: return@withScope Undefined
 
             val iterator = callable.call(iterableObj, emptyList(), it)
-                ?: return@withScope
+                ?: return@withScope Undefined
 
+            var last: JsAny? = Undefined
             while (true) {
                 val result = iterator
                     .get(Constants.next.js, it)
@@ -148,7 +160,7 @@ internal class OpForOfLoop(
                 val value = result.get(Constants.value.js, it)
                 try {
                     assign(it, value)
-                    body(it)
+                    last = bodyExpr(it)
                 } catch (t: BlockContinue) {
                     if (t.label == label) {
                         continue
@@ -163,8 +175,8 @@ internal class OpForOfLoop(
                     }
                 }
             }
+            last
         }
-        return Undefined
     }
 }
 
@@ -173,11 +185,14 @@ internal class OpDoWhileLoop(
     val body : OpBlock,
     override var label: String? = null
 ) : Expression(), Labeled {
+    // Issue #23: completion value is the last body value (see OpForLoop.block).
+    private val bodyExpr = body.copy(isExpressible = true)
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
+        var last: JsAny? = Undefined
         do {
             val cond = runtime.withScope {
                 try {
-                    body.invoke(it)
+                    last = bodyExpr.invoke(it)
                     !it.isFalse(condition.invoke(it))
                 } catch (t: BlockContinue) {
                     if (t.label == label) {
@@ -195,7 +210,7 @@ internal class OpDoWhileLoop(
             }
         } while (cond)
 
-        return Undefined
+        return last
     }
 }
 
@@ -205,10 +220,13 @@ internal class OpWhileLoop(
     val body : Expression,
     override var label: String? = null
 ) : Expression(), Labeled {
+    // Issue #23: completion value is the last body value (see OpForLoop.block).
+    private val bodyExpr = body.asExpressible()
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
+        var last: JsAny? = Undefined
         while (!runtime.isFalse(condition.invoke(runtime))) {
             try {
-                body.invoke(runtime)
+                last = bodyExpr.invoke(runtime)
             } catch (t: BlockContinue) {
                 if (t.label == label) {
                     continue
@@ -223,6 +241,6 @@ internal class OpWhileLoop(
                 }
             }
         }
-        return Undefined
+        return last
     }
 }

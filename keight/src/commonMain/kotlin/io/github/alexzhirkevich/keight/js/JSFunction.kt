@@ -5,8 +5,10 @@ import io.github.alexzhirkevich.keight.Constructor
 import io.github.alexzhirkevich.keight.Expression
 import io.github.alexzhirkevich.keight.LazyGetter
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.SourceLocation
 import io.github.alexzhirkevich.keight.Uninitialized
 import io.github.alexzhirkevich.keight.VariableType
+import io.github.alexzhirkevich.keight.asyncFormStack
 import io.github.alexzhirkevich.keight.expressions.BlockReturn
 import io.github.alexzhirkevich.keight.expressions.Destruction
 import io.github.alexzhirkevich.keight.expressions.OpAssign
@@ -25,7 +27,6 @@ import io.github.alexzhirkevich.keight.findJsRoot
 import io.github.alexzhirkevich.keight.js.interpreter.referenceCheck
 import io.github.alexzhirkevich.keight.js.interpreter.referenceError
 import io.github.alexzhirkevich.keight.js.interpreter.syntaxCheck
-import kotlinx.coroutines.async
 import kotlin.collections.List
 import kotlin.collections.Map
 import kotlin.collections.MutableMap
@@ -96,6 +97,23 @@ public open class JSFunction(
     internal val prototype : JsObject? = JsObjectImpl(),
     // Store the parent prototype for super binding
     internal val superProto : JsAny? = null,
+    /**
+     * Source location of the function's declaration/definition (the `function`
+     * keyword, the arrow, or the method name). Used to render stack frames for
+     * programmatically-invoked callbacks (e.g. Promise `.then` handlers) so they
+     * carry a `(file:line:col)` like V8, instead of an anonymous location-less
+     * frame.
+     */
+    /**
+     * V8-style inferred frame name for stack traces. Unlike [name] (which V8 only
+     * sets for lexical variable bindings and named function expressions), this is
+     * populated for *property* assignments (`obj.foo = fn`) where V8 keeps the
+     * `name` property empty but still shows `at obj.foo` in the stack. Set on the
+     * first assignment only (later re-assignments to other properties do not
+     * overwrite it), mirroring V8's first-wins behaviour.
+     */
+    inferredName : String? = null,
+    public val sourceLocation : SourceLocation? = null,
     properties : MutableMap<JsAny?, JsAny?> = mutableMapOf(),
 ) : JsObjectImpl(name, properties), Callable, JsObject, Constructor {
 
@@ -105,6 +123,13 @@ public open class JSFunction(
     private var isMutableThisRef = !isArrow
     private var bindedArgs = emptyList<JsAny?>()
     internal var closure : ScriptRuntime? = null
+
+    /**
+     * V8-style inferred frame name for stack traces (see constructor param).
+     * `null` until a property assignment infers one; set once via [setInferredName].
+     */
+    internal var inferredName: String? = inferredName
+        private set
 
     init {
         properties.forEach {
@@ -167,6 +192,16 @@ public open class JSFunction(
         )
     }
 
+    /**
+     * Records a V8-style inferred frame name (see [inferredName]). First assignment
+     * wins: subsequent calls on an already-named function are ignored, matching V8
+     * where a function object assigned to two different properties keeps the name
+     * from the first binding.
+     */
+    internal fun setInferredName(name: String) {
+        if (inferredName == null) inferredName = name
+    }
+
     override suspend fun fallbackProto(runtime: ScriptRuntime): JsAny? {
        return runtime.findJsRoot().Function.get(PROTOTYPE, runtime)
     }
@@ -185,6 +220,8 @@ public open class JSFunction(
         isAsync = isAsync,
         superConstructor = superConstructor,
         prototype = prototype,
+        sourceLocation = sourceLocation,
+        inferredName = inferredName,
     ).apply {
         closure = this@JSFunction.closure
     }
@@ -259,11 +296,13 @@ public open class JSFunction(
                         )
                     )
                 },
-                thisRef = o
-//                thisRef = Getter {
-//                    assertSuperInitialized()
-//                    o
-//                }
+                thisRef = if (mustHaveSuperInitialized) {
+                    // In a derived constructor `this` is uninitialized until `super()`
+                    // returns. Wrap it so any access before that throws ReferenceError.
+                    SuperInitGuard(o, { superInitialized }, runtime)
+                } else {
+                    o
+                }
             ).also {
                 assertSuperInitialized()
             }
@@ -296,7 +335,7 @@ public open class JSFunction(
         }
 
         return if (isAsync){
-            invokeRuntime.async { doInvoke() }.js
+            invokeRuntime.asyncFormStack { doInvoke() }.js
         } else {
             doInvoke()
         }

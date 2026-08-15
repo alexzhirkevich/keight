@@ -53,6 +53,7 @@ internal class JSArrayFunction : JSFunction(
             }.js
         },
         "of".js to "of".func("source".vararg()){
+            @Suppress("UNCHECKED_CAST")
             (it[0] as List<JsAny>).js
         }
     ),
@@ -141,6 +142,7 @@ internal class JSArrayFunction : JSFunction(
 
 private suspend fun JsAny.arrayIterator(runtime: ScriptRuntime): JsAny {
     return if (this is Iterable<*>){
+        @Suppress("UNCHECKED_CAST")
         this as Iterable<JsAny?>
         this.iterator().js
     } else {
@@ -569,6 +571,7 @@ private fun ObjectScope.reverse() {
 private fun ObjectScope.toReversed() {
     "toReversed".js.func {
         val arr = thisRef ?: return@func Undefined
+        @Suppress("UNCHECKED_CAST")
         when (this) {
             is Iterable<*> -> reversed() as List<JsAny>
             else -> {
@@ -628,6 +631,7 @@ private fun ObjectScope.splice() {
 
         val pos = toNumber(args[0]).toInt()
         val remove = toNumber(args.argOrElse(1) { (value.size - pos).js }).toInt()
+        @Suppress("UNCHECKED_CAST")
         val rest = args[2] as Collection<JsAny?>
 
         val deleted = buildList {
@@ -650,6 +654,7 @@ private fun ObjectScope.toSpliced() {
         val value = thisRef<List<JsAny?>>().toMutableList()
         val pos = toNumber(args[0]).toInt()
         val remove = toNumber(args.argOrElse(1) { (value.size - pos).js }).toInt()
+        @Suppress("UNCHECKED_CAST")
         val rest = args[2] as List<JsAny?>
 
         repeat(remove) {
@@ -726,6 +731,7 @@ private fun ObjectScope.shift() {
 private fun ObjectScope.unshift() {
     "unshift".js.func("items".vararg()) {
         val value = thisRef<MutableList<JsAny?>>()
+        @Suppress("UNCHECKED_CAST")
         val items = it[0] as Collection<JsAny?>
         value.addAll(0, items)
         items.size.js
@@ -735,6 +741,7 @@ private fun ObjectScope.concat() {
     "concat".js.func("items".vararg()) {
         buildList {
             addAll(thisRef<Iterable<JsAny?>>())
+            @Suppress("UNCHECKED_CAST")
             (it[0] as Iterable<JsAny?>).forEach {
                 when (it) {
                     is Iterable<*> -> addAll(it as Iterable<JsAny?>)
@@ -799,6 +806,7 @@ private suspend fun JsAny.flat(
         if (depth == 0 || it !is List<*>) {
             collector.add(it)
         } else {
+            @Suppress("UNCHECKED_CAST")
             it as List<JsAny?>
             it.flat(runtime, depth - 1, collector)
         }

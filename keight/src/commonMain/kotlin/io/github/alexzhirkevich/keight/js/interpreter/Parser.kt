@@ -131,6 +131,7 @@ internal fun List<LocatedToken>.parse(scriptName: String? = null) : Expression {
         .parseBlock(
             scoped = false,
             isExpressible = true,
+            isStatementList = true,
             blockContext = emptyList(),
             type = ExpectedBlockType.Block
         )
@@ -202,9 +203,41 @@ private inline fun <reified R : Token> ListIterator<LocatedToken>.nextIsInstance
     return (nextSignificant() is R).also { returnToIndex(i) }
 }
 
+/**
+ * Consume an optional `;` (and surrounding newlines) followed by [kw].
+ *
+ * Returns `true` and consumes up to and including [kw] when the sequence
+ * `;? <kw>` is present; otherwise consumes nothing and restores the stream.
+ *
+ * Used for `;`-terminated inline statements immediately followed by a
+ * continuation keyword: `if (cond) s; else ...`, `do s; while (...)`,
+ * `try { } ; catch ...` / `... ; finally ...`. Crucially, if the next token
+ * after an optional `;` is NOT [kw], the `;` is left in the stream so the
+ * enclosing block can still use it as a statement separator
+ * (e.g. `if (a) b; c` must keep running `c`, `do b; c` keeps running `c`).
+ *
+ * Fixes issue #22 (and its `do/while` + `try/catch/finally` variants): without
+ * this, the explicit `;` left after an inline body makes the continuation
+ * keyword (`else` / `while` / `catch` / `finally`) get orphaned and later
+ * parsed as a standalone statement, raising "Unexpected token" / "Missing ...".
+ */
+private fun ListIterator<LocatedToken>.eatKeywordAfterOptionalSemicolon(kw: Token.Identifier.Keyword): Boolean {
+    val start = nextIndex()
+    val first = nextSignificant()
+    val found = if (first == Token.Operator.SemiColon) {
+        nextSignificant() == kw
+    } else {
+        first == kw
+    }
+    if (!found) returnToIndex(start)
+    return found
+}
+
 private fun ListIterator<LocatedToken>.nextSignificant() : Token {
+    if (!hasNext()) return Token.EndOfFile
     var n = next().token
     while (n is Token.NewLine){
+        if (!hasNext()) return Token.EndOfFile
         n = next().token
     }
     return n
@@ -644,6 +677,7 @@ private fun ListIterator<LocatedToken>.parseFactor(
 ): Expression {
     val loc = nextSignificantLocation()
     val expr =  when (val next = nextSignificant()) {
+        is Token.Operator.New -> parseNew(loc)
         is Token.Str -> OpConstant(next.value.js).at(loc)
         is Token.Regex -> OpConstant(next.value.toJsRegex()).at(loc)
         is Token.TemplateString -> {
@@ -752,7 +786,6 @@ private fun ListIterator<LocatedToken>.parseFactor(
                 parseArrayCreation()
             }
         }
-        is Token.Operator.New -> parseNew(loc)
         is Token.Operator.Typeof -> parseTypeof()
         is Token.Operator.Void -> parseVoid()
         is Token.Operator.Delete -> parseDelete()
@@ -793,10 +826,10 @@ private fun ListIterator<LocatedToken>.parseFactor(
                 if (isPropertyName) {
                     OpGetProperty(next.identifier, receiver = null).at(loc)
                 } else {
-                    parseKeyword(next, blockContext)
+                    parseKeyword(next, blockContext, loc)
                 }
             } else {
-                parseKeyword(next, blockContext)
+                parseKeyword(next, blockContext, loc)
             }
         }
         is Token.Identifier.Reserved -> throw SyntaxError("Unexpected reserved word (${next.identifier})")
@@ -823,11 +856,73 @@ private fun ListIterator<LocatedToken>.parseFactor(
     return expr
 }
 
+/**
+ * Keywords that can only begin a *statement* in ECMAScript and therefore must never appear
+ * in an expression position (an initializer, the right-hand side of an assignment, ...).
+ *
+ * keight's parser is intentionally statement/expression agnostic: [parseFactor] routes every
+ * keyword to [parseKeyword], and [parseAssignmentValue] parses the right-hand side through the
+ * very same [parseStatement] entry point. Without this guard `var a = if (true) '1'` silently
+ * parses as an if-statement and assigns its completion value instead of raising a SyntaxError
+ * the way a spec-compliant engine does.
+ *
+ * `function`, `class` and `import` are deliberately excluded: all three have valid expression
+ * forms (function expression, class expression, dynamic `import()`).
+ */
+private val StatementOnlyKeywords = setOf(
+    Token.Identifier.Keyword.Var,
+    Token.Identifier.Keyword.Let,
+    Token.Identifier.Keyword.Const,
+    Token.Identifier.Keyword.If,
+    Token.Identifier.Keyword.Else,
+    Token.Identifier.Keyword.For,
+    Token.Identifier.Keyword.While,
+    Token.Identifier.Keyword.Do,
+    Token.Identifier.Keyword.Switch,
+    Token.Identifier.Keyword.Case,
+    Token.Identifier.Keyword.Default,
+    Token.Identifier.Keyword.Try,
+    Token.Identifier.Keyword.Catch,
+    Token.Identifier.Keyword.Finally,
+    Token.Identifier.Keyword.Throw,
+    Token.Identifier.Keyword.Return,
+    Token.Identifier.Keyword.Break,
+    Token.Identifier.Keyword.Continue,
+    Token.Identifier.Keyword.With,
+    Token.Identifier.Keyword.Debugger,
+    Token.Identifier.Keyword.Export,
+)
+
+/**
+ * Reject a [StatementOnlyKeywords] token found at the start of an expression.
+ *
+ * Nothing is consumed: the stream is always restored so the caller can parse the expression
+ * itself when the upcoming token is legal.
+ *
+ * Called from every position where the grammar requires an expression rather than a statement:
+ * assignment/initializer right-hand sides, concise arrow-function bodies, parenthesized groups
+ * (call/`new` arguments, `if`/`while`/`switch` heads), array elements, both ternary branches and
+ * the operands of `return` / `throw`.
+ */
+private fun ListIterator<LocatedToken>.checkExpressionStart() {
+    if (!hasNext()) return
+    val i = nextIndex()
+    val next = nextSignificant()
+    returnToIndex(i)
+    if (next is Token.Identifier.Keyword && next in StatementOnlyKeywords) {
+        throw SyntaxError(unexpected(next.identifier))
+    }
+}
+
 private fun ListIterator<LocatedToken>.parseAssignmentValue(
     x: Expression,
     blockContext: List<BlockContext>,
     merge: (suspend ScriptRuntime.(JsAny?, JsAny?) -> JsAny?)? = null
 ): Expression {
+    // Every branch below parses the right-hand side as an expression, so a statement-only
+    // keyword there is always a syntax error (e.g. `var a = if (true) '1'`).
+    checkExpressionStart()
+
     // When parsing property values in an object literal, use ObjectPropertyValue context
     // to distinguish array literals [1,2] from computed property names [expr]
     val propertyValueContext = blockContext + BlockContext.ObjectPropertyValue
@@ -910,7 +1005,11 @@ private fun getMergeForAssignment(operator: Token.Operator.Assign): (suspend Scr
     }
 }
 
-private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Keyword, blockContext: List<BlockContext>): Expression {
+private fun ListIterator<LocatedToken>.parseKeyword(
+    keyword: Token.Identifier.Keyword,
+    blockContext: List<BlockContext>,
+    fnLoc: SourceLocation? = null,
+): Expression {
     return when(keyword){
         Token.Identifier.Keyword.Var,
         Token.Identifier.Keyword.Let,
@@ -962,14 +1061,35 @@ private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Ke
             }
         }
 
-        Token.Identifier.Keyword.If ->  OpIfCondition(
-            condition = parseExpressionGrouping(blockContext),
-            onTrue = parseBlock(blockContext = blockContext),
-            onFalse = if (eat(Token.Identifier.Keyword.Else)) {
+        Token.Identifier.Keyword.If ->  {
+            val condition = parseExpressionGrouping(blockContext)
+            val onTrue = parseBlock(blockContext = blockContext)
+            // Issue #22: tolerate a stray `;` between the if-consequent and `else`
+            // (e.g. `if (true) x=1; else y=2`). In standard JS an explicit `;` terminates
+            // the if-statement, but many hand-written scripts rely on this form.
+            // `eatKeywordAfterOptionalSemicolon` consumes an optional `;` ONLY when `else`
+            // actually follows; otherwise the `;` stays in the stream so the enclosing
+            // block can still use it as a statement separator (e.g. `if (a) b; c`).
+            val onFalse = if (eatKeywordAfterOptionalSemicolon(Token.Identifier.Keyword.Else)) {
                 parseBlock(blockContext = blockContext)
             } else null
+            OpIfCondition(
+                condition = condition,
+                onTrue = onTrue,
+                onFalse = onFalse,
+                // Issue #23: propagate the completion value of the taken branch so that
+                // `if (true) '1'` (as a program's last statement) yields `'1'`, matching
+                // the ECMAScript completion-value semantics. `if (false)` without an
+                // `else` still yields `Undefined` (onFalse is null -> res is null).
+                expressible = true
+            )
+        }
+        Token.Identifier.Keyword.Function -> OpFunctionInit(
+            parseFunction(
+                blockContext = blockContext,
+                fnLoc = fnLoc
+            )
         )
-        Token.Identifier.Keyword.Function -> OpFunctionInit(parseFunction(blockContext = blockContext))
         Token.Identifier.Keyword.Return -> {
             syntaxCheck(BlockContext.Function in blockContext) {
                 unexpected("return")
@@ -980,16 +1100,28 @@ private fun ListIterator<LocatedToken>.parseKeyword(keyword: Token.Identifier.Ke
             // would leave the following statement without a separator and make the block fail
             // with "Unexpected token 'Keyword'" when the next statement starts with a keyword
             // (see issue #20, e.g. `if (true) return\nif (true) return`).
+            // `}` and the end of the token stream terminate an empty `return` too
+            // (`function f() { return }`), and unlike `\n` / `;` the `}` must stay in the
+            // stream for parseBlock to close the body.
             val term = peekRawToken()
-            if (term == Token.NewLine || term == Token.Operator.SemiColon) {
+            if (term == null ||
+                term == Token.NewLine ||
+                term == Token.Operator.SemiColon ||
+                term == Token.Operator.Bracket.CurlyClose
+            ) {
                 OpReturn(OpConstant(Undefined))
             } else {
+                // The operand of a non-empty `return` is an Expression. ASI was already
+                // resolved above, so peeking past newlines here is safe.
+                checkExpressionStart()
                 OpReturn(parseStatement(blockContext = blockContext, blockType = ExpectedBlockType.Object))
             }
         }
 
         Token.Identifier.Keyword.Class -> parseClass()
         Token.Identifier.Keyword.Throw -> {
+            // The operand of `throw` is an Expression.
+            checkExpressionStart()
             val throwable = parseStatement(blockType = ExpectedBlockType.Object)
             Expression {
                 val t = throwable(it)
@@ -1091,9 +1223,9 @@ private fun ListIterator<LocatedToken>.parseSuperConstructorCall(blockContext: L
 }
 
 private fun ListIterator<LocatedToken>.parseNew(loc: SourceLocation?) : Expression {
-    // JSEngine.compile() wraps script in "{\n$script\n}", which adds an
-    // extra line at the top. Compensate so line numbers match the user's source.
-    val adjustedLine = loc?.line?.let { maxOf(1, it - 1) }
+    // `loc` already points at the user's original source line (the script is no
+    // longer wrapped), so no line-number compensation is needed.
+    val adjustedLine = loc?.line
 
     val index = nextIndex()
     val next = nextSignificant()
@@ -1121,11 +1253,18 @@ private fun ListIterator<LocatedToken>.parseNew(loc: SourceLocation?) : Expressi
             it.pushCallFrame(frame)
             try {
                 constructor.construct(args.fastMap { arg -> arg(it) }, it).also { result ->
-                    if (adjustedLine != null && loc != null && result is Expression.LocationAttachable) {
+                    if (adjustedLine != null && result is Expression.LocationAttachable) {
                         result.attachLocation(adjustedLine, loc.column, loc.fileName)
                     }
                     if (result is JSError) {
-                        result.callStackFrames = it.captureCallStack()
+                        val frames = it.captureLongStack()
+                        // Drop the constructor's own call frame so the top stack
+                        // frame is the *enclosing* function at the construction
+                        // site, matching V8 (where `new Error` does not add a
+                        // separate frame — the deepest frame is e.g. `at l3`).
+                        result.callStackFrames =
+                            if (frames.lastOrNull()?.isConstructor == true) frames.dropLast(1)
+                            else frames
                     }
                 }
             } finally {
@@ -1160,7 +1299,14 @@ private fun ListIterator<LocatedToken>.parseNew(loc: SourceLocation?) : Expressi
                         result.attachLocation(adjustedLine, loc.column, loc.fileName)
                     }
                     if (result is JSError) {
-                        result.callStackFrames = it.captureCallStack()
+                        val frames = it.captureLongStack()
+                        // Drop the constructor's own call frame so the top stack
+                        // frame is the *enclosing* function at the construction
+                        // site, matching V8 (where `new Error` does not add a
+                        // separate frame — the deepest frame is e.g. `at l3`).
+                        result.callStackFrames =
+                            if (frames.lastOrNull()?.isConstructor == true) frames.dropLast(1)
+                            else frames
                     }
                 }
             } finally {
@@ -1224,6 +1370,8 @@ private fun ListIterator<LocatedToken>.parseArrayCreation(): Expression {
             if (eat(Token.Operator.Comma)) {
                 add(OpConstant(Uninitialized))
             } else {
+                // Array elements are AssignmentExpressions.
+                checkExpressionStart()
                 add(parseStatement(blockType = ExpectedBlockType.Object))
                 if (!eat(Token.Operator.Comma)) {
                     syntaxCheck(nextSignificant() is Token.Operator.Bracket.SquareClose) {
@@ -1272,6 +1420,9 @@ private fun ListIterator<LocatedToken>.parseExpressionGrouping(blockContext: Lis
             if (nextIsInstance<Token.Operator.Bracket.RoundClose>()) {
                 return@buildList
             }
+            // Every item of a parenthesized group is an expression: call arguments,
+            // `new` arguments, `if`/`while`/`switch` heads, a parenthesized expression.
+            checkExpressionStart()
             add(parseStatement(blockContext, blockType = ExpectedBlockType.Object))
         } while (nextSignificant() is Token.Operator.Comma)
         prevSignificant()
@@ -1410,19 +1561,22 @@ private fun ListIterator<LocatedToken>.parseMethodBody(
     blockContext: List<BlockContext>
 ) : JSFunction {
     // At this point, we just need to parse the { body }
+    // Capture the method's declaration location (its name) for stack frames.
+    val fnLoc = nextSignificantLocation()
     val body = parseBlock(
         scoped = false,
         blockContext = blockContext + BlockContext.Function,
         type = ExpectedBlockType.Block
     ) as OpBlock
-    
+
     // Convert arguments expressions to function parameters
     val params = arguments.map { it.toFunctionParam() }
-    
+
     return JSFunction(
         name = name,
         parameters = params,
-        body = body
+        body = body,
+        sourceLocation = fnLoc
     )
 }
 
@@ -1460,6 +1614,9 @@ private fun ListIterator<LocatedToken>.parseTernary(
     blockContext: List<BlockContext>
 ) : Expression {
 
+    // Both ternary branches are AssignmentExpressions.
+    checkExpressionStart()
+
     val body = parseStatement(
         blockContext = blockContext + BlockContext.Ternary,
         blockType = ExpectedBlockType.Block
@@ -1474,10 +1631,13 @@ private fun ListIterator<LocatedToken>.parseTernary(
     return OpIfCondition(
         condition = condition,
         onTrue = body,
-        onFalse = parseStatement(
-            blockContext = blockContext,
-            blockType = ExpectedBlockType.Block
-        ),
+        onFalse = run {
+            checkExpressionStart()
+            parseStatement(
+                blockContext = blockContext,
+                blockType = ExpectedBlockType.Block
+            )
+        },
         expressible = true
     )
 }
@@ -1732,7 +1892,10 @@ private fun ListIterator<LocatedToken>.parseDoWhileLoop(blockContext: List<Block
         scoped = false // while condition should have the same scope with body
     )
 
-    syntaxCheck(eat(Token.Identifier.Keyword.While)) {
+    // Issue #22 (do/while variant): tolerate a stray `;` between the do-body and
+    // `while` (e.g. `do x=1; while (false)`). Only consume the `;` when `while`
+    // actually follows, so `do x=1; y` keeps running `y`.
+    syntaxCheck(eatKeywordAfterOptionalSemicolon(Token.Identifier.Keyword.While)) {
         "Missing while condition in do/while block"
     }
     val condition = parseExpressionGrouping()
@@ -1749,6 +1912,8 @@ private fun ListIterator<LocatedToken>.parseAsync(blockContext: List<BlockContex
     
     if (isInObjectContext && nextIsInstance<Token.Identifier.Property>()) {
         // This is async method shorthand: { async method() {} }
+        // Capture the method's declaration location (its name) for stack frames.
+        val fnLoc = nextSignificantLocation()
         val methodName = (nextSignificant() as Token.Identifier.Property).identifier
         // Parse the function parameters and body
         val touple = parseStatement(blockType = ExpectedBlockType.None)
@@ -1767,7 +1932,8 @@ private fun ListIterator<LocatedToken>.parseAsync(blockContext: List<BlockContex
             name = methodName,
             parameters = args,
             body = block,
-            isAsync = true
+            isAsync = true,
+            sourceLocation = fnLoc
         )
         
         return OpColonAssignment(
@@ -1817,7 +1983,10 @@ private fun ListIterator<LocatedToken>.parseAwait(): Expression {
 
 private fun ListIterator<LocatedToken>.parseTryCatch(blockContext: List<BlockContext>): Expression {
     val tryBlock = parseBlock(type = ExpectedBlockType.Block, blockContext = blockContext)
-    val catchBlock = if (eat(Token.Identifier.Keyword.Catch)) {
+    // Issue #22 (try/catch variant): tolerate a stray `;` between the try-block and
+    // `catch`/`finally` (e.g. `try { } ; catch (e) ...`). Only consume the `;` when
+    // the continuation keyword actually follows, so `try { } ; x` keeps running `x`.
+    val catchBlock = if (eatKeywordAfterOptionalSemicolon(Token.Identifier.Keyword.Catch)) {
         if (eat(Token.Operator.Bracket.RoundOpen)) {
             val next = nextSignificant()
             syntaxCheck(next is Token.Identifier && eat(Token.Operator.Bracket.RoundClose)) {
@@ -1832,7 +2001,7 @@ private fun ListIterator<LocatedToken>.parseTryCatch(blockContext: List<BlockCon
         )
     } else null
 
-    val finallyBlock = if (eat(Token.Identifier.Keyword.Finally)) {
+    val finallyBlock = if (eatKeywordAfterOptionalSemicolon(Token.Identifier.Keyword.Finally)) {
         parseBlock(type = ExpectedBlockType.Block, blockContext = blockContext)
     } else null
 
@@ -1852,6 +2021,14 @@ private fun ListIterator<LocatedToken>.parseArrowFunction(blockContext: List<Blo
 
     validateFunctionParams(fArgs,true)
 
+    // A concise arrow body is an AssignmentExpression, so `() => if (true) '1'` is a
+    // SyntaxError. A block body starts with `{`, which is not a keyword, so guarding
+    // unconditionally leaves `() => { if (...) ... }` untouched.
+    checkExpressionStart()
+
+    // Capture the arrow function's location (its body start) for stack frames.
+    val fnLoc = nextSignificantLocation()
+
     val lambda = parseBlock(
         type = ExpectedBlockType.Block,
         blockContext = blockContext + BlockContext.Function,
@@ -1866,14 +2043,23 @@ private fun ListIterator<LocatedToken>.parseArrowFunction(blockContext: List<Blo
         name = "",
         parameters = fArgs,
         body = lambda.copy(isExpressible = !lambda.isSurroundedWithBraces),
-        isArrow = true
+        isArrow = true,
+        sourceLocation = fnLoc
     )
 }
 
 private fun ListIterator<LocatedToken>.parseFunction(
     name: String? = null,
-    blockContext: List<BlockContext>
+    blockContext: List<BlockContext>,
+    fnLoc: SourceLocation? = null,
 ) : JSFunction {
+
+    // Use the explicitly provided declaration location (captured at the
+    // `function` keyword by the caller) when available; otherwise peek the next
+    // significant token (used for arrow / method / async expressions where the
+    // keyword isn't in hand). This location drives the (file:line:col) shown on
+    // programmatically-invoked callback stack frames.
+    val effectiveLoc = fnLoc ?: nextSignificantLocation()
 
     val actualName = name ?: run {
         if (nextIsInstance<Token.Identifier.Property>()) {
@@ -1902,7 +2088,8 @@ private fun ListIterator<LocatedToken>.parseFunction(
     return JSFunction(
         name = actualName,
         parameters = args,
-        body = block
+        body = block,
+        sourceLocation = effectiveLoc
     )
 }
 
@@ -2113,23 +2300,35 @@ private fun ListIterator<LocatedToken>.parseBlock(
     type: ExpectedBlockType = ExpectedBlockType.None,
     isExpressible: Boolean = false,
     allowCommaSeparator : Boolean = true,
+    isStatementList: Boolean = false,
     blockContext: List<BlockContext>,
 ): Expression {
     var hoistedIndex = 0
 
     var isSurroundedWithBraces = false
     val list = buildList {
-        if (eat(Token.Operator.Bracket.CurlyOpen)) {
-            isSurroundedWithBraces = true
-            val context = if (type == ExpectedBlockType.Object)
-                blockContext + BlockContext.Object
-            else blockContext
-            while (!nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
+        /**
+         * Parse a flat statement list (either surrounded by `{`...`}` or the bare
+         * top level).  The body — hoisting, separator consumption, and ASI — is
+         * identical; only the loop condition, the fallback syntax-check terminator,
+         * and the context passed to `parseStatement` differ.
+         */
+        fun parseStatementList(
+            stmtContext: List<BlockContext>,
+            shouldContinue: () -> Boolean,
+            isNaturalTerminator: () -> Boolean,
+        ) {
+            while (shouldContinue()) {
                 val expr = parseStatement(
-                    blockContext = context,
+                    blockContext = stmtContext,
                     blockType = ExpectedBlockType.None,
                     isBlockAnchor = true
                 )
+                // Index of the first token *after* this statement. Used below to
+                // detect ASI: if the previous statement ended with a block-closing
+                // '}' and the next token is not an explicit separator, ECMAScript
+                // inserts an implicit ';' (ASI rule #2).
+                val afterStmtIndex = nextIndex()
 
                 // hoisted
                 when (expr) {
@@ -2137,7 +2336,6 @@ private fun ListIterator<LocatedToken>.parseBlock(
                         val assign = OpAssign(
                             type = VariableType.Local,
                             variableName = expr.name,
-                            receiver = null,
                             assignableValue = expr,
                             merge = null
                         )
@@ -2161,7 +2359,6 @@ private fun ListIterator<LocatedToken>.parseBlock(
                             val assign = OpAssign(
                                 type = VariableType.Local,
                                 variableName = name,
-                                receiver = null,
                                 assignableValue = expr,
                                 merge = null
                             )
@@ -2176,7 +2373,6 @@ private fun ListIterator<LocatedToken>.parseBlock(
                         val assign = OpAssign(
                             type = VariableType.Local,
                             variableName = expr.property.name,
-                            receiver = null,
                             assignableValue = expr.property,
                             merge = null
                         )
@@ -2201,7 +2397,6 @@ private fun ListIterator<LocatedToken>.parseBlock(
                         val assign = OpAssign(
                             type = VariableType.Local,
                             variableName = name,
-                            receiver = null,
                             assignableValue = expr.property,
                             merge = null
                         )
@@ -2227,22 +2422,104 @@ private fun ListIterator<LocatedToken>.parseBlock(
                     }
                     hasSeparator = true
                 }
-                syntaxCheck(hasSeparator || expr is OpCase || nextIsInstance<Token.Operator.Bracket.CurlyClose>()) {
+                // ASI (automatic semicolon insertion), rule #2: when a statement is
+                // not followed by an explicit separator (';', newline or ',') but the
+                // previous significant token was a block-closing '}', ECMAScript
+                // inserts an implicit ';'. This lets constructs such as
+                // `try { } catch { } nextStmt` (written on one line, without ';')
+                // parse, matching V8.
+                //
+                // Restricted to statement-level contexts: object literals and class
+                // bodies separate members with commas, not ASI, so a '}' there must
+                // NOT start a fresh statement (e.g. `{ a(){} b(){} }` stays a syntax
+                // error, as in V8).
+                val asiAfterBlock = !hasSeparator && hasNext() &&
+                    BlockContext.Object !in stmtContext &&
+                    BlockContext.Class !in stmtContext &&
+                    run {
+                        var ok = false
+                        if (afterStmtIndex > 0) {
+                            // Rewind to just before the next statement, step back over
+                            // any newlines to the last token of the previous statement,
+                            // then restore the iterator to afterStmtIndex.
+                            while (nextIndex() > afterStmtIndex) previous()
+                            if (hasPrevious()) {
+                                var lt = previous()
+                                while (lt.token is Token.NewLine && hasPrevious()) {
+                                    lt = previous()
+                                }
+                                // ASI rule #2: insert an implicit ';' before the next
+                                // token when it is preceded by a block-closing '}' (any
+                                // statement) or a ')' belonging to a control statement
+                                // such as `do/while` (whose body is not a block).
+                                // Expression statements (`a b`, `1 2`, `a() b()`,
+                                // `(1) 2`, `x = 1 y = 2`) stay SyntaxErrors, matching V8.
+                                ok = when (lt.token) {
+                                    is Token.Operator.Bracket.CurlyClose -> true
+                                    is Token.Operator.Bracket.RoundClose -> expr is OpDoWhileLoop
+                                    else -> false
+                                }
+                            }
+                            while (nextIndex() < afterStmtIndex) next()
+                        }
+                        ok
+                    }
+                syntaxCheck(
+                    hasSeparator || asiAfterBlock || expr is OpCase || isNaturalTerminator()
+                ) {
                     unexpected(next().token::class.simpleName.orEmpty())
                 }
             }
+        }
+
+        // For a real statement list (top-level unwrapped scripts) a leading `{`
+        // is NOT the script's surrounding brace — it starts a block *statement*.
+        // Eating it here (with `scoped` inherited from the caller, which is
+        // `false` at the top level) would make the block's `let`/`const`
+        // declarations leak into the surrounding scope, and any statements
+        // after the closing `}` would be silently dropped (e.g.
+        // `{ const t = 1; }\nt()` must throw ReferenceError, and
+        // `{ f(); } g()` must still run `g()`). The brace-less statement-list
+        // branch below parses a leading `{` via parseStatement -> parseBlock
+        // with its own (scoped) scope.
+        if (!isStatementList && eat(Token.Operator.Bracket.CurlyOpen)) {
+            isSurroundedWithBraces = true
+            val context = if (type == ExpectedBlockType.Object)
+                blockContext + BlockContext.Object
+            else blockContext
+
+            parseStatementList(
+                stmtContext = context,
+                shouldContinue = { !nextIsInstance<Token.Operator.Bracket.CurlyClose>() },
+                isNaturalTerminator = { nextIsInstance<Token.Operator.Bracket.CurlyClose>() },
+            )
 
             check(nextSignificant() is Token.Operator.Bracket.CurlyClose) {
                 "} was expected"
             }
         } else {
 
-            while (eat(Token.Operator.New)) {
-                //skip
+            // Skip leading `new` keywords in comma-separated expression lists
+            // (for-loop heads / argument lists). For a real statement list (top-level
+            // unwrapped scripts) `new` starts a `new`-expression statement and must
+            // NOT be consumed here, otherwise `new Number(1)` degrades to the plain
+            // call `Number(1)` (returning a primitive instead of a wrapper object).
+            if (!isStatementList) {
+                while (eat(Token.Operator.New)) {
+                    //skip
+                }
             }
-            do {
-                add(parseStatement(blockContext, blockType = type))
-            } while (allowCommaSeparator && eat(Token.Operator.Comma))
+            if (isStatementList) {
+                parseStatementList(
+                    stmtContext = blockContext,
+                    shouldContinue = { hasNext() },
+                    isNaturalTerminator = { !hasNext() },
+                )
+            } else {
+                do {
+                    add(parseStatement(blockContext, blockType = type))
+                } while (allowCommaSeparator && eat(Token.Operator.Comma))
+            }
         }
     }
 

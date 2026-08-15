@@ -6,7 +6,6 @@ import io.github.alexzhirkevich.keight.js.interpreter.parse
 import io.github.alexzhirkevich.keight.js.interpreter.tokenize
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -21,8 +20,7 @@ public open class JSEngine<out R : JSRuntime>(
 ) : ScriptEngine<R> {
 
     override fun compile(script: String, name: String?): Script {
-        val tokens = "{\n$script\n}".tokenize()
-        val expression = tokens.parse(name)
+        val expression = script.tokenize().parse(name)
 
         return if (name == null) {
             JSScript(runtime, expression, name)
@@ -43,7 +41,7 @@ private open class JSScript(
     protected val mutex = Mutex()
 
     override suspend fun invoke(runtime: ScriptRuntime): JsAny? {
-        return withContext(runtime.coroutineContext) {
+        return runtime.withContext(runtime.coroutineContext) {
             mutex.withLock {
                 invokeImpl(runtime)
             }
@@ -81,12 +79,14 @@ private class JSModule(
 
 
     override suspend fun invokeIfNeeded() {
-        mutex.withLock {
-            if (!runtime.isEvaluated) {
-                try {
-                    invokeImpl(runtime)
-                } finally {
-                    runtime.isEvaluated = true
+        runtime.withContext(runtime.coroutineContext) {
+            mutex.withLock {
+                if (!runtime.isEvaluated) {
+                    try {
+                        invokeImpl(runtime)
+                    } finally {
+                        runtime.isEvaluated = true
+                    }
                 }
             }
         }

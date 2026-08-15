@@ -33,10 +33,12 @@ internal class JSSetFunction : JSFunction(
             thisRef<Iterable<JsAny?>>().contains(it[0]).js
         }
         "difference".js.func("other" defaults OpConstant(Undefined)) {
+            @Suppress("ConvertArgumentToSet", "UNCHECKED_CAST")
             thisRef<Iterable<JsAny?>>().subtract(it[0] as Iterable<JsAny?>).js
         }
         "symmetricDifference".js.func("other" defaults OpConstant(Undefined)) {
             val s = thisRef<Iterable<JsAny?>>()
+            @Suppress("UNCHECKED_CAST")
             val other = (it[0] as Iterable<JsAny?>).toSet()
 
             buildSet {
@@ -46,26 +48,31 @@ internal class JSSetFunction : JSFunction(
         }
         "union".js.func("other" defaults OpConstant(Undefined)) {
             val s = thisRef<Iterable<JsAny?>>()
+            @Suppress("UNCHECKED_CAST")
             val other = it[0] as Iterable<JsAny?>
             s.union(other).js
         }
         "intersection".js.func("other" defaults OpConstant(Undefined)) {
             val s = thisRef<Iterable<JsAny?>>()
+            @Suppress("UNCHECKED_CAST")
             val other = it[0] as Iterable<JsAny?>
             s.intersect(other).js
         }
         "isDisjointFrom".js.func("other" defaults OpConstant(Undefined)) {
             val s = thisRef<Iterable<JsAny?>>()
+            @Suppress("UNCHECKED_CAST")
             val other = it[0] as Iterable<JsAny?>
             other.all { v -> v !in s }.js
         }
         "isSubsetOf".js.func("other" defaults OpConstant(Undefined)) {
             val s = thisRef<Iterable<JsAny?>>()
+            @Suppress("UNCHECKED_CAST")
             val other = it[0] as Iterable<JsAny?>
             other.all { v -> v in s }.js
         }
         "isSupersetOf".js.func("other" defaults OpConstant(Undefined)) {
             val s = thisRef<Iterable<JsAny?>>()
+            @Suppress("UNCHECKED_CAST")
             val other = it[0] as Iterable<JsAny?>
             s.all { v -> v in other }.js
         }
@@ -108,6 +115,7 @@ internal class JSSetFunction : JSFunction(
         }
         val x = args[0]
 
+        @Suppress("UNCHECKED_CAST")
         return when {
             x is Iterable<*> -> (x as Iterable<JsAny?>).toSet().js
             x?.isIterator(runtime) == true -> {

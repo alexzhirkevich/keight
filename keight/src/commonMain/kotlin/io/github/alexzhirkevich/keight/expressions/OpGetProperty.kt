@@ -43,3 +43,18 @@ internal class OpGetProperty(
         }
     }
 }
+
+/**
+ * Best-effort textual source name of an expression, used to build V8-style
+ * inferred frame names for property assignments. Returns the dotted identifier
+ * path for simple identifiers and member chains (`a`, `a.b`, `a.b.c`), or `null`
+ * for anything that is not a plain reference (calls, literals, complex
+ * expressions) where a meaningful name cannot be derived.
+ */
+internal fun Expression.referencedName(): String? = when (this) {
+    is OpGetProperty -> {
+        val base = receiver?.referencedName()
+        if (base == null) name else "$base.$name"
+    }
+    else -> null
+}

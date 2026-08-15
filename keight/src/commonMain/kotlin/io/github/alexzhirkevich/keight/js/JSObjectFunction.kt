@@ -52,7 +52,7 @@ internal class JSObjectFunction : JSFunction(
             Undefined
         },
         "create".func( "object") { args ->
-            val obj = args.getOrNull(0) as? JsAny ?: return@func JsObjectImpl()
+            val obj = args.getOrNull(0) ?: return@func JsObjectImpl()
             Object {
                 obj.keys(this@func).fastForEach {
                     it eq obj.get(it, this@func)
@@ -66,6 +66,7 @@ internal class JSObjectFunction : JSFunction(
                 ?: emptyList<JsAny?>().js
         },
         "fromEntries".func("object") { args ->
+            @Suppress("UNCHECKED_CAST")
             val entries = (args.getOrNull(0) as? List<List<JsAny?>>).orEmpty()
             JsObjectImpl(properties = entries.associate { it[0] to it[1] })
         },
@@ -87,6 +88,7 @@ internal class JSObjectFunction : JSFunction(
                 "$obj is not iterable".js
             }
 
+            @Suppress("UNCHECKED_CAST")
             obj as Iterable<JsAny?>
 
             val callback = args.getOrNull(1)?.callableOrNull()

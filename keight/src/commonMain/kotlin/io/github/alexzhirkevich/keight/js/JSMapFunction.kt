@@ -71,9 +71,11 @@ internal class JSMapFunction : JSFunction(
 
             val mapEntries = when {
                 entries is Map<*, *> -> {
+                    @Suppress("UNCHECKED_CAST")
                     return LinkedHashMap(entries as Map<JsAny?, JsAny?>).js
                 }
                 entries is Iterable<*> -> {
+                    @Suppress("UNCHECKED_CAST")
                     entries as Iterable<JsAny?>
                     entries.mapNotNull {
                         it?.pairOfFirstEntries(runtime)
@@ -101,6 +103,7 @@ internal class JSMapFunction : JSFunction(
 private suspend fun JsAny.pairOfFirstEntries(runtime : ScriptRuntime): Pair<JsAny?, JsAny?> {
     return when {
         this is Iterable<*> -> {
+            @Suppress("UNCHECKED_CAST")
             this as Iterable<JsAny?>
             val iter = iterator()
             iter.next() to iter.next()

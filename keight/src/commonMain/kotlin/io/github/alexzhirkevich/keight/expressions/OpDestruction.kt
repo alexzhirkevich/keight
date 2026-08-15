@@ -119,6 +119,7 @@ internal sealed interface DestructionContext {
             default: Getter<*>?
         ): JsAny? {
             val ret = if (obj is List<*>) {
+                @Suppress("UNCHECKED_CAST")
                 obj as List<JsAny?>
                 obj.getOrElse(index) { Undefined }
             } else {
@@ -141,6 +142,7 @@ internal sealed interface DestructionContext {
 //            runtime.typeCheck (d is List<*>) {
 //                "${JSStringFunction.toString(d, runtime)} is not iterable"
 //            }
+            @Suppress("UNCHECKED_CAST")
             d as List<JsAny?>
             return d.getOrElse(index) { Undefined }
         }
@@ -324,6 +326,7 @@ private class SpreadDestruction(
     ) {
         when {
             obj is Iterable<*> -> {
+                @Suppress("UNCHECKED_CAST")
                 obj as Iterable<JsAny?>
                 value.destruct(
                     obj = JsArrayWrapper(obj.drop(context.index).toMutableList()),
@@ -356,6 +359,7 @@ private class DestructionWithDefault(
         default: Getter<*>?
     ) {
         if (context is DestructionContext.Array) {
+            @Suppress("UNCHECKED_CAST")
             obj as List<JsAny?>
             destruction.destruct(
                 obj = obj.getOrElse(context.index) { Undefined },

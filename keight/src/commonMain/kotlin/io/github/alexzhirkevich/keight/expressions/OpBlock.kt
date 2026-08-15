@@ -43,22 +43,50 @@ internal data class OpBlock(
             return Undefined
         }
 
-        if (expressions.size > 1) {
-            repeat(expressions.size - 1) {
-                expressions[it].invoke(context)
+        // Track the completion value of the last normally-completed statement so that a
+        // `break`/`continue` (which aborts the block) can still propagate it. This makes
+        // e.g. `switch(x){ case 1: 'a'; break }` complete with `'a'` (ECMAScript semantics).
+        var last: JsAny? = Undefined
+        try {
+            for (i in expressions.indices) {
+                last = expressions[i].invoke(context)
             }
+        } catch (t: BlockBreak) {
+            if (label != null && t.label == label) {
+                // Targeted labelled break: the enclosing loop/switch handles the value.
+                throw t
+            }
+            t.value = if (isExpressible) last else Undefined
+            throw t
+        } catch (t: BlockContinue) {
+            if (label != null && t.label == label) {
+                throw t
+            }
+            t.value = if (isExpressible) last else Undefined
+            throw t
         }
 
-        return expressions.last().invoke(context).let {
-            if (isExpressible) it else Undefined
-        }
+        return if (isExpressible) last else Undefined
     }
 }
 
 
+/**
+ * Return an `Expression` whose completion value is the value of its last normally-completed
+ * statement. `parseBlock` wraps control-structure bodies/branches in an `OpBlock` whose
+ * `isExpressible` defaults to `false`, which discards the inner completion value. For
+ * ECMAScript completion-value semantics (Issue #23) we must mark those blocks expressible so
+ * the enclosing `if`/`for`/`while`/`try`/... can propagate the body's last statement value.
+ */
+internal fun Expression.asExpressible(): Expression {
+    val block = this as? OpBlock ?: return this
+    return if (block.isExpressible) this else block.copy(isExpressible = true)
+}
+
+
 internal sealed class ScopeException : Throwable()
-internal class BlockContinue(val label : String? = null) : ScopeException()
-internal class BlockBreak(val label : String? = null) : ScopeException()
+internal class BlockContinue(val label : String? = null, var value: JsAny? = null) : ScopeException()
+internal class BlockBreak(val label : String? = null, var value: JsAny? = null) : ScopeException()
 internal class BlockReturn(val value: JsAny?) : ScopeException()
 
 internal class OpReturn(

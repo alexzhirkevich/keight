@@ -2,14 +2,10 @@ package io.github.alexzhirkevich.keight
 
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsObject
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.InternalCoroutinesApi
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
-import kotlin.jvm.JvmInline
+import kotlin.coroutines.EmptyCoroutineContext
 
 
 public enum class VariableType {
@@ -35,23 +31,66 @@ public interface ScriptRuntime : CoroutineScope {
     public val callStack: MutableList<CallFrame>
 
     /**
-     * Push a call frame onto the call stack.
+     * Push a call frame onto the current task's call stack.
      */
-    public fun pushCallFrame(frame: CallFrame) {
-        callStack.add(frame)
+    public suspend fun pushCallFrame(frame: CallFrame) {
+        currentCoroutineContext()[CallStackElement]?.stack?.add(frame)
+            ?: callStack.add(frame)
     }
 
     /**
-     * Pop the most recent call frame from the call stack.
+     * Pop the most recent call frame from the current task's call stack.
      */
-    public fun popCallFrame(): CallFrame? {
-        return if (callStack.isNotEmpty()) callStack.removeAt(callStack.lastIndex) else null
+    public suspend fun popCallFrame(): CallFrame? {
+        return currentCoroutineContext()[CallStackElement]?.stack?.removeLastOrNull()
+            ?: callStack.removeLastOrNull()
     }
 
     /**
-     * Get a snapshot of the current call stack.
+     * Get a snapshot of the current task's call stack (without the async parent).
      */
-    public fun captureCallStack(): List<CallFrame> = callStack.toList()
+    public suspend fun captureCallStack(): List<CallFrame> =
+        currentCoroutineContext()[CallStackElement]?.stack?.toList()
+            ?: callStack.toList()
+
+    /**
+     * Get the full async-aware call stack: the current task's frames followed by
+     * the (marked) frames of every parent asynchronous task. Returned in
+     * most-recent-call-LAST order, ready to be reversed for rendering.
+     */
+    public suspend fun captureLongStack(): List<CallFrame> {
+        val el = currentCoroutineContext()[CallStackElement]
+        val current = el?.stack?.toList() ?: callStack.toList()
+        val parent = el?.asyncParent ?: emptyList()
+        // parent frames are older; they come first (most-recent-last convention).
+        return parent.map { it.copy(isAsync = true) } + current
+    }
+
+    /**
+     * @see launchFormStack
+     **/
+    public suspend fun CoroutineScope.launch(
+        context: CoroutineContext = EmptyCoroutineContext,
+        start: CoroutineStart = CoroutineStart.DEFAULT,
+        block: suspend CoroutineScope.() -> Unit
+    ): Job = launchFormStack(context, start, block)
+
+    /**
+     * @see asyncFormStack
+     */
+    public suspend fun <T> CoroutineScope.async(
+        context: CoroutineContext = EmptyCoroutineContext,
+        start: CoroutineStart = CoroutineStart.DEFAULT,
+        block: suspend CoroutineScope.() -> T
+    ): Deferred<T> = asyncFormStack(context, start, block)
+
+    /**
+     * @see withContextFormStack
+     */
+    public suspend fun <T> withContext(
+        context: CoroutineContext,
+        block: suspend CoroutineScope.() -> T
+    ): T = withContextFormStack(context, block)
 
     public suspend fun delete(property: JsAny?, ignoreConstraints: Boolean = false): Boolean
 

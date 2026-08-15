@@ -291,7 +291,6 @@ class ClassesTest {
     }
 
     @Test
-    @Ignore
     fun thisBeforeSuperCall() = runTest {
         assertFailsWith<ReferenceError> {
             """

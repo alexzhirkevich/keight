@@ -18,10 +18,11 @@ internal class OpMakeArray(
     override val items : List<Expression>
 ) : OpMake() {
     override suspend fun execute(runtime: ScriptRuntime): JsAny? {
-        return buildList<JsAny?> {
+        return buildList {
             items.fastForEach { i ->
                 val value = i(runtime)
                 if (i is OpSpread && value is Iterable<*>) {
+                    @Suppress("UNCHECKED_CAST")
                     addAll(value as Iterable<JsAny?>)
                 } else {
                     add(value)

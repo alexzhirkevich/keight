@@ -136,7 +136,7 @@ class SourceLocationTest {
         assertTrue("Should be TypeError") { error is TypeError }
         assertTrue("lineNumber should be set") { error.lineNumber != null }
         assertTrue("stack should contain 'TypeError'") { (error.stack ?: "").contains("TypeError") }
-        assertTrue("stack should contain line info") { (error.stack ?: "").contains("3:1") }
+        assertTrue("stack should contain line info") { (error.stack ?: "").contains("2:1") }
     }
 
     @Test
@@ -154,7 +154,7 @@ class SourceLocationTest {
         """.trimIndent().eval()
         val str = result?.toString() ?: ""
         assertTrue("JS stack should contain 'TypeError': got '$str'") { str.contains("TypeError") }
-        assertTrue("JS stack should contain line info: got '$str'") { str.contains("5") }
+        assertTrue("JS stack should contain line info: got '$str'") { str.contains("4:9") }
     }
 
     @Test
@@ -340,7 +340,11 @@ class SourceLocationTest {
         val s = result.toString()
         assertTrue("stack should contain 'a'" ) { s.contains("a") }
         assertTrue("stack should contain 'b'" ) { s.contains("b") }
-        assertTrue("stack should contain 'new Error'" ) { s.contains("new Error") }
+        // V8 does not render the `new Error` constructor as a separate frame; the
+        // deepest frame is the enclosing function (`b`) at the construction site.
+        assertTrue("deepest frame should be the enclosing function 'b'") {
+            s.contains("at b")
+        }
     }
 
     @Test
@@ -455,5 +459,68 @@ class SourceLocationTest {
             }
             a
         """.trimIndent().eval().assertEqualsTo(3L)
+    }
+
+    // ========== Unwrapped top-level scripts (no "{\n...\n}" wrap) ==========
+    // Scripts are no longer wrapped in "{\n$script\n}", so a number/expression
+    // can be the very last token of the input (EOF). These cases previously
+    // either OOM'd (lexer number() rewound the last digit forever) or degraded
+    // `new X()` to a plain `X()` call (the brace-less branch ate leading `new`).
+
+    @Test
+    fun topLevelSingleLiteral() = runTest {
+        "2".eval().assertEqualsTo(2L)
+    }
+
+    @Test
+    fun topLevelSingleExpression() = runTest {
+        "1+2".eval().assertEqualsTo(3L)
+        "13+17".eval().assertEqualsTo(30L)
+        "-13+ -17.0 + 10 - 4.0".eval().assertEqualsTo(-24.0)
+    }
+
+    @Test
+    fun topLevelTrailingNumberAtEof() = runTest {
+        // The lexer's number() must not rewind the final digit when EOF is
+        // reached without peeking another char (previously caused an infinite
+        // re-read loop -> OutOfMemoryError).
+        "1+2".eval().assertEqualsTo(3L)
+        "var x = 1; x = 2; x".eval().assertEqualsTo(2L)
+    }
+
+    @Test
+    fun topLevelNumberFormats() = runTest {
+        "0xff".eval().assertEqualsTo(255L)
+        "3.14".eval().assertEqualsTo(3.14)
+    }
+
+    @Test
+    fun topLevelNewConstructorIsNotStripped() = runTest {
+        // `new` at the start of a top-level statement must be preserved so that
+        // `new Number(1)` constructs a Number *object* (type "object"), not the
+        // primitive returned by the plain call Number(1).
+        "new Number(1) === 1".eval().assertEqualsTo(false)
+        "new Number(1) == 1".eval().assertEqualsTo(true)
+        "typeof new Number(1)".eval().assertEqualsTo("object")
+        "typeof Number(1)".eval().assertEqualsTo("number")
+    }
+
+    @Test
+    fun topLevelFunctionHoistingBeforeDeclaration() = runTest {
+        "f(); function f(){ return 7; }".eval().assertEqualsTo(7L)
+    }
+
+    @Test
+    fun topLevelErrorLineColumnUnwrapped() = runTest {
+        // With the wrap gone, line numbers reflect the user's source directly
+        // (no +1 from a synthetic leading "{\n", no -1 compensation elsewhere).
+        var error: JSError? = null
+        try {
+            "var x;\nx();".eval()
+        } catch (e: JSError) {
+            error = e
+        }
+        checkNotNull(error)
+        assertTrue("stack should contain :2:1") { (error.stack ?: "").contains("2:1") }
     }
 }

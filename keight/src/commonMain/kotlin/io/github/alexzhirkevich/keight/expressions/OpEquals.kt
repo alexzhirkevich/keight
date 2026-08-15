@@ -84,7 +84,7 @@ private tailrec suspend fun OpLooselyEqualsImpl(a : JsAny?, b : JsAny?,  runtime
             // as the same value. If either operand is NaN, return false; so, NaN is never equal to NaN.
             is JsNumberWrapper -> {
                 val ad = runtime.toNumber(a).toDouble()
-                val bd = runtime.toNumber(b as JsAny).toDouble()
+                val bd = runtime.toNumber(b).toDouble()
                 (ad == bd && !ad.isNaN())
             }
             // Boolean: return true only if operands are both true or both false.

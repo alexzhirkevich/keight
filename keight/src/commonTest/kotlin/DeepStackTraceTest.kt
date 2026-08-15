@@ -455,6 +455,11 @@ class DeepStackTraceTest {
         assertTrue("stack should contain 'factory made'") { s.contains("factory made") }
         assertTrue("stack should contain 'factory'") { s.contains("factory") }
         assertTrue("stack should contain 'caller'") { s.contains("caller") }
-        assertTrue("stack should contain 'new Error'") { s.contains("new Error") }
+        // V8 does not render the `new Error` constructor as a separate frame; the
+        // deepest frame is the enclosing function (`factory`) at the construction
+        // site.
+        assertTrue("deepest frame should be the enclosing function 'factory'") {
+            s.contains("at factory")
+        }
     }
 }

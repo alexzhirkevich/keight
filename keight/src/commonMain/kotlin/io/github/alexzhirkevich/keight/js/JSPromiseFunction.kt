@@ -1,7 +1,10 @@
 package io.github.alexzhirkevich.keight.js
 
 import io.github.alexzhirkevich.keight.Callable
+import io.github.alexzhirkevich.keight.CallFrame
 import io.github.alexzhirkevich.keight.ScriptRuntime
+import io.github.alexzhirkevich.keight.asyncFormStack
+import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.callableOrNull
 import io.github.alexzhirkevich.keight.callableOrThrow
 import io.github.alexzhirkevich.keight.expressions.OpConstant
@@ -12,10 +15,54 @@ import io.github.alexzhirkevich.keight.requireThisRef
 import io.github.alexzhirkevich.keight.thisRef
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlin.coroutines.cancellation.CancellationException
+
+/**
+ * Push a call frame for a callback that is invoked programmatically (e.g. a
+ * Promise `then`/`catch`/`finally` handler). Such callbacks are not reached
+ * through an `OpCall` expression, so they would otherwise never get a frame on
+ * the async task's isolated call stack.
+ */
+private suspend fun ScriptRuntime.pushCallbackFrame(callable: Callable?) {
+    val jsFn = callable as? JSFunction
+    val name = jsFn?.name?.takeIf { it.isNotEmpty() }
+    val loc = jsFn?.sourceLocation
+    pushCallFrame(
+        CallFrame(
+            functionName = name,
+            fileName = loc?.fileName,
+            lineNumber = loc?.line,
+            columnNumber = loc?.column,
+        )
+    )
+}
+
+/**
+ * Implement JS `Promise` resolution: if a `.then`/`.catch`/`.finally` callback
+ * returns a thenable (a Promise, represented here by a [Job]), the resulting
+ * promise must *adopt* that thenable's state rather than resolving with the
+ * job object itself. So we recursively await returned jobs until we reach a
+ * non-promise value (or a rejection, which propagates out).
+ *
+ * This mirrors the Promise Resolution Procedure and is what makes
+ * `Promise.resolve().then(() => Promise.resolve().then(...))` chains unwrap,
+ * and what lets an error thrown deep inside the chain surface at the `await`.
+ */
+private suspend fun resolveThenable(result: JsAny?, runtime: ScriptRuntime): JsAny? {
+    var value: JsAny? = result
+    while (value is Job) {
+        value = if (value is Deferred<*>) {
+            value.await() as JsAny?
+        } else {
+            value.joinSuccess()
+            Undefined
+        }
+    }
+    return value
+}
 
 internal class JSPromiseFunction : JSFunction(
     name = "Promise",
@@ -36,7 +83,12 @@ internal class JSPromiseFunction : JSFunction(
                 } catch (t: CancellationException) {
                     throw t
                 } catch (t: Throwable) {
-                    callable.invoke(t.js.listOf(), this@func)
+                    this@func.pushCallbackFrame(callable)
+                    try {
+                        resolveThenable(callable.invoke(t.js.listOf(), this@func), this@func)
+                    } finally {
+                        this@func.popCallFrame()
+                    }
                 }
             }.js
         }
@@ -55,14 +107,23 @@ internal class JSPromiseFunction : JSFunction(
                         job.joinSuccess()
                         Undefined
                     }
-                    onFulfilled.callableOrThrow(this@func)
-                        .invoke(res.listOf(), this@func)
+                    val cb = onFulfilled.callableOrThrow(this@func)
+                    this@func.pushCallbackFrame(cb)
+                    try {
+                        resolveThenable(cb.invoke(res.listOf(), this@func), this@func)
+                    } finally {
+                        this@func.popCallFrame()
+                    }
                 } catch (t: CancellationException) {
                     throw t
                 } catch (t: Throwable) {
-                    args.argOrElse(1) { throw t }
-                        .callableOrThrow(this@func)
-                        .invoke(t.js.listOf(), this@func)
+                    val rej = args.argOrElse(1) { throw t }.callableOrThrow(this@func)
+                    this@func.pushCallbackFrame(rej)
+                    try {
+                        resolveThenable(rej.invoke(t.js.listOf(), this@func), this@func)
+                    } finally {
+                        this@func.popCallFrame()
+                    }
                 }
             }.js
         }
@@ -79,7 +140,12 @@ internal class JSPromiseFunction : JSFunction(
                     value.joinSuccess()
                     Undefined
                 } finally {
-                    callable.invoke(emptyList(), this@func)
+                    this@func.pushCallbackFrame(callable)
+                    try {
+                        resolveThenable(callable.invoke(emptyList(), this@func), this@func)
+                    } finally {
+                        this@func.popCallFrame()
+                    }
                 }
             }.js
         }
@@ -97,18 +163,32 @@ internal class JSPromiseFunction : JSFunction(
                 )
             }.js
         },
-        "all".func("values".vararg()) { args ->
+        "all".func(FunctionParam("values")) { args ->
             async {
-                (args[0] as Iterable<JsAny?>).map {
-                    val job = it?.toKotlin(this@func)
-                    typeCheck(job is Job){ "$job is not a Promise".js }
-                    if (job is Deferred<*>) {
-                        job.await() as JsAny
-                    } else {
-                        job.joinSuccess()
-                        Undefined
+                @Suppress("UNCHECKED_CAST")
+                val iterable = args[0] as? Iterable<JsAny?>
+                    ?: typeError { "${args.getOrNull(0)} is not iterable".js }
+                // Launch every member concurrently and await them all, mirroring
+                // the ECMAScript semantics: the returned promise resolves with an
+                // array of the resolved values (preserving input order) and
+                // rejects with the reason of the first member that rejects.
+                val settled = iterable.map { el ->
+                    async {
+                        val job = el?.toKotlin(this@func)
+                        if (job is Job) {
+                            if (job is Deferred<*>) {
+                                job.await() as JsAny?
+                            } else {
+                                job.joinSuccess()
+                                Undefined
+                            }
+                        } else {
+                            // Non-promise values are treated as already-resolved.
+                            el
+                        }
                     }
-                }.js
+                }
+                settled.awaitAll().js
             }.js
         }
     ).associateBy { it.name.js }.toMutableMap()
@@ -133,8 +213,7 @@ internal class JSPromiseFunction : JSFunction(
                 x as? Throwable ?: ThrowableValue(x)
             ); Undefined
         }
-
-        return runtime.async {
+        return runtime.asyncFormStack {
             resolveReject.invoke(listOf(resolve, reject), runtime)
             deferred.await()
         }.js
