@@ -676,8 +676,11 @@ private fun ListIterator<LocatedToken>.parseFactor(
     blockType: ExpectedBlockType = ExpectedBlockType.None
 ): Expression {
     val loc = nextSignificantLocation()
+    // In object / class property-key position *any* IdentifierName (incl. reserved words and the
+    // operator-keywords below) is a valid property name; see [KEYWORD_OPERATOR_NAMES].
+    val inMemberKeyPosition = blockContext.lastOrNull() == BlockContext.Object
+        || blockContext.lastOrNull() == BlockContext.Class
     val expr =  when (val next = nextSignificant()) {
-        is Token.Operator.New -> parseNew(loc)
         is Token.Str -> OpConstant(next.value.js).at(loc)
         is Token.Regex -> OpConstant(next.value.toJsRegex()).at(loc)
         is Token.TemplateString -> {
@@ -786,9 +789,31 @@ private fun ListIterator<LocatedToken>.parseFactor(
                 parseArrayCreation()
             }
         }
-        is Token.Operator.Typeof -> parseTypeof()
-        is Token.Operator.Void -> parseVoid()
-        is Token.Operator.Delete -> parseDelete()
+        // Operator-keywords name a property in member-key position (see [KEYWORD_OPERATOR_NAMES]);
+        // otherwise each keeps its operator semantics.
+        //
+        // `in`/`instanceof` are binary operators, but they DO reach this point: object-literal
+        // keys are parsed through the generic expression path, so `{ in: 1 }` / `({in(){}}).in()`
+        // call `parseFactor` with an `In` token as the very first token of the key. Dropping these
+        // two cases makes `({in: 42}).in` fail with "Unexpected token 'In'"
+        // (see KeywordPropertyNameTest.allKeywordsAreValidPropertyNamesLikeV8).
+        Token.Operator.New,
+        Token.Operator.Typeof,
+        Token.Operator.Void,
+        Token.Operator.Delete,
+        Token.Operator.In,
+        Token.Operator.Instanceof -> {
+            val keywordName = next.propertyNameOrNull()
+            if (inMemberKeyPosition && keywordName != null) {
+                OpGetProperty(name = keywordName, receiver = null).at(loc)
+            } else when (next) {
+                is Token.Operator.New -> parseNew(loc)
+                is Token.Operator.Typeof -> parseTypeof()
+                is Token.Operator.Void -> parseVoid()
+                is Token.Operator.Delete -> parseDelete()
+                else -> throw SyntaxError(unexpected(next::class.simpleName.orEmpty()))
+            }
+        }
         is Token.Identifier.Keyword -> {
             // In object/class property key position, keywords (e.g. `default`, `if`, `class`)
             // can be valid property names. We decide by peeking the token that immediately
@@ -832,7 +857,27 @@ private fun ListIterator<LocatedToken>.parseFactor(
                 parseKeyword(next, blockContext, loc)
             }
         }
-        is Token.Identifier.Reserved -> throw SyntaxError("Unexpected reserved word (${next.identifier})")
+        is Token.Identifier.Reserved -> {
+            // Reserved words (enum/implements/package/...) are valid IdentifierNames, so V8
+            // accepts them as property keys (`{enum: 1}`, `({enum(){}}).enum()`, `a.enum`,
+            // `a?.enum`) — but NOT as shorthand references (`{enum}` / `{enum, a:1}` are
+            // SyntaxError in V8 because a reserved word can never be an IdentifierReference).
+            // Hence: property name only when followed by `:` (key) or `(` (method).
+            val ctx = blockContext.lastOrNull()
+            val inMemberKeyPosition = ctx == BlockContext.Object || ctx == BlockContext.Class
+            if (inMemberKeyPosition) {
+                val i = nextIndex()
+                val n = nextSignificant()
+                returnToIndex(i)
+                if (n is Token.Operator.Colon || n is Token.Operator.Bracket.RoundOpen) {
+                    OpGetProperty(next.identifier, receiver = null).at(loc)
+                } else {
+                    throw SyntaxError("Unexpected reserved word (${next.identifier})")
+                }
+            } else {
+                throw SyntaxError("Unexpected reserved word (${next.identifier})")
+            }
+        }
         is Token.Identifier.Property -> {
             val ctx2 = blockContext.lastOrNull()
             val canHaveAccessor = ctx2 == BlockContext.Object || ctx2 == BlockContext.Class
@@ -1434,16 +1479,47 @@ private fun ListIterator<LocatedToken>.parseExpressionGrouping(blockContext: Lis
     return OpTouple(expressions)
 }
 
+/**
+ * ECMAScript allows *any* IdentifierName — including reserved words and punctuator-keywords —
+ * to be used as a property name in three positions:
+ *  - member access:      `a.delete`
+ *  - optional chaining:  `a?.delete`
+ *  - the key of an object literal / class element: `{ delete: 1 }`, `class C { delete(){} }`
+ *
+ * The lexer emits `delete`, `void`, `typeof`, `in`, `instanceof` and `new` as operator tokens
+ * (which carry no textual name), so whenever such a token appears in a property-name position we
+ * recover the original identifier from this map. `null` means the token cannot name a property.
+ */
+private val KEYWORD_OPERATOR_NAMES = mapOf<Token, String>(
+    Token.Operator.New to "new",
+    Token.Operator.In to "in",
+    Token.Operator.Instanceof to "instanceof",
+    Token.Operator.Typeof to "typeof",
+    Token.Operator.Void to "void",
+    Token.Operator.Delete to "delete",
+)
+
+/**
+ * Returns the property-name string for a token if it may legally name a property, otherwise `null`.
+ * `Token.Identifier` (incl. `Token.Identifier.Keyword` such as `class`/`function`/`if`) already
+ * carries its name; the operator-keywords listed in [KEYWORD_OPERATOR_NAMES] recover theirs here.
+ */
+private fun Token.propertyNameOrNull(): String? = when (this) {
+    is Token.Identifier -> identifier
+    else -> KEYWORD_OPERATOR_NAMES[this]
+}
+
 private fun ListIterator<LocatedToken>.parseMemberOf(receiver: Expression): Expression {
     return when (nextSignificant()){
 
         is Token.Operator.Period, is Token.Operator.DoublePeriod -> {
             val propLoc = nextSignificantLocation()  // peek at property name location
             val next = nextSignificant()
-            syntaxCheck(next is Token.Identifier) {
+            val name = next.propertyNameOrNull()
+            syntaxCheck(name != null) {
                 "Illegal symbol after '.'"
             }
-            OpGetProperty(name = next.identifier, receiver = receiver)
+            OpGetProperty(name = name, receiver = receiver)
                 .at(propLoc)
         }
         is Token.Operator.Bracket.SquareOpen -> {
@@ -1481,14 +1557,16 @@ private fun ListIterator<LocatedToken>.parseOptionalChaining(receiver: Expressio
             prevSignificant()
             parseFunctionCall(receiver, optional = true, blockContext = emptyList())
         }
-        is Token.Identifier -> {
-            OpGetProperty(
-                name = next.identifier,
-                receiver = receiver,
-                isOptional = true
-            ).at(loc)
+        else -> {
+            val name = next.propertyNameOrNull()
+            if (name != null) {
+                OpGetProperty(
+                    name = name,
+                    receiver = receiver,
+                    isOptional = true
+                ).at(loc)
+            } else throw SyntaxError("Invalid usage of ?. operator")
         }
-        else -> throw SyntaxError("Invalid usage of ?. operator")
     }
 }
 
