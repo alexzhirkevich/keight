@@ -8,6 +8,8 @@ import io.github.alexzhirkevich.keight.js.JsObjectImpl
 import io.github.alexzhirkevich.keight.js.JsPropertyAccessor
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsArrayWrapper
+import io.github.alexzhirkevich.keight.js.interpreter.typeCheck
+import io.github.alexzhirkevich.keight.js.iterateToList
 import io.github.alexzhirkevich.keight.js.js
 
 internal abstract class OpMake : Expression() {
@@ -21,9 +23,11 @@ internal class OpMakeArray(
         return buildList {
             items.fastForEach { i ->
                 val value = i(runtime)
-                if (i is OpSpread && value is Iterable<*>) {
-                    @Suppress("UNCHECKED_CAST")
-                    addAll(value as Iterable<JsAny?>)
+                if (i is OpSpread) {
+                    runtime.typeCheck(value != null){
+                        "$value is not iterable".js
+                    }
+                    addAll(runtime.iterateToList(value))
                 } else {
                     add(value)
                 }

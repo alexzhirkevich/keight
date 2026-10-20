@@ -91,6 +91,15 @@ internal class JSIteratorFunction : JSFunction(
     }
 }
 
+internal suspend fun ScriptRuntime.iterateToList(iter : JsAny) : List<JsAny?> {
+
+    return buildList {
+        iter.forEach(this@iterateToList) {
+            add(it)
+        }
+    }
+}
+
 internal fun IteratorDone() = Object {
     Constants.done.js eq true.js
 }
@@ -149,6 +158,8 @@ internal suspend inline fun JsAny.forEach(runtime: ScriptRuntime, block : (JsAny
                 block(get(i.js, runtime))
             }
         }
+
+        else -> runtime.typeError("$this is not iterable".js)
     }
 }
 

@@ -9,7 +9,6 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.Constants
 import io.github.alexzhirkevich.keight.js.JSFunction
-import io.github.alexzhirkevich.keight.js.JsNumberWrapper
 import io.github.alexzhirkevich.keight.expressions.OpAssign
 import io.github.alexzhirkevich.keight.expressions.OpAssignByIndex
 import io.github.alexzhirkevich.keight.expressions.OpBlock
@@ -103,6 +102,7 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 import kotlin.math.pow
 import io.github.alexzhirkevich.keight.SourceLocation
+import io.github.alexzhirkevich.keight.expressions.OpWith
 
 internal fun List<LocatedToken>.parse() : Expression {
     return sanitize()
@@ -313,11 +313,22 @@ private fun ListIterator<LocatedToken>.parseStatement(
 
     var precedence = -1
 
+    val isFunctionDeclaration = isBlockAnchor && run {
+        val start = nextIndex()
+        var t = nextSignificant()
+        if (t == Token.Identifier.Keyword.Async) t = nextSignificant()
+        returnToIndex(start)
+        t == Token.Identifier.Keyword.Function
+    }
+
     var x = parseFactor(blockContext, blockType)
 
     while (++precedence <= maxPrecedence) {
 
-        if (x is OpConstant && (x.value is JSFunction || x.value is OpClassInit) && isBlockAnchor) {
+        if (isBlockAnchor && (
+            x is OpConstant && (x.value is JSFunction || x.value is OpClassInit)) ||
+                (isFunctionDeclaration && x is OpFunctionInit && !x.function.isArrow)
+        ) {
             return x
         }
 
@@ -604,7 +615,6 @@ private fun ListIterator<LocatedToken>.parseStatement(
                 14 -> when (val next = nextSignificant()) {
                     Token.Operator.QuestionMark -> parseTernary(
                         condition = x,
-                        precedence = precedence,
                         blockContext = blockContext
                     )
 
@@ -881,7 +891,7 @@ private fun ListIterator<LocatedToken>.parseFactor(
         is Token.Identifier.Property -> {
             val ctx2 = blockContext.lastOrNull()
             val canHaveAccessor = ctx2 == BlockContext.Object || ctx2 == BlockContext.Class
-            var i = nextIndex()
+            val i = nextIndex()
             val n = nextSignificant()
             when {
                 canHaveAccessor && next.identifier == "get" && n is Token.Identifier ->
@@ -894,7 +904,7 @@ private fun ListIterator<LocatedToken>.parseFactor(
                 }
             }
         }
-        is Token.Operator.SemiColon -> Expression { Undefined }.at(loc)
+        is Token.Operator.SemiColon, Token.EndOfFile -> Expression { Undefined }.at(loc)
         else -> throw SyntaxError(unexpected(next::class.simpleName.orEmpty()))
     }
 
@@ -975,14 +985,20 @@ private fun ListIterator<LocatedToken>.parseAssignmentValue(
         is OpIndex -> OpAssignByIndex(
             receiver = x.receiver,
             index = x.index,
-            assignableValue = parseStatement(blockType = ExpectedBlockType.Object, blockContext = propertyValueContext),
+            assignableValue = parseStatement(
+                blockType = ExpectedBlockType.Object,
+                blockContext = propertyValueContext
+            ),
             merge = merge
         )
 
         is OpGetProperty -> OpAssign(
             variableName = x.name,
             receiver = x.receiver,
-            assignableValue = parseStatement(blockType = ExpectedBlockType.Object,blockContext = propertyValueContext),
+            assignableValue = parseStatement(
+                blockType = ExpectedBlockType.Object,
+                blockContext = propertyValueContext
+            ),
             merge = merge
         )
         is OpBlock, is OpMake -> OpDestructAssign(
@@ -1178,24 +1194,17 @@ private fun ListIterator<LocatedToken>.parseKeyword(
         Token.Identifier.Keyword.Try -> parseTryCatch(blockContext)
         Token.Identifier.Keyword.This -> Expression { it.thisRef }
         Token.Identifier.Keyword.With -> {
-            TODO()
-//            val arg = parseExpressionGrouping().expressions.single()
-//            val block = parseBlock(type = ExpectedBlockType.Block, scoped = false, blockContext = emptyList())
-//
-//            return Expression { r ->
-//
-//                val a = arg(r)
-//
-//                if (a is JSObject) {
-//                    r.withScope(
-//                        thisRef = a,
-//                    ) {
-//                        block(it)
-//                    }
-//                } else {
-//
-//                }
-//            }
+            val tuple = parseStatement(blockType = ExpectedBlockType.None)
+            syntaxCheck(tuple is OpTouple && tuple.expressions.size == 1) {
+                "Invalid 'with' declaration"
+            }
+
+            val body = parseBlock(
+                blockContext = blockContext,
+                type = ExpectedBlockType.Block,
+            )
+
+            OpWith(tuple.expressions.single(), body)
         }
         Token.Identifier.Keyword.Debugger -> throw SyntaxError("Debugger is not supported")
         Token.Identifier.Keyword.Of -> throw SyntaxError("'of' can only be used in for...of loop")
@@ -1222,7 +1231,7 @@ private fun ListIterator<LocatedToken>.parseSuper(blockContext: List<BlockContex
         "'super' can only be used in class methods"
     }
 
-    return when (val next = nextSignificant()) {
+    return when (nextSignificant()) {
         // super() - call parent constructor
         is Token.Operator.Bracket.RoundOpen -> {
             prevSignificant()
@@ -1384,7 +1393,7 @@ private fun ListIterator<LocatedToken>.parseTypeof() : Expression {
     return Expression {
         try {
             expr(it)?.type?.js ?: "object".js
-        } catch (t : ReferenceError){
+        } catch (_ : ReferenceError){
             "undefined".js
         }
     }
@@ -1455,7 +1464,9 @@ private fun ListIterator<LocatedToken>.parseComputedPropertyName(): Expression {
     return OpComputedPropertyName(keyExpr)
 }
 
-private fun ListIterator<LocatedToken>.parseExpressionGrouping(blockContext: List<BlockContext> = emptyList()): OpTouple {
+private fun ListIterator<LocatedToken>.parseExpressionGrouping(
+    blockContext: List<BlockContext> = emptyList()
+): OpTouple {
     check(eat(Token.Operator.Bracket.RoundOpen))
 
     val expressions = if (nextIsInstance<Token.Operator.Bracket.RoundClose>()) {
@@ -1688,7 +1699,6 @@ private fun ListIterator<LocatedToken>.parseInstanceOfOperator(subject : Express
 
 private fun ListIterator<LocatedToken>.parseTernary(
     condition : Expression,
-    precedence: Int,
     blockContext: List<BlockContext>
 ) : Expression {
 
@@ -1745,10 +1755,8 @@ private fun ListIterator<LocatedToken>.parseClass() : OpClassInit {
     var construct : JSFunction? = null
 
     while (!eat(Token.Operator.Bracket.CurlyClose)) {
-        val token = nextSignificant()
-
-        when {
-            token is Token.Identifier && nextIsInstance<Token.Operator.Bracket.RoundOpen>() -> {
+        when (val token = nextSignificant()) {
+            is Token.Identifier if nextIsInstance<Token.Operator.Bracket.RoundOpen>() -> {
                 val f = parseFunction(
                     name = token.identifier,
                     blockContext = listOf(BlockContext.Class)
@@ -1762,11 +1770,11 @@ private fun ListIterator<LocatedToken>.parseClass() : OpClassInit {
                 properties[token.identifier.js] = OpFunctionInit(f)
             }
 
-            token is Token.Identifier.Property && token.identifier == "static" -> {
+            is Token.Identifier.Property if token.identifier == "static" -> {
                 staticMembers.add(parseStaticClassMember())
             }
 
-            token is Token.Identifier -> {
+            is Token.Identifier -> {
                 prevSignificant()
                 when (val statement = parseStatement(blockContext = listOf(BlockContext.Class), blockType = ExpectedBlockType.None)) {
                     is OpAssign -> properties[statement.variableName.js] = statement.assignableValue
@@ -1775,13 +1783,16 @@ private fun ListIterator<LocatedToken>.parseClass() : OpClassInit {
                         // Store getter as a special marker, will be processed in OpClassInit
                         properties["${Constants.getterPrefix}${statement.value.name}".js] = statement
                     }
+
                     is OpSetter -> {
                         // Store setter as a special marker, will be processed in OpClassInit
                         properties["${Constants.setterPrefix}${statement.value.name}".js] = statement
                     }
+
                     else -> throw SyntaxError("Invalid class member")
                 }
             }
+
             else -> throw  SyntaxError("Invalid class declaration")
         }
     }

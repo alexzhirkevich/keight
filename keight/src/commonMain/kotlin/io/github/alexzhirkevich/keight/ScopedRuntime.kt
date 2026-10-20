@@ -8,7 +8,7 @@ import io.github.alexzhirkevich.keight.js.mapThisArg
 import kotlinx.coroutines.CoroutineScope
 
 
-internal class ScopedRuntime(
+internal open class ScopedRuntime(
     override val parent: ScriptRuntime,
     val isIsolated: Boolean,
     private val strict: Boolean = parent.isStrict,

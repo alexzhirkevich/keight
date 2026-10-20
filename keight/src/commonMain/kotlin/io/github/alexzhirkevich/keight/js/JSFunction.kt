@@ -466,7 +466,7 @@ internal infix fun String.defaults(default: Expression?) : FunctionParam {
 
 internal class OpFunctionInit(
     val function : JSFunction
-) : Expression() {
+) : Expression(), JsAny {
     // Cache the result to avoid repeated execution which would overwrite closure
     private var cachedResult: JsAny? = null
     

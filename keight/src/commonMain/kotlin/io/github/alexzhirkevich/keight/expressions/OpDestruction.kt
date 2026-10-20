@@ -19,10 +19,16 @@ import kotlin.reflect.KClass
 
 internal fun Destruction(
     variables : List<String>,
-    block : suspend (obj: JsAny?, variableType: VariableType?, runtime: ScriptRuntime, default: Getter<*>?) -> Unit
-) = object  : Destruction {
+    block : suspend (
+        obj: JsAny?,
+        variableType: VariableType?,
+        runtime: ScriptRuntime,
+        default: Getter<*>?
+    ) -> Unit
+) = object : Destruction {
 
-    override val variables: List<String> get() = variables
+    override val variables: List<String>
+        get() = variables
 
     override suspend fun destruct(
         obj: JsAny?,

@@ -83,7 +83,7 @@ internal class OpAssignByIndex(
                     }
                     rec.get(idx, runtime)
                 }
-                else -> error("Can't assign '$value' by index ($idx)")
+                else -> error("Can't assign '$value' by index ($idx). Receiver is $rec")
             }
         }
     }
