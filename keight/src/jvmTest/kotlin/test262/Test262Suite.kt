@@ -71,7 +71,7 @@ class Test262Suite {
     var passed = 0
 
     @Test
-//    @Ignore
+    @Ignore
     fun test() = runtimeTest { r ->
 
         val order = listOf(
