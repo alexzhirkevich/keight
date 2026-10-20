@@ -9,6 +9,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.application).apply(false)
+    alias(libs.plugins.android.library)
     alias(libs.plugins.mavenPublish)
 }
 
@@ -25,7 +26,16 @@ rootProject.projectDir.resolve("local.properties").let {
 }
 
 kotlin {
-    jvm()
+    android {
+        namespace = group.toString() + path
+            .replace("-", "")
+            .split(":")
+            .joinToString(".")
+        compileSdk {
+            version = release((findProperty("android.compileSdk") as String).toInt())
+        }
+    }
+
 }
 
 val _jvmTarget = findProperty("jvmTarget").toString()
@@ -40,9 +50,7 @@ subprojects {
 
     plugins.apply("com.vanniktech.maven.publish")
     plugins.apply("org.jetbrains.kotlin.multiplatform")
-    plugins.apply("android-library")
-
-    androidLibrarySetup()
+    plugins.apply("com.android.kotlin.multiplatform.library")
 
     project.kotlin {
         explicitApi()
@@ -55,15 +63,27 @@ subprojects {
             }
         }
 
-        androidTarget {
+        android {
             compilerOptions {
                 jvmTarget.set(JvmTarget.fromTarget(_jvmTarget))
             }
-            publishLibraryVariants("release")
+
+            namespace = group.toString() + path
+                .replace("-", "")
+                .split(":")
+                .joinToString(".")
+
+            compileSdk {
+                version = release((findProperty("android.compileSdk") as String).toInt())
+            }
+
+            minSdk {
+                version = release((findProperty("android.minSdk") as String).toInt())
+            }
         }
 
 
-        js(IR) { // why not ¯\_(ツ)_/¯
+        js { // why not ¯\_(ツ)_/¯
             nodejs()
             browser()
         }
@@ -128,19 +148,4 @@ subprojects {
         }
     }
 
-}
-
-fun Project.androidLibrarySetup() {
-    extensions.configure<LibraryExtension> {
-        namespace = group.toString() + path.replace("-", "").split(":").joinToString(".")
-        compileSdk = (findProperty("android.compileSdk") as String).toInt()
-
-        defaultConfig {
-            minSdk = (findProperty("android.minSdk") as String).toInt()
-        }
-        compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_1_8
-            targetCompatibility = JavaVersion.VERSION_1_8
-        }
-    }
 }
