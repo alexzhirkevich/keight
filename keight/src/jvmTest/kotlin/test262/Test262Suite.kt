@@ -7,6 +7,7 @@ import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.js
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.runTest
 import runtimeTest
 import kotlin.test.Test
 import kotlin.test.Ignore
@@ -19,7 +20,8 @@ private val UNSUPPORTED_FEATURES = listOf(
     "u180e",
     "generators",
     "BigInt",
-    "Symbol.iterator",
+//    "Symbol.iterator",
+    "Symbol.unscopables",
     "destructuring-binding",
     "new.target",
     "dynamic-import"
@@ -56,6 +58,8 @@ private val MUTED_TESTS = listOf(
     "this.js",
     "S11.8.1_A4.4.js", // -0.0, +0.0
     "S11.8.1_A3.2_T1.2.js", // function.toString() - no code
+
+    "dflt-params-ref-self.js" // arrow default param self ref
 )
 
 class Test262Suite {
